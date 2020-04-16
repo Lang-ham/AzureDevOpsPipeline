@@ -338,4 +338,26 @@ if ( isset($plugin_page) ) {
 	if ( $typenow == 'page' ) {
 		if ( $pagenow == 'post-new.php' )
 			do_action( 'load-page-new.php' );
-		elseif ( $
+		elseif ( $pagenow == 'post.php' )
+			do_action( 'load-page.php' );
+	}  elseif ( $pagenow == 'edit-tags.php' ) {
+		if ( $taxnow == 'category' )
+			do_action( 'load-categories.php' );
+		elseif ( $taxnow == 'link_category' )
+			do_action( 'load-edit-link-categories.php' );
+	} elseif( 'term.php' === $pagenow ) {
+		do_action( 'load-edit-tags.php' );
+	}
+}
+
+if ( ! empty( $_REQUEST['action'] ) ) {
+	/**
+	 * Fires when an 'action' request variable is sent.
+	 *
+	 * The dynamic portion of the hook name, `$_REQUEST['action']`,
+	 * refers to the action derived from the `GET` or `POST` request.
+	 *
+	 * @since 2.6.0
+	 */
+	do_action( 'admin_action_' . $_REQUEST['action'] );
+}
