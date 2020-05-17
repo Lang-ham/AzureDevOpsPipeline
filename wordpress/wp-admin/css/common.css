@@ -1,0 +1,195 @@
+/* 2 column liquid layout */
+#wpwrap {
+	height: auto;
+	min-height: 100%;
+	width: 100%;
+	position: relative;
+	-webkit-font-smoothing: subpixel-antialiased;
+}
+
+#wpcontent {
+	height: 100%;
+	padding-left: 20px;
+}
+
+#wpcontent,
+#wpfooter {
+	margin-left: 160px;
+}
+
+.folded #wpcontent,
+.folded #wpfooter {
+	margin-left: 36px;
+}
+
+#wpbody-content {
+	padding-bottom: 65px;
+	float: left;
+	width: 100%;
+	overflow: visible !important;
+}
+
+/* inner 2 column liquid layout */
+
+.inner-sidebar {
+	float: right;
+	clear: right;
+	display: none;
+	width: 281px;
+	position: relative;
+}
+
+.columns-2 .inner-sidebar {
+	margin-right: auto;
+	width: 286px;
+	display: block;
+}
+
+.inner-sidebar #side-sortables,
+.columns-2 .inner-sidebar #side-sortables {
+	min-height: 300px;
+	width: 280px;
+	padding: 0;
+}
+
+.has-right-sidebar .inner-sidebar {
+	display: block;
+}
+
+.has-right-sidebar #post-body {
+	float: left;
+	clear: left;
+	width: 100%;
+	margin-right: -2000px;
+}
+
+.has-right-sidebar #post-body-content {
+	margin-right: 300px;
+	float: none;
+	width: auto;
+}
+
+/* 2 columns main area */
+
+#col-left {
+	float: left;
+	width: 35%;
+}
+
+#col-right {
+	float: right;
+	width: 65%;
+}
+
+#col-left .col-wrap {
+	padding: 0 6px 0 0;
+}
+
+#col-right .col-wrap {
+	padding: 0 0 0 6px;
+}
+
+/* utility classes */
+.alignleft {
+	float: left;
+}
+
+.alignright {
+	float: right;
+}
+
+.textleft {
+	text-align: left;
+}
+
+.textright {
+	text-align: right;
+}
+
+.clear {
+	clear: both;
+}
+
+/* modern clearfix */
+.wp-clearfix:after {
+	content: "";
+	display: table;
+	clear: both;
+}
+
+/* Hide visually but not from screen readers */
+.screen-reader-text,
+.screen-reader-text span,
+.ui-helper-hidden-accessible {
+	border: 0;
+	clip: rect(1px, 1px, 1px, 1px);
+	-webkit-clip-path: inset(50%);
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
+	word-wrap: normal !important; /* many screen reader and browser combinations announce broken words as they would appear visually */
+}
+
+.screen-reader-shortcut {
+	position: absolute;
+	top: -1000em;
+}
+
+.screen-reader-shortcut:focus {
+	left: 6px;
+	top: -25px;
+	height: auto;
+	width: auto;
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	padding: 15px 23px 14px;
+	background: #f1f1f1;
+	color: #0073aa;
+	z-index: 100000;
+	line-height: normal;
+	box-shadow: 0 0 2px 2px rgba(0,0,0,.6);
+	text-decoration: none;
+	outline: none;
+}
+
+.hidden,
+.js .closed .inside,
+.js .hide-if-js,
+.no-js .hide-if-no-js,
+.js.wp-core-ui .hide-if-js,
+.js .wp-core-ui .hide-if-js,
+.no-js.wp-core-ui .hide-if-no-js,
+.no-js .wp-core-ui .hide-if-no-js {
+	display: none;
+}
+
+/* @todo: Take a second look. Large chunks of shared color, from the colors.css merge */
+.widget-top,
+.menu-item-handle,
+.widget-inside,
+#menu-settings-column .accordion-container,
+#menu-management .menu-edit,
+.manage-menus,
+table.widefat,
+.stuffbox,
+p.popular-tags,
+.widgets-holder-wrap,
+.wp-editor-container,
+.popular-tags,
+.feature-filter,
+.imgedit-group,
+.comment-ays {
+	border: 1px solid #e5e5e5;
+	box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+table.widefat,
+.wp-editor-container,
+.stuffbox,
+p.popular-tags,
+.widgets-
