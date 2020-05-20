@@ -192,4 +192,679 @@ table.widefat,
 .wp-editor-container,
 .stuffbox,
 p.popular-tags,
-.widgets-
+.widgets-holder-wrap,
+.popular-tags,
+.feature-filter,
+.imgedit-group,
+.comment-ays {
+	background: #fff;
+}
+
+/* general */
+html,
+body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background: #f1f1f1;
+	color: #444;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-size: 13px;
+	line-height: 1.4em;
+	min-width: 600px;
+}
+
+body.iframe {
+	min-width: 0;
+	padding-top: 1px;
+}
+
+body.modal-open {
+	overflow: hidden;
+}
+
+body.mobile.modal-open #wpwrap {
+	overflow: hidden;
+	position: fixed;
+	height: 100%;
+}
+
+iframe,
+img {
+	border: 0;
+}
+
+td {
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+}
+
+/* Any change to the default link style must be applied to button-link too. */
+a {
+	color: #0073aa;
+	transition-property: border, background, color;
+	transition-duration: .05s;
+	transition-timing-function: ease-in-out;
+}
+
+a,
+div {
+	outline: 0;
+}
+
+a:hover,
+a:active {
+	color: #00a0d2;
+}
+
+a:focus,
+a:focus .media-icon img,
+.wp-person a:focus .gravatar {
+	color: #124964;
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+.ie8 a:focus {
+	outline: #5b9dd9 solid 1px;
+}
+
+#adminmenu a:focus,
+.screen-reader-text:focus {
+	box-shadow: none;
+	outline: none;
+}
+
+blockquote,
+q {
+	quotes: none;
+}
+
+blockquote:before,
+blockquote:after,
+q:before,
+q:after {
+	content: "";
+	content: none;
+}
+
+p {
+	font-size: 13px;
+	line-height: 1.5;
+	margin: 1em 0;
+}
+
+blockquote {
+	margin: 1em;
+}
+
+li,
+dd {
+	margin-bottom: 6px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	display: block;
+	font-weight: 600;
+}
+
+h1 {
+	color: #23282d;
+	font-size: 2em;
+	margin: .67em 0;
+}
+
+h2,
+h3 {
+	color: #23282d;
+	font-size: 1.3em;
+	margin: 1em 0;
+}
+
+.update-core-php h2 {
+	margin-top: 2em;
+}
+
+.update-php h2,
+.update-messages h2,
+h4 {
+	font-size: 1em;
+	margin: 1.33em 0;
+}
+
+h5 {
+	font-size: 0.83em;
+	margin: 1.67em 0;
+}
+
+h6 {
+	font-size: 0.67em;
+	margin: 2.33em 0;
+}
+
+ul,
+ol {
+	padding: 0;
+}
+
+ul {
+	list-style: none;
+}
+
+ol {
+	list-style-type: decimal;
+	margin-left: 2em;
+}
+
+ul.ul-disc {
+	list-style: disc outside;
+}
+
+ul.ul-square {
+	list-style: square outside;
+}
+
+ol.ol-decimal {
+	list-style: decimal outside;
+}
+
+ul.ul-disc,
+ul.ul-square,
+ol.ol-decimal {
+	margin-left: 1.8em;
+}
+
+ul.ul-disc > li,
+ul.ul-square > li,
+ol.ol-decimal > li {
+	margin: 0 0 0.5em;
+}
+
+/* rtl:ignore */
+.ltr {
+	direction: ltr;
+}
+
+/* rtl:ignore */
+.code,
+code {
+	font-family: Consolas, Monaco, monospace;
+	direction: ltr;
+	unicode-bidi: embed;
+}
+
+kbd,
+code {
+	padding: 3px 5px 2px 5px;
+	margin: 0 1px;
+	background: #eaeaea;
+	background: rgba(0,0,0,0.07);
+	font-size: 13px;
+}
+
+.subsubsub {
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+	font-size: 13px;
+	float: left;
+	color: #666;
+}
+
+.subsubsub a {
+	line-height: 2;
+	padding: .2em;
+	text-decoration: none;
+}
+
+.subsubsub a .count,
+.subsubsub a.current .count {
+	color: #555d66; /* #f1f1f1 background */
+	font-weight: 400;
+}
+
+.subsubsub a.current {
+	font-weight: 600;
+	border: none;
+}
+
+.subsubsub li {
+	display: inline-block;
+	margin: 0;
+	padding: 0;
+	white-space: nowrap;
+}
+
+/* .widefat - main style for tables */
+.widefat {
+	border-spacing: 0;
+	width: 100%;
+	clear: both;
+	margin: 0;
+}
+
+.widefat * {
+	word-wrap: break-word;
+}
+
+.widefat a,
+.widefat button.button-link {
+	text-decoration: none;
+}
+
+.widefat td,
+.widefat th {
+	padding: 8px 10px;
+}
+
+.widefat thead th,
+.widefat thead td {
+	border-bottom: 1px solid #e1e1e1;
+}
+
+.widefat tfoot th,
+.widefat tfoot td {
+	border-top: 1px solid #e1e1e1;
+	border-bottom: none;
+}
+
+.widefat .no-items td {
+	border-bottom-width: 0;
+}
+
+.widefat td {
+	vertical-align: top;
+}
+
+.widefat td,
+.widefat td p,
+.widefat td ol,
+.widefat td ul {
+	font-size: 13px;
+	line-height: 1.5em;
+}
+
+.widefat th,
+.widefat thead td,
+.widefat tfoot td {
+	text-align: left;
+	line-height: 1.3em;
+	font-size: 14px;
+}
+
+.widefat th input,
+.updates-table td input,
+.widefat thead td input,
+.widefat tfoot td input {
+	margin: 0 0 0 8px;
+	padding: 0;
+	vertical-align: text-top;
+}
+
+.widefat .check-column {
+	width: 2.2em;
+	padding: 6px 0 25px;
+	vertical-align: top;
+}
+
+.widefat tbody th.check-column {
+	padding: 9px 0 22px;
+}
+
+.widefat thead td.check-column,
+.widefat tbody th.check-column,
+.updates-table tbody td.check-column,
+.widefat tfoot td.check-column {
+	padding: 11px 0 0 3px;
+}
+
+.widefat thead td.check-column,
+.widefat tfoot td.check-column {
+	padding-top: 4px;
+	vertical-align: middle;
+}
+
+.update-php div.updated,
+.update-php div.error {
+	margin-left: 0;
+}
+
+.no-js .widefat thead .check-column input,
+.no-js .widefat tfoot .check-column input {
+	display: none;
+}
+
+.widefat .num,
+.column-comments,
+.column-links,
+.column-posts {
+	text-align: center;
+}
+
+.widefat th#comments {
+	vertical-align: middle;
+}
+
+.wrap {
+	margin: 10px 20px 0 2px;
+}
+
+.wrap > h2:first-child, /* Back-compat for pre-4.4 */
+.wrap [class$="icon32"] + h2, /* Back-compat for pre-4.4 */
+.postbox .inside h2, /* Back-compat for pre-4.4 */
+.wrap h1 {
+	font-size: 23px;
+	font-weight: 400;
+	margin: 0;
+	padding: 9px 0 4px 0;
+	line-height: 29px;
+}
+
+.wrap h1.wp-heading-inline {
+	display: inline-block;
+	margin-right: 5px;
+}
+
+.wp-header-end {
+	visibility: hidden;
+	margin: -2px 0 0;
+}
+
+.subtitle {
+	margin: 0;
+	padding-left: 25px;
+	color: #555d66;
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1;
+}
+
+.wrap .add-new-h2, /* deprecated */
+.wrap .add-new-h2:active, /* deprecated */
+.wrap .page-title-action,
+.wrap .page-title-action:active {
+	margin-left: 4px;
+	padding: 4px 8px;
+	position: relative;
+	top: -3px;
+	text-decoration: none;
+	border: none;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+	background: #f7f7f7;
+	text-shadow: none;
+	font-weight: 600;
+	font-size: 13px;
+	line-height: normal; /* IE8-IE11 need this for buttons */
+	color: #0073aa; /* some of these controls are button elements and don't inherit from links */
+	cursor: pointer;
+	outline: 0;
+}
+
+.wrap .wp-heading-inline + .page-title-action {
+	margin-left: 0;
+}
+
+.wrap .add-new-h2:hover, /* deprecated */
+.wrap .page-title-action:hover {
+	border-color: #008EC2;
+	background: #00a0d2;
+	color: #fff;
+}
+
+/* lower specificity: color needs to be overridden by :hover and :active */
+.page-title-action:focus {
+	color: #124964;
+}
+
+.wrap .page-title-action:focus {
+	border-color: #5b9dd9;
+	box-shadow: 0 0 2px rgba( 30, 140, 190, 0.8 );
+}
+
+.wrap h1.long-header {
+	padding-right: 0;
+}
+
+.wp-dialog {
+	background-color: #fff;
+}
+
+.widgets-chooser ul,
+#widgets-left .widget-in-question .widget-top,
+#available-widgets .widget-top:hover,
+div#widgets-right .widget-top:hover,
+#widgets-left .widget-top:hover {
+	border-color: #999;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.sorthelper {
+	background-color: #ccf3fa;
+}
+
+.ac_match,
+.subsubsub a.current {
+	color: #000;
+}
+
+.striped > tbody > :nth-child(odd),
+ul.striped > :nth-child(odd),
+.alternate {
+	background-color: #f9f9f9;
+}
+
+.bar {
+	background-color: #e8e8e8;
+	border-right-color: #99d;
+}
+
+/* Helper classes for plugins to leverage the active WordPress color scheme */
+
+.highlight {
+	background-color: #e4f2fd;
+	color: #000;
+}
+
+.wp-ui-primary {
+	color: #fff;
+	background-color: #32373c;
+}
+.wp-ui-text-primary {
+	color: #32373c;
+}
+
+.wp-ui-highlight {
+	color: #fff;
+	background-color: #1e8cbe;
+}
+.wp-ui-text-highlight {
+	color: #1e8cbe;
+}
+
+.wp-ui-notification {
+	color: #fff;
+	background-color: #d54e21;
+}
+.wp-ui-text-notification {
+	color: #d54e21;
+}
+
+.wp-ui-text-icon {
+	color: #82878c; /* same as new icons */
+}
+
+/* For emoji replacement images */
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+	box-shadow: none !important;
+}
+
+/*------------------------------------------------------------------------------
+  1.0 - Text Styles
+------------------------------------------------------------------------------*/
+
+.widget .widget-top,
+.postbox .hndle,
+.stuffbox .hndle,
+.control-section .accordion-section-title,
+.sidebar-name,
+#nav-menu-header,
+#nav-menu-footer,
+.menu-item-handle,
+.checkbox,
+.side-info,
+#your-profile #rich_editing,
+.widefat thead th,
+.widefat thead td,
+.widefat tfoot th,
+.widefat tfoot td {
+	line-height: 1.4em;
+}
+
+.widget .widget-top,
+.menu-item-handle {
+	background: #fafafa;
+	color: #23282d;
+}
+
+.postbox .hndle,
+.stuffbox .hndle {
+	border-bottom: 1px solid #eee;
+}
+
+.quicktags,
+.search {
+	background-color: #ccc;
+	color: #000;
+	font-size: 12px;
+}
+
+.icon32 {
+	display: none;
+}
+
+/* @todo can we combine these into a class or use an existing dashicon one? */
+.welcome-panel .welcome-panel-close:before,
+.tagchecklist .ntdelbutton .remove-tag-icon:before,
+#bulk-titles div a:before,
+.notice-dismiss:before {
+	background: none;
+	color: #72777c;
+	content: "\f153";
+	display: block;
+	font: normal 16px/20px dashicons;
+	speak: none;
+	height: 20px;
+	text-align: center;
+	width: 20px;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.welcome-panel .welcome-panel-close:before {
+	margin: 0;
+}
+
+#bulk-titles div a:before {
+	margin: 1px 0;
+}
+
+.tagchecklist .ntdelbutton .remove-tag-icon:before {
+	margin-left: 2px;
+	border-radius: 50%;
+	color: #0073aa;
+	/* vertically center the icon cross browsers */
+	line-height: 1.28;
+}
+
+.tagchecklist .ntdelbutton:focus {
+	outline: 0;
+}
+
+.welcome-panel .welcome-panel-close:hover:before,
+.welcome-panel .welcome-panel-close:focus:before,
+.tagchecklist .ntdelbutton:hover .remove-tag-icon:before,
+.tagchecklist .ntdelbutton:focus .remove-tag-icon:before,
+#bulk-titles div a:hover:before,
+#bulk-titles div a:focus:before {
+	color: #c00;
+}
+
+.tagchecklist .ntdelbutton:focus .remove-tag-icon:before {
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+.key-labels label {
+	line-height: 24px;
+}
+
+strong, b {
+	font-weight: 600;
+}
+
+.pre {
+	/* https://developer.mozilla.org/en-US/docs/CSS/white-space */
+	white-space: pre-wrap; /* css-3 */
+	word-wrap: break-word; /* IE 5.5 - 7 */
+}
+
+.howto {
+	color: #666;
+	font-style: italic;
+	display: block;
+}
+
+p.install-help {
+	margin: 8px 0;
+	font-style: italic;
+}
+
+.no-break {
+	white-space: nowrap;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #ddd;
+	border-bottom: 1px solid #fafafa;
+}
+
+.row-actions span.delete a,
+.row-actions span.trash a,
+.row-actions span.spam a,
+.plugins a.delete,
+#all-plugins-table .plugins a.delete,
+#search-plugins-table .plugins a.delete,
+.submitbox .submitdelete,
+#media-items a.delete,
+#media-items a.delete-permanently,
+#nav-menu-footer .menu-delete,
+#delete-link a.delete {
+	color: #a00;
+}
+
+abbr.required,
+span.required,
+.file-error,
+.ro
