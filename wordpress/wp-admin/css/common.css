@@ -2110,4 +2110,604 @@ html.wp-toolbar {
   21.0 - Admin Footer
 ------------------------------------------------------------------------------*/
 
-#wpfoo
+#wpfooter {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	padding: 10px 20px;
+	color: #555d66;
+}
+
+#wpfooter p {
+	font-size: 13px;
+	margin: 0;
+	line-height: 20px;
+}
+
+#footer-thankyou {
+	font-style: italic;
+}
+
+/*------------------------------------------------------------------------------
+  25.0 - Tabbed Admin Screen Interface (Experimental)
+------------------------------------------------------------------------------*/
+
+.nav-tab {
+	float: left;
+	border: 1px solid #ccc;
+	border-bottom: none;
+	margin-left: 0.5em; /* half the font size so set the font size properly */
+	padding: 5px 10px;
+	font-size: 14px;
+	line-height: 24px;
+	font-weight: 600;
+	background: #e5e5e5;
+	color: #555;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+h3 .nav-tab, /* Back-compat for pre-4.4 */
+.nav-tab-small .nav-tab {
+	padding: 5px 14px;
+	font-size: 12px;
+	line-height: 16px;
+}
+
+.nav-tab:hover,
+.nav-tab:focus {
+	background-color: #fff;
+	color: #444;
+}
+
+.nav-tab-active,
+.nav-tab:focus:active {
+	box-shadow: none;
+}
+
+.nav-tab-active {
+	margin-bottom: -1px;
+	color: #444;
+}
+
+.nav-tab-active,
+.nav-tab-active:hover,
+.nav-tab-active:focus,
+.nav-tab-active:focus:active {
+	border-bottom: 1px solid #f1f1f1;
+	background: #f1f1f1;
+	color: #000;
+}
+
+h1.nav-tab-wrapper, /* Back-compat for pre-4.4 */
+.wrap h2.nav-tab-wrapper, /* higher specificity to override .wrap > h2:first-child */
+.nav-tab-wrapper {
+	border-bottom: 1px solid #ccc;
+	margin: 0;
+	padding-top: 9px;
+	padding-bottom: 0;
+	line-height: inherit;
+}
+
+/* Back-compat for plugins. Deprecated. Use .wp-clearfix instead. */
+.nav-tab-wrapper:not(.wp-clearfix):after {
+ 	content: "";
+ 	display: table;
+ 	clear: both;
+ }
+
+.ie8 .nav-tab-wrapper {
+	/* contain floats establishing a new block formatting context */
+	display: inline-block;
+	width: 100%;
+	vertical-align: top;
+}
+
+/*------------------------------------------------------------------------------
+  26.0 - Misc
+------------------------------------------------------------------------------*/
+
+.spinner {
+	background: url(../images/spinner.gif) no-repeat;
+	background-size: 20px 20px;
+	display: inline-block;
+	visibility: hidden;
+	float: right;
+	vertical-align: middle;
+	opacity: 0.7;
+	filter: alpha(opacity=70);
+	width: 20px;
+	height: 20px;
+	margin: 4px 10px 0;
+}
+
+.spinner.is-active,
+.loading-content .spinner {
+	visibility: visible;
+}
+
+#template > div {
+	margin-right: 16em;
+}
+#template .notice {
+	margin-top: 1em;
+	margin-right: 3%;
+}
+#template .notice p {
+	width: auto;
+}
+#template .submit .spinner {
+	float: none;
+}
+
+.metabox-holder .stuffbox > h3, /* Back-compat for pre-4.4 */
+.metabox-holder .postbox > h3, /* Back-compat for pre-4.4 */
+.metabox-holder h3.hndle, /* Back-compat for pre-4.4 */
+.metabox-holder h2.hndle {
+	font-size: 14px;
+	padding: 8px 12px;
+	margin: 0;
+	line-height: 1.4;
+}
+
+/* Back-compat for nav-menus screen */
+.nav-menus-php .metabox-holder h3 {
+	padding: 10px 10px 11px 14px;
+	line-height: 21px;
+}
+
+#templateside ul li a {
+	text-decoration: none;
+}
+
+.plugin-install #description,
+.plugin-install-network #description {
+	width: 60%;
+}
+
+table .vers,
+table .column-visible,
+table .column-rating {
+	text-align: left;
+}
+
+.attention,
+.error-message {
+	color: #dc3232;
+	font-weight: 600;
+}
+
+/* Scrollbar fix for bulk upgrade iframe */
+body.iframe {
+	height: 98%;
+}
+
+/* Upgrader styles, Specific to Language Packs */
+.lp-show-latest p {
+	display: none;
+}
+.lp-show-latest p:last-child,
+.lp-show-latest .lp-error p {
+	display: block;
+}
+
+/* - Only used once or twice in all of WP - deprecate for global style
+------------------------------------------------------------------------------*/
+.media-icon {
+	width: 62px; /* icon + border */
+	text-align: center;
+}
+
+.media-icon img {
+	border: 1px solid #e5e5e5;
+	border: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+#howto {
+	font-size: 11px;
+	margin: 0 5px;
+	display: block;
+}
+
+.importers {
+	font-size: 16px;
+	width: auto;
+}
+
+.importers td {
+	padding-right: 14px;
+	line-height: 1.5em;
+}
+
+.importers .import-system {
+	max-width: 250px;
+}
+
+.importers td.desc {
+	max-width: 500px;
+}
+
+.importer-title,
+.importer-desc,
+.importer-action {
+	display: block;
+}
+
+.importer-title {
+	color: #000;
+	font-size: 14px;
+	font-weight: 400;
+	margin-bottom: .2em;
+}
+
+.importer-action {
+	line-height: 20px; /* Same as with .updating-message */
+	color: #555;
+	margin-bottom: 1em;
+}
+
+#post-body #post-body-content #namediv h3, /* Back-compat for pre-4.4 */
+#post-body #post-body-content #namediv h2 {
+	margin-top: 0;
+}
+
+.edit-comment-author {
+	font-size: 14px;
+	line-height: 1.4;
+	font-weight: 600;
+	color: #222;
+	margin: 2px 0 0 9px;
+}
+
+#namediv h3 label, /* Back-compat for pre-4.4 */
+#namediv h2 label {
+	vertical-align: baseline;
+}
+
+#namediv table {
+	width: 100%;
+}
+
+#namediv td.first {
+	width: 10px;
+	white-space: nowrap;
+}
+
+#namediv input {
+	width: 98%;
+}
+
+#namediv p {
+	margin: 10px 0;
+}
+
+#submitdiv h3 {
+	margin-bottom: 0 !important;
+}
+
+/* - Used - but could/should be deprecated with a CSS reset
+------------------------------------------------------------------------------*/
+.zerosize {
+	height: 0;
+	width: 0;
+	margin: 0;
+	border: 0;
+	padding: 0;
+	overflow: hidden;
+	position: absolute;
+}
+
+br.clear {
+	height: 2px;
+	line-height: 2px;
+}
+
+.checkbox {
+	border: none;
+	margin: 0;
+	padding: 0;
+}
+
+fieldset {
+	border: 0;
+	padding: 0;
+	margin: 0;
+}
+
+.post-categories {
+	display: inline;
+	margin: 0;
+	padding: 0;
+}
+
+.post-categories li {
+	display: inline;
+}
+
+/* Star Ratings - Back-compat for pre-3.8 */
+div.star-holder {
+	position: relative;
+	height: 17px;
+	width: 100px;
+	background: url(../images/stars.png?ver=20121108) repeat-x bottom left;
+}
+
+div.star-holder .star-rating {
+	background: url(../images/stars.png?ver=20121108) repeat-x top left;
+	height: 17px;
+	float: left;
+}
+
+/* Star Ratings */
+.star-rating {
+	white-space: nowrap;
+}
+.star-rating .star {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	-webkit-font-smoothing: antialiased;
+	font-size: 20px;
+	line-height: 1;
+	font-family: dashicons;
+	text-decoration: inherit;
+	font-weight: 400;
+	font-style: normal;
+	vertical-align: top;
+	transition: color .1s ease-in 0;
+	text-align: center;
+	color: #ffb900;
+}
+
+.star-rating .star-full:before {
+	content: "\f155";
+}
+
+.star-rating .star-half:before {
+	content: "\f459";
+}
+
+.rtl .star-rating .star-half {
+	-webkit-transform: rotateY(180deg);
+	transform: rotateY(180deg);
+}
+
+.star-rating .star-empty:before {
+	content: "\f154";
+}
+
+div.action-links {
+	font-weight: 400;
+	margin: 6px 0 0;
+}
+
+/* Plugin install thickbox */
+#plugin-information {
+	background: #fff;
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 100%;
+	padding: 0;
+}
+
+#plugin-information-scrollable {
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	height: 100%;
+}
+
+#plugin-information-title {
+	padding: 0 26px;
+	background: #f5f5f5;
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 56px;
+	position: relative;
+	height: 56px;
+}
+
+#plugin-information-title.with-banner {
+	margin-right: 0;
+	height: 250px;
+	background-size: cover;
+}
+
+#plugin-information-title h2 {
+	font-size: 1em;
+	font-weight: 600;
+	padding: 0;
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#plugin-information-title.with-banner h2 {
+	position: relative;
+	font-family: "Helvetica Neue", sans-serif;
+	display: inline-block;
+	font-size: 30px;
+	line-height: 50px;
+	box-sizing: border-box;
+	max-width: 100%;
+	padding: 0 15px;
+	margin-top: 174px;
+	color: #fff;
+	background: rgba( 30, 30, 30, 0.9 );
+	text-shadow: 0 1px 3px rgba( 0, 0, 0, 0.4 );
+	box-shadow: 0 0 30px rgba( 255, 255, 255, 0.1 );
+	border-radius: 8px;
+}
+
+#plugin-information-title div.vignette {
+	display: none;
+}
+
+#plugin-information-title.with-banner div.vignette {
+	position: absolute;
+	display: block;
+	top: 0;
+	left: 0;
+	height: 250px;
+	width: 100%;
+	background: transparent;
+	box-shadow: inset 0 0 50px 4px rgba( 0, 0, 0, 0.2 ), inset 0 -1px 0 rgba( 0, 0, 0, 0.1 );
+}
+
+#plugin-information-tabs {
+	padding: 0 16px;
+	position: relative;
+	right: 0;
+	left: 0;
+	min-height: 36px;
+	font-size: 0;
+	z-index: 1;
+	border-bottom: 1px solid #ddd;
+	background: #f3f3f3;
+}
+
+#plugin-information-tabs a {
+	position: relative;
+	display: inline-block;
+	padding: 9px 10px;
+	margin: 0;
+	height: 18px;
+	line-height: 18px;
+	font-size: 14px;
+	text-decoration: none;
+	transition: none;
+}
+
+#plugin-information-tabs a.current {
+	margin: 0 -1px -1px;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-bottom-color: #fff;
+	padding-top: 8px;
+	color: #32373c;
+}
+
+#plugin-information-tabs.with-banner a.current {
+	border-top: none;
+	padding-top: 9px;
+}
+
+#plugin-information-tabs a:active,
+#plugin-information-tabs a:focus {
+	outline: none;
+}
+
+#plugin-information-content {
+	overflow: hidden; /* equal height column trick */
+	background: #fff;
+	position: relative;
+	top: 0;
+	right: 0;
+	left: 0;
+	min-height: 100%;
+	/* Height of title + tabs + install now */
+	min-height: calc( 100% - 152px );
+}
+
+#plugin-information-content.with-banner {
+	/* Height of banner + tabs + install now */
+	min-height: calc( 100% - 346px );
+}
+
+#section-holder {
+	position: relative;
+	top: 0;
+	right: 250px;
+	bottom: 0;
+	left: 0;
+	margin-right: 250px; /* FYI box */
+	padding: 10px 26px;
+	margin-bottom: -99939px; /* 60px less than the padding below to accommodate footer */
+	padding-bottom: 99999px; /* equal height column trick */
+}
+
+#section-holder .updated {
+	margin: 16px 0;
+}
+
+#plugin-information .fyi {
+	float: right;
+	position: relative;
+	top: 0;
+	right: 0;
+	padding: 16px;
+	margin-bottom: -99939px; /* 60px less than the padding below to accommodate footer */
+	padding-bottom: 99999px; /* equal height column trick */
+	width: 217px;
+	border-left: 1px solid #ddd;
+	background: #f3f3f3;
+	color: #666;
+}
+
+#plugin-information .fyi strong {
+	color: #444;
+}
+
+#plugin-information .fyi h3 {
+	font-weight: 600;
+	text-transform: uppercase;
+	font-size: 12px;
+	color: #666;
+	margin: 24px 0 8px;
+}
+
+#plugin-information .fyi h2 {
+	font-size: 0.9em;
+	margin-bottom: 0;
+	margin-right: 0;
+}
+
+#plugin-information .fyi ul {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+#plugin-information .fyi li {
+	margin: 0 0 10px;
+}
+
+#plugin-information .fyi-description {
+	margin-top: 0;
+}
+
+#plugin-information .counter-container {
+	margin: 3px 0;
+}
+
+#plugin-information .counter-label {
+	float: left;
+	margin-right: 5px;
+	min-width: 55px;
+}
+
+#plugin-information .counter-back {
+	height: 17px;
+	width: 92px;
+	background-color: #e5e5e5;
+	float: left;
+}
+
+#plugin-information .counter-bar {
+	height: 17px;
+	background-color: #ffc733; /* slightly lighter than stars due to larger expanse */
+	float: left;
+}
+
+#plugin-information .counter-count {
+	margin-left: 5px;
+}
+
+#plugin-information .fyi ul.contributors {
+	margin-top: 10px;
+}
+
