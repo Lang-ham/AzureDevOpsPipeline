@@ -2711,3 +2711,588 @@ div.action-links {
 	margin-top: 10px;
 }
 
+#plugin-information .fyi ul.contributors li {
+	display: inline-block;
+	margin-right: 8px;
+	vertical-align: middle;
+}
+
+#plugin-information .fyi ul.contributors li {
+	display: inline-block;
+	margin-right: 8px;
+	vertical-align: middle;
+}
+
+#plugin-information .fyi ul.contributors li img {
+	vertical-align: middle;
+	margin-right: 4px;
+}
+
+#plugin-information-footer {
+	padding: 13px 16px;
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 33px; /* 33+13+13+1=60 */
+	border-top: 1px solid #ddd;
+	background: #f3f3f3;
+}
+
+/* rtl:ignore */
+#plugin-information .section {
+	direction: ltr;
+}
+
+/* rtl:ignore */
+#plugin-information .section ul,
+#plugin-information .section ol {
+	list-style-type: disc;
+	margin-left: 24px;
+}
+
+#plugin-information .section,
+#plugin-information .section p {
+	font-size: 14px;
+	line-height: 1.7;
+}
+
+#plugin-information #section-screenshots ol {
+	list-style: none;
+	margin: 0;
+}
+
+#plugin-information #section-screenshots li img {
+	vertical-align: text-top;
+	margin-top: 16px;
+	max-width: 100%;
+	width: auto;
+	height: auto;
+	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.3 );
+}
+
+/* rtl:ignore */
+#plugin-information #section-screenshots li p {
+	font-style: italic;
+	padding-left: 20px;
+}
+
+#plugin-information pre {
+	padding: 7px;
+	overflow: auto;
+	border: 1px solid #ccc;
+}
+
+#plugin-information blockquote {
+	border-left: 2px solid #ddd;
+	color: #666;
+	font-style: italic;
+	margin: 1em 0;
+	padding: 0 0 0 1em;
+}
+
+/* rtl:ignore */
+#plugin-information .review {
+	overflow: hidden; /* clearfix */
+	width: 100%;
+	margin-bottom: 20px;
+	border-bottom: 1px solid #e5e5e5;
+}
+
+#plugin-information .review-title-section {
+	overflow: hidden; /* clearfix */
+}
+
+/* rtl:ignore */
+#plugin-information .review-title-section h4 {
+	display: inline-block;
+	float: left;
+	margin: 0 6px 0 0;
+}
+
+#plugin-information .reviewer-info p {
+	clear: both;
+	margin: 0;
+	padding-top: 2px;
+}
+
+/* rtl:ignore */
+#plugin-information .reviewer-info .avatar {
+	float: left;
+	margin: 4px 6px 0 0;
+}
+
+/* rtl:ignore */
+#plugin-information .reviewer-info .star-rating {
+	float: left;
+}
+
+/* rtl:ignore */
+#plugin-information .review-meta {
+	float: left;
+	margin-left: 0.75em;
+}
+
+/* rtl:ignore */
+#plugin-information .review-body {
+	float: left;
+	width: 100%;
+}
+
+.plugin-version-author-uri {
+	font-size: 13px;
+}
+
+/* For non-js plugin installation screen ticket #36430. */
+.update-php .button.button-primary {
+	margin-right: 1em;
+}
+
+@media screen and ( max-width: 771px ) {
+	#plugin-information-title.with-banner {
+		height: 100px;
+	}
+
+	#plugin-information-title.with-banner h2 {
+		margin-top: 30px;
+		font-size: 20px;
+		line-height: 40px;
+		max-width: 85%;
+	}
+
+	#plugin-information-title.with-banner div.vignette {
+		height: 100px;
+	}
+
+	#plugin-information-tabs {
+		overflow: hidden; /* clearfix */
+		padding: 0;
+		height: auto; /* let tabs wrap */
+	}
+
+	#plugin-information-tabs a.current {
+		margin-bottom: 0;
+		border-bottom: none;
+	}
+
+	#plugin-information .fyi {
+		float: none;
+		border: 1px solid #ddd;
+		position: static;
+		width: auto;
+		margin: 26px 26px 0;
+		padding-bottom: 0; /* reset from the two column height fix */
+	}
+
+	#section-holder {
+		position: static;
+		margin: 0;
+		padding-bottom: 70px; /* reset from the two column height fix, plus accommodate footer */
+	}
+
+	#plugin-information .fyi h3,
+	#plugin-information .fyi small {
+		display: none;
+	}
+
+	#plugin-information-footer {
+		padding: 12px 16px 0;
+		height: 46px;
+	}
+}
+
+/* Thickbox for the Plugin details modal. */
+#TB_window.plugin-details-modal {
+	background: #fcfcfc;
+}
+
+#TB_window.plugin-details-modal.thickbox-loading:before {
+	content: "";
+	display: block;
+	width: 20px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	z-index: -1;
+	margin: -10px 0 0 -10px;
+	background: #fcfcfc url(../images/spinner.gif) no-repeat center;
+	background-size: 20px 20px;
+	-webkit-transform: translateZ(0);
+	transform: translateZ(0);
+}
+
+@media print,
+	(-webkit-min-device-pixel-ratio: 1.25),
+	(min-resolution: 120dpi) {
+
+	#TB_window.plugin-details-modal.thickbox-loading:before {
+		background-image: url(../images/spinner-2x.gif);
+	}
+}
+
+.plugin-details-modal #TB_title {
+	float: left;
+	height: 1px;
+}
+
+.plugin-details-modal #TB_ajaxWindowTitle {
+	display: none;
+}
+
+.plugin-details-modal #TB_closeWindowButton {
+	left: auto;
+	right: -30px;
+	color: #eee;
+}
+
+.plugin-details-modal #TB_closeWindowButton:hover,
+.plugin-details-modal #TB_closeWindowButton:focus {
+	color: #00a0d2;
+	outline: none;
+	box-shadow: none;
+}
+
+.plugin-details-modal .tb-close-icon {
+	display: none;
+}
+
+.plugin-details-modal #TB_closeWindowButton:after {
+	content: "\f335";
+	font: normal 32px/29px 'dashicons';
+	speak: none;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* move plugin install close icon to top on narrow screens */
+@media screen and ( max-width: 830px ) {
+	.plugin-details-modal #TB_closeWindowButton {
+		right: 0;
+		top: -30px;
+	}
+}
+
+/* @todo: move this. */
+img {
+	border: none;
+}
+
+/* Metabox collapse arrow indicators */
+.sidebar-name .toggle-indicator:before,
+.js .meta-box-sortables .postbox .toggle-indicator:before,
+.bulk-action-notice .toggle-indicator:before {
+	content: "\f142";
+	display: inline-block;
+	font: normal 20px/1 dashicons;
+	speak: none;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-decoration: none !important;
+}
+
+.js .widgets-holder-wrap.closed .toggle-indicator:before,
+.js .meta-box-sortables .postbox.closed .handlediv .toggle-indicator:before,
+.bulk-action-notice .bulk-action-errors-collapsed .toggle-indicator:before {
+	content: "\f140";
+}
+
+.js .postbox .handlediv .toggle-indicator:before {
+	margin-top: 4px;
+	width: 20px;
+	border-radius: 50%;
+	text-indent: -1px; /* account for the dashicon alignment */
+}
+
+.rtl.js .postbox .handlediv .toggle-indicator:before {
+	text-indent: 1px; /* account for the dashicon alignment */
+}
+
+.bulk-action-notice .toggle-indicator:before {
+	line-height: 16px;
+	vertical-align: top;
+	color: #72777c;
+}
+
+.js .postbox .handlediv:focus {
+	box-shadow: none;
+	outline: none;
+}
+
+.js .postbox .handlediv:focus .toggle-indicator:before {
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+/* @todo: appears to be Press This only and overridden */
+#photo-add-url-div input[type="text"] {
+	width: 300px;
+}
+
+/* Theme/Plugin Editor */
+.alignleft h2 {
+	margin: 0;
+}
+
+#template textarea {
+	font-family: Consolas, Monaco, monospace;
+	font-size: 13px;
+	background: #f9f9f9;
+	-moz-tab-size: 4;
+	-o-tab-size: 4;
+	tab-size: 4;
+}
+
+#template textarea,
+#template .CodeMirror {
+	width: 100%;
+	min-height: 60vh;
+	height: calc( 100vh - 295px );
+	border: 1px solid #ddd;
+	box-sizing: border-box;
+}
+
+#templateside > h2 {
+	padding-top: 6px;
+	padding-bottom: 7px;
+	margin: 0;
+}
+
+#templateside ol,
+#templateside ul {
+	margin: 0;
+	padding: 0;
+}
+#templateside > ul {
+	box-sizing: border-box;
+	margin-top: 0;
+	overflow: auto;
+	padding: 0;
+	min-height: 60vh;
+	height: calc(100vh - 295px);
+	background-color: #f7f7f7;
+	border: 1px solid #ddd;
+	border-left: none;
+}
+#templateside ul ul {
+	padding-left: 12px;
+}
+#templateside > ul > li > ul[role=group] {
+	padding-left: 0;
+}
+
+/*
+ * Styles for Theme and Plugin editors.
+ */
+
+/* Hide collapsed items. */
+[role="treeitem"][aria-expanded="false"] > ul {
+	display: none;
+}
+
+/* Use arrow dashicons for folder states, but hide from screen readers. */
+[role="treeitem"] span[aria-hidden] {
+	display: inline;
+	font-family: dashicons;
+	font-size: 20px;
+	position: absolute;
+	pointer-events: none;
+}
+[role="treeitem"][aria-expanded="false"] > .folder-label .icon:after {
+	content: "\f139";
+}
+[role="treeitem"][aria-expanded="true"] > .folder-label .icon:after {
+	content: "\f140";
+}
+[role="treeitem"] .folder-label {
+	display: block;
+	padding: 3px 3px 3px 12px;
+	cursor: pointer;
+}
+
+/* Remove outline, and create our own focus and hover styles */
+[role="treeitem"] {
+	outline: 0;
+}
+[role="treeitem"] .folder-label.focus {
+	color: #124964;
+	box-shadow: 0 0 0 1px #5b9dd9, 0 0 2px 1px rgba(30, 140, 190, .8);
+}
+[role="treeitem"].hover,
+[role="treeitem"] .folder-label.hover {
+	background-color: #eaeaea;
+}
+
+.tree-folder {
+	margin: 0;
+	position: relative;
+}
+[role="treeitem"] li {
+	position: relative;
+}
+
+/* Styles for folder indicators/depth */
+.tree-folder .tree-folder::after {
+	content: ' ';
+	display: block;
+	position: absolute;
+	left: 2px;
+	border-left: 1px solid #ccc;
+	top: -13px;
+	bottom: 10px;
+}
+.tree-folder > li::before {
+	content: ' ';
+	position: absolute;
+	display: block;
+	border-left: 1px solid #ccc;
+	left: 2px;
+	top: -5px;
+	height: 18px;
+	width: 7px;
+	border-bottom: 1px solid #ccc;
+}
+.tree-folder > li::after {
+	content: ' ';
+	position: absolute;
+	display: block;
+	border-left: 1px solid #ccc;
+	left: 2px;
+	bottom: -7px;
+	top: 0;
+}
+
+/* current-file needs to adjustment for .notice styles */
+#templateside .current-file {
+	margin: -4px 0 -2px;
+}
+.tree-folder > .current-file::before {
+	left: 4px;
+	height: 15px;
+	width: 0px;
+	border-left: none;
+	top: 3px;
+}
+.tree-folder > .current-file::after {
+	bottom: -4px;
+	height: 7px;
+	left: 2px;
+	top: auto;
+}
+
+/* Lines shouldn't continue on last item */
+.tree-folder > li:last-child::after,
+.tree-folder li:last-child > .tree-folder::after {
+	display: none;
+}
+
+
+#theme-plugin-editor-label {
+	display: inline-block;
+	margin-bottom: 1em;
+	font-weight: 600;
+}
+
+/* rtl:ignore */
+#template textarea,
+#docs-list {
+	direction: ltr;
+}
+
+.fileedit-sub #theme,
+.fileedit-sub #plugin {
+	max-width: 40%;
+}
+.fileedit-sub .alignright {
+	text-align: right;
+}
+
+#template p {
+	width: 97%;
+}
+
+#file-editor-linting-error {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+#file-editor-linting-error > .notice {
+	margin: 0;
+	display: inline-block;
+}
+#file-editor-linting-error > .notice > p {
+	width: auto;
+}
+#template .submit {
+	margin-top: 1em;
+	padding: 0;
+}
+
+#template .submit input[type=submit][disabled] {
+	cursor: not-allowed;
+}
+#templateside {
+	float: right;
+	width: 16em;
+	word-wrap: break-word;
+}
+
+#postcustomstuff p.submit {
+	margin: 0;
+}
+
+#templateside h4 {
+	margin: 1em 0 0;
+}
+
+#templateside li {
+	margin: 4px 0;
+}
+
+#templateside li:not(.howto) a,
+.theme-editor-php .highlight {
+	display: block;
+	padding: 3px 0 3px 12px;
+	text-decoration: none;
+}
+
+#templateside li:not(.howto) > a:first-of-type {
+	padding-top: 0;
+}
+
+#templateside li.howto {
+	padding: 6px 12px 12px 12px;
+}
+
+.theme-editor-php .highlight {
+	margin: -3px 3px -3px -12px;
+}
+
+#templateside .highlight {
+	border: none;
+	font-weight: 600;
+}
+
+.nonessential {
+	color: #666;
+	font-size: 11px;
+	font-style: italic;
+	padding-left: 12px;
+}
+
+#documentation {
+	margin-top: 10px;
+}
+
+#documentation label {
+	line-height: 22px;
+	vertical-align: baseline;
+	font-weight: 600;
+}
+
+.fileedit-sub {
+	padding: 10px 0 8px;
+	line-height: 180%;
+}
+
+#file-editor-warning .file-
