@@ -3870,4 +3870,101 @@ img {
 		display: block;
 	}
 
-	#document
+	#documentation select[name="docs-list"] {
+		margin-left: 0;
+		max-width: 60%;
+	}
+
+	#documentation input[type="button"] {
+		margin-bottom: 0;
+		padding: 8px 18px;
+	}
+
+	#wpfooter {
+		display: none;
+	}
+
+	#comments-form .checkforspam {
+		display: none;
+	}
+
+	.edit-comment-author {
+		margin: 2px 0 0;
+	}
+
+	.filter-drawer .filter-group-feature input,
+	.filter-drawer .filter-group-feature label {
+		line-height: 25px;
+	}
+
+	.filter-drawer .filter-group-feature label {
+		margin-left: 32px;
+	}
+
+	.wp-filter .button.drawer-toggle {
+		font-size: 13px;
+		line-height: 26px;
+		height: 28px;
+	}
+}
+
+/* Smartphone */
+@media screen and (max-width: 600px) {
+	/* Disable horizontal scroll when responsive menu is open
+	   since we push the main content off to the right. */
+	#wpwrap.wp-responsive-open {
+		overflow-x: hidden;
+	}
+
+	html.wp-toolbar {
+		padding-top: 0;
+	}
+
+	#wpbody {
+		padding-top: 46px;
+	}
+
+	/* Keep full-width boxes on Edit Post page from causing horizontal scroll */
+	div#post-body.metabox-holder.columns-1 {
+		overflow-x: hidden;
+	}
+
+	h1.nav-tab-wrapper,
+	.wrap h2.nav-tab-wrapper,
+	.nav-tab-wrapper {
+		border-bottom: 0;
+	}
+
+	h1 .nav-tab,
+	h2 .nav-tab,
+	h3 .nav-tab {
+		margin: 10px 10px 0 0;
+		border-bottom: 1px solid #ccc;
+	}
+}
+
+.options-media-php br {
+	display: none;
+}
+
+@media screen and (max-width: 375px) {
+	.options-media-php input[type="number"][name*="_size_"] {
+		margin: 5px 0;
+	}
+	.options-media-php label[for*="_size_h"]:before {
+		content: '';
+		display: block;
+	}
+	.options-media-php br {
+		display: block;
+	}
+}
+
+@media screen and (max-width: 320px) {
+	/* Prevent default center alignment and larger font for the Right Now widget when
+	   the network dashboard is viewed on a small mobile device. */
+	#network_dashboard_right_now .subsubsub {
+		font-size: 14px;
+		text-align: left;
+	}
+}
