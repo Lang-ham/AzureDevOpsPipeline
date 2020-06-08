@@ -1197,4 +1197,467 @@ p.customize-section-description {
 }
 #customize-controls .panel-meta > .customize-control-notifications-container,
 #customize-controls .customize-section-title > .customize-control-notifications-container {
-	border-top: 1px soli
+	border-top: 1px solid #ddd;
+}
+#customize-controls #customize-notifications-area .notice,
+#customize-controls .panel-meta > .customize-control-notifications-container .notice,
+#customize-controls .customize-section-title > .customize-control-notifications-container .notice {
+	padding: 9px 14px;
+}
+#customize-controls #customize-notifications-area .notice.is-dismissible,
+#customize-controls .panel-meta > .customize-control-notifications-container .notice.is-dismissible,
+#customize-controls .customize-section-title > .customize-control-notifications-container .notice.is-dismissible {
+	padding-right: 38px;
+}
+#customize-controls #customize-notifications-area .notice + .notice,
+#customize-controls .panel-meta > .customize-control-notifications-container .notice + .notice,
+#customize-controls .customize-section-title > .customize-control-notifications-container .notice + .notice {
+	margin-top: 1px;
+}
+
+@-webkit-keyframes customize-fade-in {
+	0%   { opacity: 0; }
+	100% { opacity: 1; }
+}
+
+@keyframes customize-fade-in {
+	0%   { opacity: 0; }
+	100% { opacity: 1; }
+}
+
+#customize-controls .notice.notification-overlay,
+#customize-controls #customize-notifications-area .notice.notification-overlay {
+	margin: 0;
+	border-left: 0; /* @todo Appropriate styles could be added for notice-error, notice-warning, notice-success, etc */
+}
+
+#customize-controls .customize-control-notifications-container.has-overlay-notifications {
+	-webkit-animation: customize-fade-in 0.5s;
+	animation: customize-fade-in 0.5s;
+	z-index: 30;
+}
+
+/* Note: Styles for this are also defined in themes.css */
+#customize-controls #customize-notifications-area .notice.notification-overlay .notification-message {
+	clear: both;
+	color: #191e23;
+	font-size: 18px;
+	font-style: normal;
+	margin: 0;
+	padding: 2em 0;
+	text-align: center;
+	width: 100%;
+	display: block;
+	top: 50%;
+	position: relative;
+}
+
+/* Style for custom settings */
+
+/**
+ * Static front page
+ */
+
+#customize-control-show_on_front.has-error {
+	margin-bottom: 0;
+}
+#customize-control-show_on_front.has-error .customize-control-notifications-container {
+	margin-top: 12px;
+}
+
+/**
+ * Dropdowns
+ */
+
+.accordion-section .dropdown {
+	float: left;
+	display: block;
+	position: relative;
+	cursor: pointer;
+}
+
+.accordion-section .dropdown-content {
+	overflow: hidden;
+	float: left;
+	min-width: 30px;
+	height: 16px;
+	line-height: 16px;
+	margin-right: 16px;
+	padding: 4px 5px;
+	border: 2px solid #eee;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+/* @todo maybe no more used? */
+.customize-control .dropdown-arrow {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	width: 20px;
+	background: #eee;
+}
+
+.customize-control .dropdown-arrow:after {
+	content: "\f140";
+	font: normal 20px/1 dashicons;
+	speak: none;
+	display: block;
+	padding: 0;
+	text-indent: 0;
+	text-align: center;
+	position: relative;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-decoration: none !important;
+	color: #32373c;
+}
+
+.customize-control .dropdown-status {
+	color: #32373c;
+	background: #eee;
+	display: none;
+	max-width: 112px;
+}
+
+.customize-control-color .dropdown {
+	margin-right: 5px;
+	margin-bottom: 5px;
+}
+
+.customize-control-color .dropdown .dropdown-content {
+	background-color: #555d66;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.customize-control-color .dropdown:hover .dropdown-content {
+	border-color: rgba(0, 0, 0, 0.25);
+}
+
+/**
+ * iOS can't scroll iframes,
+ * instead it expands the iframe size to match the size of the content
+ */
+
+.ios .wp-full-overlay {
+	position: relative;
+}
+
+.ios #customize-controls .wp-full-overlay-sidebar-content {
+	-webkit-overflow-scrolling: touch;
+}
+
+/* Media controls */
+
+.customize-control .actions .button {
+	margin-top: 12px;
+}
+
+.customize-control-header .actions,
+.customize-control-header .uploaded {
+	margin-bottom: 18px;
+}
+
+.customize-control-header .uploaded button:not(.random),
+.customize-control-header .default button:not(.random) {
+	width: 100%;
+	padding: 0;
+	margin: 0;
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+}
+
+.customize-control-header button img {
+	display: block;
+}
+
+.customize-control .attachment-media-view .remove-button,
+.customize-control .attachment-media-view .default-button,
+.customize-control .attachment-media-view .upload-button,
+.customize-control-header button.new,
+.customize-control-header button.remove {
+	width: auto;
+	height: auto;
+	white-space: normal;
+}
+
+.customize-control .attachment-media-view .thumbnail,
+.customize-control-header .current .container {
+	overflow: hidden;
+}
+
+.customize-control .attachment-media-view .placeholder,
+.customize-control-header .placeholder {
+	width: 100%;
+	position: relative;
+	text-align: center;
+	cursor: default;
+	border: 1px dashed #b4b9be;
+	box-sizing: border-box;
+	padding: 9px 0;
+	line-height: 20px;
+}
+
+.customize-control-header .inner {
+	display: none;
+	position: absolute;
+	width: 100%;
+	color: #555d66;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	overflow: hidden;
+}
+
+.customize-control-header .inner,
+.customize-control-header .inner .dashicons {
+	line-height: 20px;
+	top: 8px;
+}
+
+.customize-control-header .list .inner,
+.customize-control-header .list .inner .dashicons {
+	top: 9px;
+}
+
+.customize-control-header .header-view {
+	position: relative;
+	width: 100%;
+	margin-bottom: 12px;
+}
+
+.customize-control-header .header-view:last-child {
+	margin-bottom: 0px;
+}
+
+/* Convoluted, but 'outline' support isn't good enough yet */
+.customize-control-header .header-view:after {
+	border: 0;
+}
+
+.customize-control-header .header-view.selected .choice:focus {
+	outline: none;
+}
+
+.customize-control-header .header-view.selected:after {
+	content: '';
+	position: absolute;
+	height: auto;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	border: 4px solid #00a0d2;
+	border-radius: 2px;
+}
+
+.customize-control-header .header-view.button.selected {
+	border: 0;
+}
+
+/* Header control: overlay "close" button */
+
+.customize-control-header .uploaded .header-view .close {
+	font-size: 20px;
+	color: #fff;
+	background: #555d66;
+	background: rgba(0, 0, 0, 0.5);
+	position: absolute;
+	top: 10px;
+	left: -999px;
+	z-index: 1;
+	width: 26px;
+	height: 26px;
+	cursor: pointer;
+}
+
+.customize-control-header .header-view:hover .close,
+.customize-control-header .header-view .close:focus {
+	left: auto;
+	right: 10px;
+}
+
+.customize-control-header .header-view .close:focus {
+	outline: 1px solid #5b9dd9;
+}
+
+/* Header control: randomiz(s)er */
+
+.customize-control-header .random.placeholder {
+	cursor: pointer;
+	border-radius: 2px;
+	height: 40px;
+}
+
+.customize-control-header button.random {
+	width: 100%;
+	height: auto;
+	min-height: 40px;
+	white-space: normal;
+}
+
+.customize-control-header button.random .dice {
+	margin-top: 4px;
+}
+
+.customize-control-header .placeholder:hover .dice,
+.customize-control-header .header-view:hover > button.random .dice {
+	-webkit-animation: dice-color-change 3s infinite;
+	animation: dice-color-change 3s infinite;
+}
+
+.button-see-me {
+	-webkit-animation: bounce .7s 1;
+	animation: bounce .7s 1;
+	-webkit-transform-origin: center bottom;
+	transform-origin: center bottom;
+}
+
+@-webkit-keyframes bounce {
+	from, 20%, 53%, 80%, to {
+		-webkit-animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+		-webkit-transform: translate3d(0,0,0);
+	}
+
+	40%, 43% {
+		-webkit-animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		-webkit-transform: translate3d(0, -12px, 0);
+	}
+
+	70% {
+		-webkit-animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		-webkit-transform: translate3d(0, -6px, 0);
+	}
+
+	90% {
+		-webkit-transform: translate3d(0,-1px,0);
+	}
+}
+
+@keyframes bounce {
+	from, 20%, 53%, 80%, to {
+		-webkit-animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+		animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+		-webkit-transform: translate3d(0,0,0);
+		transform: translate3d(0,0,0);
+	}
+
+	40%, 43% {
+		-webkit-animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		-webkit-transform: translate3d(0, -12px, 0);
+		transform: translate3d(0, -12px, 0);
+	}
+
+	70% {
+		-webkit-animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+		-webkit-transform: translate3d(0, -6px, 0);
+		transform: translate3d(0, -6px, 0);
+	}
+
+	90% {
+		-webkit-transform: translate3d(0,-1px,0);
+		transform: translate3d(0,-1px,0);
+	}
+}
+
+.customize-control-header .choice {
+	position: relative;
+	display: block;
+	margin-bottom: 9px;
+}
+
+.customize-control-header .choice:focus {
+	outline: none;
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 3px 1px rgba(30, 140, 190, .8);
+}
+
+.customize-control-header .uploaded div:last-child > .choice {
+	margin-bottom: 0;
+}
+
+.customize-control .attachment-media-view .thumbnail-image img,
+.customize-control-header img {
+	max-width: 100%;
+}
+
+.customize-control .attachment-media-view .remove-button,
+.customize-control .attachment-media-view .default-button,
+.customize-control-header .remove {
+	margin-right: 8px;
+}
+
+/* Background position control */
+.customize-control-background_position .background-position-control .button-group {
+	display: block;
+}
+
+/**
+ * Code Editor Control and Custom CSS Section
+ *
+ * Modifications to the Section Container to make the textarea full-width and
+ * full-height, if the control is the only control in the section.
+ */
+
+.customize-control-code_editor textarea {
+	width: 100%;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+	padding: 6px 8px;
+	-moz-tab-size: 2;
+	-o-tab-size: 2;
+	tab-size: 2;
+}
+.customize-control-code_editor textarea,
+.customize-control-code_editor .CodeMirror {
+	height: 14em;
+}
+
+#customize-controls .customize-section-description-container.section-meta.customize-info {
+	border-bottom: none;
+}
+
+#sub-accordion-section-custom_css .customize-control-notifications-container {
+	margin-bottom: 15px;
+}
+
+#customize-control-custom_css textarea {
+	display: block;
+	height: 500px;
+}
+
+.customize-section-description-container + #customize-control-custom_css .customize-control-title {
+	margin-left: 12px;
+}
+
+.customize-section-description-container + #customize-control-custom_css:last-child textarea {
+	border-right: 0;
+	border-left: 0;
+	height: calc( 100vh - 185px );
+	resize: none;
+}
+
+.customize-section-description-container + #customize-control-custom_css:last-child {
+	margin-left: -12px;
+	width: 299px;
+	width: calc( 100% + 24px );
+	margin-bottom: -12px;
+}
+
+.customize-section-description-container + #customize-control-custom_css:last-child .CodeMirror {
+	height: calc( 100vh - 185px );
+}
+
+.CodeMirror-lint-tooltip,
+.CodeMirror-hints {
+	z-index: 500000 !important;
+}
+
+.customize-section-description-container + #customize-control-custom_cs
