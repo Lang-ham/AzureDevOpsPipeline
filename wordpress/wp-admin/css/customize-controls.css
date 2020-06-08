@@ -711,4 +711,490 @@ body.trashing #publish-settings {
 	position: static;
 }
 
-.customize-section-description-c
+.customize-section-description-container,
+.control-section-nav_menu .customize-section-description-container,
+.control-section-new_menu .customize-section-description-container {
+	margin-bottom: 15px;
+}
+
+.control-section-nav_menu .customize-control,
+.control-section-new_menu .customize-control {
+	/* Override default `margin-bottom` for `.customize-control` */
+	margin-bottom: 0;
+}
+
+.customize-section-title {
+	margin: -12px -12px 0 -12px;
+	border-bottom: 1px solid #ddd;
+	background: #fff;
+}
+
+div.customize-section-description {
+	margin-top: 22px;
+}
+
+.customize-info div.customize-section-description {
+	margin-top: 0;
+}
+
+div.customize-section-description p:first-child {
+	margin-top: 0;
+}
+
+div.customize-section-description p:last-child {
+	margin-bottom: 0;
+}
+
+#customize-theme-controls .customize-themes-panel h3.customize-section-title:first-child {
+	border-bottom: 1px solid #ddd;
+	padding: 12px 12px 12px 12px;
+}
+
+.ios #customize-theme-controls .customize-themes-panel h3.customize-section-title:first-child {
+	padding: 12px 12px 13px 12px;
+}
+
+.customize-section-title h3,
+h3.customize-section-title {
+	padding: 10px 10px 12px 14px;
+	margin: 0;
+	line-height: 21px;
+	color: #555d66;
+}
+
+.accordion-sub-container.control-panel-content {
+	display: none;
+	position: absolute;
+	top: 0;
+	width: 100%;
+}
+
+.accordion-sub-container.control-panel-content.busy {
+	display: block;
+}
+
+.current-panel .accordion-sub-container.control-panel-content {
+	width: 100%;
+}
+
+.customize-controls-close {
+	display: block;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 45px;
+	height: 41px;
+	padding: 0 2px 0 0;
+	background: #eee;
+	border: none;
+	border-top: 4px solid #eee;
+	border-right: 1px solid #ddd;
+	color: #444;
+	text-align: left;
+	cursor: pointer;
+	transition: color .15s ease-in-out,
+	            border-color .15s ease-in-out,
+	            background .15s ease-in-out;
+	box-sizing: content-box;
+}
+
+.customize-panel-back,
+.customize-section-back {
+	display: block;
+	float: left;
+	width: 48px;
+	height: 71px;
+	padding: 0 24px 0 0;
+	margin: 0;
+	background: #fff;
+	border: none;
+	border-right: 1px solid #ddd;
+	border-left: 4px solid #fff;
+	box-shadow: none;
+	cursor: pointer;
+	transition: color .15s ease-in-out,
+	            border-color .15s ease-in-out,
+	            background .15s ease-in-out;
+}
+
+.customize-section-back {
+	height: 74px;
+}
+
+.ios .customize-panel-back {
+	display: none;
+}
+
+.ios .expanded.in-sub-panel .customize-panel-back {
+	display: block;
+}
+
+#customize-controls .panel-meta.customize-info .accordion-section-title {
+	margin-left: 48px;
+	border-left: none;
+}
+
+#customize-controls .panel-meta.customize-info .accordion-section-title:hover,
+#customize-controls .cannot-expand:hover .accordion-section-title {
+	background: #fff;
+	color: #555d66;
+	border-left-color: #fff;
+}
+
+.customize-controls-close:focus,
+.customize-controls-close:hover,
+.customize-controls-preview-toggle:focus,
+.customize-controls-preview-toggle:hover {
+	background: #fff;
+	color: #0073aa;
+	border-top-color: #0073aa;
+	outline: none;
+	box-shadow: none;
+}
+
+
+.customize-panel-back:hover,
+.customize-panel-back:focus,
+.customize-section-back:hover,
+.customize-section-back:focus {
+	color: #0073aa;
+	background: #f3f3f5;
+	border-left-color: #0073aa;
+	outline: none;
+	box-shadow: none;
+}
+
+.customize-controls-close:before {
+	font: normal 22px/45px dashicons;
+	content: "\f335";
+	position: relative;
+	top: -3px;
+	left: 13px;
+}
+
+.customize-panel-back:before,
+.customize-section-back:before {
+	font: normal 20px/72px dashicons;
+	content: "\f341";
+	position: relative;
+	left: 9px;
+}
+
+.wp-full-overlay-sidebar .wp-full-overlay-header {
+	background-color: #eee;
+	transition: padding ease-in-out .18s;
+}
+
+.in-sub-panel .wp-full-overlay-sidebar .wp-full-overlay-header {
+	padding-left: 62px;
+}
+
+p.customize-section-description {
+	font-style: normal;
+	margin-top: 22px;
+	margin-bottom: 0;
+}
+
+.customize-section-description ul {
+	margin-left: 1em;
+}
+
+.customize-section-description ul > li {
+	list-style: disc;
+}
+
+.section-description-buttons {
+	text-align: right;
+}
+
+.section-description-buttons button.button-link {
+	color: #0073aa;
+	text-decoration: underline;
+}
+
+.customize-control {
+	width: 100%;
+	float: left;
+	clear: both;
+	margin-bottom: 12px;
+}
+
+.customize-control select,
+.customize-control input[type="radio"],
+.customize-control input[type="checkbox"] {
+	line-height: 28px;
+}
+
+.customize-control input[type="text"],
+.customize-control input[type="password"],
+.customize-control input[type="email"],
+.customize-control input[type="number"],
+.customize-control input[type="search"],
+.customize-control input[type="tel"],
+.customize-control input[type="url"] {
+	width: 100%;
+	line-height: 18px;
+	margin: 0;
+}
+
+.customize-control-hidden {
+	margin: 0;
+}
+
+.customize-control-textarea textarea {
+	width: 100%;
+	resize: vertical;
+}
+
+.customize-control select {
+	width: 100%;
+	height: 28px;
+	line-height: 28px;
+}
+
+.customize-control select[multiple] {
+	height: auto;
+}
+
+.customize-control-title {
+	display: block;
+	font-size: 14px;
+	line-height: 24px;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.customize-control-description {
+	display: block;
+	font-style: italic;
+	line-height: 18px;
+	margin-top: 0;
+	margin-bottom: 5px;
+}
+
+.customize-section-description a.external-link:after {
+	font: 16px/11px dashicons;
+	content: "\f310";
+	top: 3px;
+	position: relative;
+	padding-left: 3px;
+	display: inline-block;
+	text-decoration: none;
+}
+
+.customize-control-color .color-picker,
+.customize-control-upload div {
+	line-height: 28px;
+}
+
+.customize-control .customize-inside-control-row {
+	line-height: 20px;
+	display: block;
+	margin-left: 24px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+
+.customize-control-radio input,
+.customize-control-checkbox input,
+.customize-control-nav_menu_auto_add input {
+	margin-right: 4px;
+	margin-left: -24px;
+}
+
+.customize-control-radio {
+	padding: 5px 0 10px;
+}
+
+.customize-control-radio .customize-control-title {
+	margin-bottom: 0;
+	line-height: 22px;
+}
+
+.customize-control-radio .customize-control-title + .customize-control-description {
+	margin-top: 7px;
+}
+
+.customize-control-radio label,
+.customize-control-checkbox label {
+	vertical-align: top;
+}
+
+.customize-control .attachment-thumb.type-icon {
+	float: left;
+	margin: 10px;
+	width: auto;
+}
+
+.customize-control .attachment-title {
+	font-weight: 600;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+.customize-control .attachment-meta {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin: 0;
+	padding: 0 10px;
+}
+
+.customize-control .attachment-meta-title {
+	padding-top: 7px;
+}
+
+/* Remove descender space. */
+.customize-control .thumbnail-image,
+.customize-control-header .current,
+.customize-control .wp-media-wrapper.wp-video {
+	line-height: 0;
+}
+
+/* Remove descender space. */
+.customize-control-site_icon .favicon-preview .browser-preview {
+	vertical-align: top;
+}
+
+.customize-control .thumbnail-image img {
+	cursor: pointer;
+}
+
+#customize-controls .thumbnail-audio .thumbnail {
+	max-width: 64px;
+	max-height: 64px;
+	margin: 10px;
+	float: left;
+}
+
+#available-menu-items .accordion-section-content .new-content-item,
+.customize-control-dropdown-pages .new-content-item {
+	width: calc(100% - 30px);
+	padding: 8px 15px;
+	position: absolute;
+	bottom: 0;
+	z-index: 10;
+	background: #eee;
+	display: -webkit-box;
+	display: flex;
+}
+
+.customize-control-dropdown-pages .new-content-item {
+	width: 100%;
+	padding: 5px 0 5px 1px;
+	position: relative;
+}
+
+#available-menu-items .new-content-item .create-item-input,
+.customize-control-dropdown-pages .new-content-item .create-item-input {
+	-webkit-box-flex: 10;
+	flex-grow: 10;
+}
+
+#available-menu-items .new-content-item .add-content,
+.customize-control-dropdown-pages .new-content-item .add-content {
+	margin: 2px 0 2px 6px;
+	-webkit-box-flex: 10;
+	flex-grow: 1;
+}
+
+.customize-control-dropdown-pages .new-content-item .create-item-input.invalid {
+	border: 1px solid #dc3232;
+}
+
+.customize-control-dropdown-pages .add-new-toggle {
+	margin-left: 1px;
+	font-weight: 600;
+	line-height: 28px;
+}
+
+#customize-preview iframe {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+}
+#customize-preview iframe + iframe {
+	visibility: hidden;
+}
+
+.wp-full-overlay-sidebar {
+	background: #eee;
+	border-right: 1px solid #ddd;
+}
+
+
+/**
+ * Notifications
+ */
+
+#customize-controls .customize-control-notifications-container { /* Scoped to #customize-controls for specificity over notification styles in common.css. */
+	margin: 4px 0 8px 0;
+	padding: 0;
+	cursor: default;
+}
+
+#customize-controls .customize-control-widget_form.has-error .widget .widget-top,
+.customize-control-nav_menu_item.has-error .menu-item-bar .menu-item-handle {
+	box-shadow: inset 0 0 0 2px #dc3232;
+	transition: .15s box-shadow linear;
+}
+
+#customize-controls .customize-control-notifications-container li.notice {
+	list-style: none;
+	margin: 0 0 6px 0;
+	padding: 9px 14px;
+	overflow: hidden;
+}
+#customize-controls .customize-control-notifications-container .notice.is-dismissible {
+	padding-right: 38px;
+}
+
+.customize-control-notifications-container li.notice:last-child {
+	margin-bottom: 0;
+}
+
+#customize-controls .customize-control-nav_menu_item .customize-control-notifications-container {
+	margin-top: 0;
+}
+
+#customize-controls .customize-control-widget_form .customize-control-notifications-container {
+	margin-top: 8px;
+}
+
+.customize-control-text.has-error input {
+	outline: 2px solid #dc3232;
+}
+
+#customize-controls #customize-notifications-area {
+	position: absolute;
+	top: 46px;
+	width: 100%;
+	border-bottom: 1px solid #ddd;
+	display: block;
+	padding: 0;
+	margin: 0;
+}
+
+.wp-full-overlay.collapsed #customize-controls #customize-notifications-area {
+	display: none !important;
+}
+
+#customize-controls #customize-notifications-area:not(.has-overlay-notifications),
+#customize-controls .customize-section-title > .customize-control-notifications-container:not(.has-overlay-notifications),
+#customize-controls .panel-meta > .customize-control-notifications-container:not(.has-overlay-notifications) {
+	max-height: 210px;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+#customize-controls #customize-notifications-area > ul,
+#customize-controls #customize-notifications-area .notice,
+#customize-controls .panel-meta > .customize-control-notifications-container,
+#customize-controls .panel-meta > .customize-control-notifications-container .notice,
+#customize-controls .customize-section-title > .customize-control-notifications-container,
+#customize-controls .customize-section-title > .customize-control-notifications-container .notice {
+	margin: 0;
+}
+#customize-controls .panel-meta > .customize-control-notifications-container,
+#customize-controls .customize-section-title > .customize-control-notifications-container {
+	border-top: 1px soli
