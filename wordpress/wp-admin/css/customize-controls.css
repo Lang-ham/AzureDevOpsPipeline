@@ -1660,4 +1660,430 @@ p.customize-section-description {
 	z-index: 500000 !important;
 }
 
-.customize-section-description-container + #customize-control-custom_cs
+.customize-section-description-container + #customize-control-custom_css:last-child .customize-control-notifications-container {
+	margin-left: 12px;
+	margin-right: 12px;
+}
+
+.theme-browser .theme.active .theme-actions,
+.wp-customizer .theme-browser .theme .theme-actions {
+	padding: 10px 15px;
+	box-shadow: inset 0 1px 0 rgba(0,0,0,0.1);
+}
+
+@media screen and ( max-width: 640px ) {
+	.customize-section-description-container + #customize-control-custom_css:last-child {
+		margin-right: 0;
+	}
+
+	.customize-section-description-container + #customize-control-custom_css:last-child textarea {
+		height: calc( 100vh - 140px );
+	}
+}
+
+/**
+ * Themes
+ */
+
+#customize-theme-controls .control-panel-themes {
+	border-bottom: none;
+}
+
+#customize-theme-controls .control-panel-themes > .accordion-section-title:hover, /* Not a focusable element. */
+#customize-theme-controls .control-panel-themes > .accordion-section-title {
+	cursor: default;
+	background: #fff;
+	color: #555d66;
+	border-top: 1px solid #ddd;
+	border-bottom: 1px solid #ddd;
+	border-left: none;
+	border-right: none;
+	margin: 0 0 15px 0;
+	padding-right: 100px; /* Space for the button */
+}
+
+#customize-theme-controls .control-section-themes .customize-themes-panel .accordion-section-title:first-child:hover, /* Not a focusable element. */
+#customize-theme-controls .control-section-themes .customize-themes-panel .accordion-section-title:first-child {
+	border-top: 0;
+}
+
+#customize-theme-controls .control-section-themes > .accordion-section-title:hover, /* Not a focusable element. */
+#customize-theme-controls .control-section-themes > .accordion-section-title {
+	margin: 0 0 15px;
+}
+
+#customize-controls .customize-themes-panel .accordion-section-title:hover,
+#customize-controls .customize-themes-panel .accordion-section-title {
+	margin: 15px -8px;
+}
+
+#customize-controls .control-section-themes .accordion-section-title,
+#customize-controls .customize-themes-panel .accordion-section-title {
+	padding-right: 100px; /* Space for the button */
+}
+
+.control-panel-themes .accordion-section-title span.customize-action,
+#customize-controls .customize-section-title span.customize-action,
+#customize-controls .control-section-themes .accordion-section-title span.customize-action,
+#customize-controls .customize-section-title span.customize-action {
+	font-size: 13px;
+	display: block;
+	font-weight: 400;
+}
+
+#customize-theme-controls .control-panel-themes .accordion-section-title .change-theme {
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	margin-top: -14px;
+	font-weight: 400;
+}
+
+#customize-theme-controls .control-panel-themes > .accordion-section-title:after {
+	display: none;
+}
+
+.control-panel-themes .customize-themes-full-container {
+	position: fixed;
+	top: 0;
+	left: 0;
+	transition: .18s left ease-in-out;
+	margin: 0 0 0 300px;
+	padding: 71px 0 25px;
+	overflow-y: scroll;
+	width: calc(100% - 300px);
+	height: calc(100% - 96px);
+	background: #eee;
+	z-index: 20;
+}
+
+@media screen and (min-width: 1670px) {
+	.control-panel-themes .customize-themes-full-container {
+		width: 82%;
+		right: 0;
+		left: initial;
+	}
+}
+
+.modal-open .control-panel-themes .customize-themes-full-container {
+	overflow-y: visible;
+}
+
+/* Animations for opening the themes panel */
+#customize-save-button-wrapper,
+#customize-header-actions .spinner,
+#customize-header-actions .customize-controls-preview-toggle {
+	transition: .18s margin ease-in-out;
+}
+
+#customize-footer-actions,
+#customize-footer-actions .collapse-sidebar {
+	bottom: 0;
+	transition: .18s bottom ease-in-out;
+}
+
+.in-themes-panel:not(.animating) #customize-header-actions .spinner,
+.in-themes-panel:not(.animating) #customize-header-actions .customize-controls-preview-toggle,
+.in-themes-panel:not(.animating) #customize-preview,
+.in-themes-panel:not(.animating) #customize-footer-actions {
+	visibility: hidden;
+}
+
+.wp-full-overlay.in-themes-panel {
+	background: #eee; /* Prevents a black flash when fading in the panel */
+}
+
+.in-themes-panel #customize-save-button-wrapper,
+.in-themes-panel #customize-header-actions .spinner,
+.in-themes-panel #customize-header-actions .customize-controls-preview-toggle {
+	margin-top: -46px; /* Height of header actions bar */
+}
+
+.in-themes-panel #customize-footer-actions,
+.in-themes-panel #customize-footer-actions .collapse-sidebar {
+	bottom: -45px;
+}
+
+/* Don't show the theme count while the panel opens, as it's in the wrong place during the animation */
+.in-themes-panel.animating .control-panel-themes .filter-themes-count {
+	display: none;
+}
+
+.in-themes-panel.wp-full-overlay .wp-full-overlay-sidebar-content {
+	bottom: 0;
+}
+
+.themes-filter-bar .feature-filter-toggle {
+	float: right;
+	margin: 3px 0 3px 25px;
+}
+
+.themes-filter-bar .feature-filter-toggle:before {
+    content: "\f111";
+    margin: 0 5px 0 0;
+    font: normal 16px/1 dashicons;
+    vertical-align: text-bottom;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.themes-filter-bar .feature-filter-toggle.open {
+	background: #eee;
+	border-color: #999;
+	box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, 0.5 );
+	-webkit-transform: translateY(1px);
+	transform: translateY(1px);
+}
+
+.themes-filter-bar .feature-filter-toggle .filter-count-filters {
+	display: none;
+}
+
+.filter-drawer {
+	box-sizing: border-box;
+	width: 100%;
+	position: absolute;
+	top: 46px;
+	left: 0;
+	padding: 25px 0 25px 25px;
+	border-top: 0;
+	margin: 0;
+	background: #eee;
+	border-bottom: 1px solid #ddd;
+}
+
+.filter-drawer .filter-group {
+	margin: 0 25px 0 0;
+	width: calc( (100% - 75px) / 3);
+	min-width: 200px;
+	max-width: 320px;
+}
+
+/* Adds a delay before fading in to avoid it "jumping" */
+@-webkit-keyframes themes-fade-in {
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+@keyframes themes-fade-in {
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+.control-panel-themes .customize-themes-full-container.animate {
+	-webkit-animation: .6s themes-fade-in 1;
+	animation: .6s themes-fade-in 1;
+}
+
+.in-themes-panel:not(.animating) .control-panel-themes .filter-themes-count {
+	-webkit-animation: .6s themes-fade-in 1;
+	animation: .6s themes-fade-in 1;
+}
+
+.control-panel-themes .filter-themes-count {
+	position: relative;
+	float: right;
+	line-height: 34px;
+}
+
+.control-panel-themes .filter-themes-count .themes-displayed {
+	font-weight: 600;
+	color: #555d66;
+}
+
+.customize-themes-notifications {
+	margin: 0;
+}
+
+.control-panel-themes .customize-themes-notifications .notice {
+	margin: 0 0 25px 0;
+}
+
+.customize-themes-full-container .customize-themes-section {
+	display: none !important; /* There is unknown JS that perpetually tries to show all theme sections when more items are added. */
+	overflow: hidden;
+}
+
+.customize-themes-full-container .customize-themes-section.current-section {
+	display: list-item !important; /* There is unknown JS that perpetually tries to show all theme sections when more items are added. */
+}
+
+.control-section .customize-section-text-before {
+	padding: 0 0 8px 15px;
+	margin: 15px 0 0 0;
+	line-height: 16px;
+	border-bottom: 1px solid #ddd;
+	color: #555d66;
+}
+
+.control-panel-themes .customize-themes-section-title {
+	width: 100%;
+	background: #fff;
+	box-shadow: none;
+	outline: none;
+	border-top: none;
+	border-bottom: 1px solid #ddd;
+	border-left: 4px solid #fff;
+	border-right: none;
+	cursor: pointer;
+	padding: 10px 15px;
+	position: relative;
+	text-align: left;
+	font-size: 14px;
+	font-weight: 600;
+	color: #555d66;
+	text-shadow: none;
+}
+
+.control-panel-themes #accordion-section-installed_themes {
+	border-top: 1px solid #ddd;
+}
+
+.control-panel-themes .theme-section {
+	margin: 0;
+	position: relative;
+}
+
+.control-panel-themes .customize-themes-section-title:focus,
+.control-panel-themes .customize-themes-section-title:hover {
+	border-left-color: #0073aa;
+	color: #0073aa;
+	background: #f5f5f5;
+}
+
+.customize-themes-section-title:not(.selected):after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 9px;
+	right: 15px;
+	width: 18px;
+	height: 18px;
+	border-radius: 100%;
+	border: 1px solid #ccc;
+	background: #fff;
+}
+
+.control-panel-themes .theme-section .customize-themes-section-title.selected:after {
+	content: "\f147";
+	font: 16px/1 dashicons;
+	box-sizing: border-box;
+	width: 20px;
+	height: 20px;
+	padding: 3px 3px 1px 1px; /* Re-align the icon to the smaller grid */
+	border-radius: 100%;
+	position: absolute;
+	top: 9px;
+	right: 15px;
+	background: #0073aa;
+	color: #fff;
+}
+
+.control-panel-themes .customize-themes-section-title.selected {
+	color: #0073aa;
+}
+
+#customize-theme-controls .themes.accordion-section-content {
+	position: relative;
+	left: 0;
+	padding: 0;
+	width: 100%;
+}
+
+.loading .customize-themes-section .spinner {
+	display: block;
+	visibility: visible;
+	position: relative;
+	clear: both;
+	width: 20px;
+	height: 20px;
+	left: calc(50% - 10px);
+	float: none;
+	margin-top: 50px;
+}
+
+.customize-themes-section .no-themes,
+.customize-themes-section .no-themes-local {
+	display: none;
+}
+
+.themes-section-installed_themes .theme .notice-success:not(.updated-message) {
+	display: none; /* Hide "installed" notice on installed themes tab. */
+}
+
+.customize-control-theme .theme {
+	width: 100%;
+	margin: 0;
+	border: 1px solid #ddd;
+	background: #fff;
+}
+
+.customize-control-theme .theme .theme-name, .customize-control-theme .theme .theme-actions {
+	background: #fff;
+	border: none;
+}
+
+.customize-control.customize-control-theme { /* override most properties on .customize-control */
+	box-sizing: border-box;
+	width: 25%;
+	max-width: 600px; /* Max. screenshot size / 2 */
+	margin: 0 25px 25px 0;
+	padding: 0;
+	clear: none;
+}
+
+/* 5 columns above 2100px */
+@media screen and (min-width: 2101px) {
+	.customize-control.customize-control-theme {
+		width: calc( ( 100% - 125px ) / 5 - 1px ); /* 1px offset accounts for browser rounding, typical all grids */
+	}
+}
+
+/* 4 columns up to 2100px */
+@media screen and (min-width: 1601px) and (max-width: 2100px) {
+	.customize-control.customize-control-theme {
+		width: calc( ( 100% - 100px ) / 4 - 1px );
+	}
+}
+
+/* 3 columns up to 1600px */
+@media screen and (min-width: 1201px) and (max-width: 1600px) {
+	.customize-control.customize-control-theme {
+		width: calc( ( 100% - 75px ) / 3 - 1px );
+	}
+}
+
+/* 2 columns up to 1200px */
+@media screen and (min-width: 851px) and (max-width: 1200px) {
+	.customize-control.customize-control-theme {
+		width: calc( ( 100% - 50px ) / 2 - 1px );
+
+	}
+}
+
+/* 1 column up to 850 px */
+@media screen and (max-width: 850px) {
+	.customize-control.customize-control-theme {
+		width: 100%;
+	}
+}
+
+.wp-customizer .theme-browser .themes {
+	padding: 0 0 25px 25px;
+	transition: .18s margin-top linear;
+}
+
+.wp-customizer .theme-browser .theme .theme-actions
