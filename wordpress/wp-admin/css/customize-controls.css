@@ -2579,4 +2579,454 @@ body.adding-widget .add-new-widget:before,
 	transform: rotate(45deg);
 }
 
-#available-
+#available-widgets,
+#available-menu-items {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -301px;
+	visibility: hidden;
+	overflow-x: hidden;
+	overflow-y: auto;
+	width: 300px;
+	margin: 0;
+	z-index: 4;
+	background: #eee;
+	transition: left .18s;
+	border-right: 1px solid #ddd;
+}
+
+#available-widgets .customize-section-title,
+#available-menu-items .customize-section-title {
+	display: none;
+}
+
+#available-widgets-list {
+	top: 60px;
+	position: absolute;
+	overflow: auto;
+	bottom: 0;
+	width: 100%;
+	border-top: 1px solid #ddd;
+}
+
+.no-widgets-found #available-widgets-list {
+	border-top: none;
+}
+
+#available-widgets-filter {
+	position: fixed;
+	top: 0;
+	z-index: 1;
+	width: 300px;
+	background: #eee;
+}
+
+/* search field container */
+#available-widgets-filter,
+#available-menu-items-search .accordion-section-title {
+	padding: 13px 15px;
+	box-sizing: border-box;
+}
+
+#available-widgets-filter input,
+#available-menu-items-search input {
+	width: 100%;
+	height: 32px;
+	margin: 1px 0;
+	padding: 6px 30px;
+}
+
+#available-widgets-filter input::-ms-clear,
+#available-menu-items-search input::-ms-clear {
+	display: none; /* remove the "x" in IE, which conflicts with the "x" icon on button.clear-results */
+}
+
+#available-menu-items-search .search-icon,
+#available-widgets-filter .search-icon {
+	display: block;
+	position: absolute;
+	top: 15px; /* 13 container padding +1 input margin +1 input border */
+	left: 16px;
+	width: 30px;
+	height: 30px;
+	line-height: 28px;
+	text-align: center;
+	color: #72777c;
+}
+
+#available-widgets-filter .clear-results,
+#available-menu-items-search .clear-results {
+	position: absolute;
+	top: 15px; /* 13 container padding +1 input margin +1 input border */
+	right: 16px;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	cursor: pointer;
+	background: none;
+	color: #a00;
+	text-decoration: none;
+	outline: 0;
+}
+
+#available-widgets-filter .clear-results,
+#available-menu-items-search .clear-results,
+#available-menu-items-search.loading .clear-results.is-visible {
+	display: none;
+}
+
+#available-widgets-filter .clear-results.is-visible,
+#available-menu-items-search .clear-results.is-visible {
+	display: block;
+}
+
+#available-widgets-filter .clear-results:before,
+#available-menu-items-search .clear-results:before {
+	content: "\f335";
+	font: normal 20px/1 dashicons;
+	vertical-align: middle;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+#available-widgets-filter .clear-results:hover,
+#available-widgets-filter .clear-results:focus,
+#available-menu-items-search .clear-results:hover,
+#available-menu-items-search .clear-results:focus {
+	color: #dc3232;
+}
+
+#available-widgets-filter .clear-results:focus,
+#available-menu-items-search .clear-results:focus {
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+#available-menu-items-search .search-icon:after,
+#available-widgets-filter .search-icon:after,
+.themes-filter-bar .search-icon:after {
+	content: "\f179";
+	font: normal 20px/1 dashicons;
+	vertical-align: middle;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.themes-filter-bar .search-icon {
+	position: absolute;
+	top: 7px;
+	left: 26px;
+	z-index: 1;
+	color: #72777c;
+	height: 30px;
+	width: 30px;
+	line-height: 2;
+	text-align: center;
+}
+
+.no-widgets-found-message {
+	display: none;
+	margin: 0;
+	padding: 0 15px;
+	line-height: inherit;
+}
+
+.no-widgets-found .no-widgets-found-message {
+	display: block;
+}
+
+#available-widgets .widget-top,
+#available-widgets .widget-top:hover,
+#available-menu-items .item-top,
+#available-menu-items .item-top:hover {
+	border: none;
+	background: transparent;
+	box-shadow: none;
+}
+
+#available-widgets .widget-tpl,
+#available-menu-items .item-tpl {
+	position: relative;
+	padding: 15px 15px 15px 60px;
+	background: #fff;
+	border-bottom: 1px solid #ddd;
+	border-left: 4px solid #fff;
+	transition: .15s color ease-in-out,
+	            .15s background-color ease-in-out,
+	            .15s border-color ease-in-out;
+	cursor: pointer;
+	display: none;
+}
+
+#available-widgets .widget,
+#available-menu-items .item {
+	position: static;
+}
+
+
+/* Responsive */
+.customize-controls-preview-toggle {
+	display: none;
+}
+
+@media only screen and (max-width: 782px) {
+	.wp-customizer .theme:not(.active):hover .theme-actions,
+	.wp-customizer .theme:not(.active):focus .theme-actions {
+		display: block;
+	}
+
+	.wp-customizer .theme-browser .theme.active .theme-name span {
+		display: inline;
+	}
+
+	.customize-control-header button.random .dice {
+		margin-top: 0;
+	}
+
+	.customize-control-radio .customize-inside-control-row,
+	.customize-control-checkbox .customize-inside-control-row,
+	.customize-control-nav_menu_auto_add .customize-inside-control-row {
+		margin-left: 32px;
+	}
+
+	.customize-control-radio input,
+	.customize-control-checkbox input,
+	.customize-control-nav_menu_auto_add input {
+		margin-left: -32px;
+	}
+
+	.customize-control input[type="radio"] + label + br,
+	.customize-control input[type="checkbox"] + label + br {
+		line-height: 32px; /* For widgets checkboxes */
+	}
+
+	.customize-control .date-time-fields select {
+		height: 39px;
+	}
+
+	.date-time-fields .date-input.month {
+		width: 79px;
+	}
+
+	.date-time-fields .date-input.day,
+	.date-time-fields .date-input.hour,
+	.date-time-fields .date-input.minute {
+		width: 55px;
+	}
+
+	.date-time-fields .date-input.year {
+		width: 80px;
+	}
+
+	.date-time-fields .date-timezone {
+		line-height: 3.2;
+	}
+
+	#customize-control-changeset_preview_link a {
+		bottom: 16px;
+	}
+
+	.preview-link-wrapper .customize-copy-preview-link.preview-control-element.button {
+		bottom: 10px;
+	}
+
+	.media-widget-control .media-widget-buttons .button.edit-media,
+	.media-widget-control .media-widget-buttons .button.change-media,
+	.media-widget-control .media-widget-buttons .button.select-media {
+		margin-top: 12px;
+	}
+
+	.wp-core-ui .themes-filter-bar .feature-filter-toggle {
+		margin: 3px 0 3px 25px;
+	}
+}
+
+@media screen and ( max-width: 1200px ) {
+	.outer-section-open .wp-full-overlay.expanded.preview-mobile .wp-full-overlay-main,
+	.adding-menu-items .wp-full-overlay.expanded.preview-mobile .wp-full-overlay-main,
+	.adding-widget .wp-full-overlay.expanded.preview-mobile .wp-full-overlay-main {
+		left: 67%;
+	}
+}
+
+@media screen and ( max-width: 640px ) {
+
+	/* when the sidebar is collapsed and switching to responsive view,
+	   bring it back see ticket #35220 */
+	.wp-full-overlay.collapsed #customize-controls {
+		margin-left: 0;
+	}
+
+	.wp-full-overlay-sidebar .wp-full-overlay-sidebar-content {
+		bottom: 0;
+	}
+
+	.customize-controls-preview-toggle {
+		display: block;
+		position: absolute;
+		top: 0;
+		left: 48px;
+		line-height: 45px;
+		font-size: 14px;
+		padding: 0 12px;
+		margin: 0;
+		height: 45px;
+		background: #eee;
+		border: 0;
+		border-right: 1px solid #ddd;
+		color: #555d66;
+		cursor: pointer;
+		transition: color .1s ease-in-out, background .1s ease-in-out;
+	}
+
+	#customize-footer-actions,
+	/*#customize-preview,*/
+	.customize-controls-preview-toggle .controls,
+	.preview-only .wp-full-overlay-sidebar-content,
+	.preview-only .customize-controls-preview-toggle .preview {
+		display: none;
+	}
+
+	.preview-only #customize-save-button-wrapper {
+		margin-top: -46px;
+	}
+
+	.customize-controls-preview-toggle .preview:before,
+	.customize-controls-preview-toggle .controls:before {
+		font: normal 20px/1 dashicons;
+		content: "\f177";
+		position: relative;
+		top: 4px;
+		margin-right: 6px;
+	}
+
+	.customize-controls-preview-toggle .controls:before {
+		content: "\f540";
+	}
+
+	.preview-only #customize-controls {
+		height: 45px;
+	}
+
+	.preview-only #customize-preview,
+	.preview-only .customize-controls-preview-toggle .controls {
+		display: block;
+	}
+
+	.wp-core-ui.wp-customizer .button {
+		padding: 6px 14px;
+		line-height: normal;
+		font-size: 14px;
+		vertical-align: middle;
+		height: auto;
+	}
+
+	#publish-settings {
+		height: 31px;
+	}
+
+	#customize-control-changeset_status .customize-inside-control-row {
+		padding-top: 15px;
+	}
+
+	body.adding-widget div#available-widgets,
+	body.adding-menu-items div#available-menu-items,
+	body.outer-section-open div#customize-sidebar-outer-content {
+		width: 100%;
+	}
+
+	#available-widgets .customize-section-title,
+	#available-menu-items .customize-section-title {
+		display: block;
+		margin: 0;
+	}
+
+	#available-widgets .customize-section-back,
+	#available-menu-items .customize-section-back {
+		height: 69px;
+	}
+
+	#available-widgets .customize-section-title h3,
+	#available-menu-items .customize-section-title h3 {
+		font-size: 20px;
+		font-weight: 200;
+		padding: 9px 10px 12px 14px;
+		margin: 0;
+		line-height: 24px;
+		color: #555d66;
+		display: block;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	#available-widgets .customize-section-title .customize-action,
+	#available-menu-items .customize-section-title .customize-action {
+		font-size: 13px;
+		display: block;
+		font-weight: 400;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	#available-widgets-filter {
+		position: relative;
+		width: 100%;
+		height: auto;
+	}
+
+	#available-widgets-list {
+		top: 130px;
+	}
+
+	#available-menu-items-search .clear-results,
+	#available-menu-items-search .search-icon {
+		top: 85px; /* 70 section title height + 13 container padding +1 input margin +1 input border */
+	}
+
+	.reorder,
+	.reordering .reorder-done {
+		padding: 8px;
+	}
+
+	.wp-core-ui .themes-filter-bar .feature-filter-toggle {
+		margin: 0;
+	}
+
+	.theme-browser .theme.active .theme-actions,
+	.wp-customizer .theme-browser .theme .theme-actions {
+		padding: 9px 15px;
+		box-shadow: inset 0 1px 0 rgba(0,0,0,0.1);
+	}
+}
+
+@media screen and ( max-width: 600px ) {
+	.theme-browser .theme.active .theme-actions,
+	.wp-customizer .theme-browser .theme .theme-actions {
+		padding: 8px 15px;
+		box-shadow: none;
+	}
+
+	.wp-full-overlay.expanded {
+		margin-left: 0;
+	}
+
+	body.adding-widget div#available-widgets,
+	body.adding-menu-items div#available-menu-items,
+	body.outer-section-open div#customize-sidebar-outer-content {
+		top: 46px;
+		z-index: 10;
+	}
+
+	body.wp-customizer .wp-full-overlay.expanded #customize-sidebar-outer-content {
+		left: -100%;
+	}
+
+	body.wp-customizer.outer-section-open .wp-full-overlay.expanded #customize-sidebar-outer-content {
+		left: 0;
+	}
+}
