@@ -267,4 +267,357 @@
 	color: #0073aa;
 }
 
-.customize-sc
+.customize-screen-options-toggle:focus,
+#customize-controls .customize-info .customize-help-toggle:focus {
+	outline: none;
+}
+
+.customize-screen-options-toggle:before {
+	-moz-osx-font-smoothing: grayscale;
+	border: none;
+	content: "\f111";
+	display: block;
+	font: 18px/1 dashicons;
+	padding: 5px;
+	text-align: center;
+	text-decoration: none !important;
+	text-indent: 0;
+	right: 6px;
+	position: absolute;
+	top: 6px;
+}
+
+.customize-screen-options-toggle:focus:before,
+#customize-controls .customize-info .customize-help-toggle:focus:before {
+	border-radius: 100%;
+}
+
+.wp-customizer #screen-options-wrap {
+	display: none;
+	background: #fff;
+	border-top: 1px solid #ddd;
+	padding: 4px 15px 15px;
+}
+
+.wp-customizer .metabox-prefs label {
+	display: block;
+	padding-left: 0;
+	line-height: 30px;
+}
+
+/* rework the arrow indicator implementation for NVDA bug same as #32715 */
+.wp-customizer .toggle-indicator {
+	display: inline-block;
+	font-size: 20px;
+	line-height: 1;
+}
+
+.rtl .wp-customizer .toggle-indicator {
+	text-indent: 1px; /* account for the dashicon alignment */
+}
+
+.wp-customizer .menu-item .item-edit .toggle-indicator:before,
+#available-menu-items .accordion-section-title .toggle-indicator:before {
+	content: "\f140";
+	display: block;
+	padding: 1px 0px 1px 2px;
+	speak: none;
+	border-radius: 50%;
+	color: #72777c;
+	font: normal 20px/1 dashicons;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-decoration: none !important;
+}
+
+.control-section-nav_menu .field-link-target,
+.control-section-nav_menu .field-title-attribute,
+.control-section-nav_menu .field-css-classes,
+.control-section-nav_menu .field-xfn,
+.control-section-nav_menu .field-description {
+	display: none;
+}
+
+.control-section-nav_menu.field-link-target-active .field-link-target,
+.control-section-nav_menu.field-title-attribute-active .field-title-attribute,
+.control-section-nav_menu.field-css-classes-active .field-css-classes,
+.control-section-nav_menu.field-xfn-active .field-xfn,
+.control-section-nav_menu.field-description-active .field-description {
+	display: block;
+}
+
+/* WARNING: The 20px factor is hard-coded in JS. */
+.menu-item-depth-0  { margin-right: 0;     }
+.menu-item-depth-1  { margin-right: 20px;  }
+.menu-item-depth-2  { margin-right: 40px;  }
+.menu-item-depth-3  { margin-right: 60px;  }
+.menu-item-depth-4  { margin-right: 80px;  }
+.menu-item-depth-5  { margin-right: 100px; }
+.menu-item-depth-6  { margin-right: 120px; }
+.menu-item-depth-7  { margin-right: 140px; }
+.menu-item-depth-8  { margin-right: 160px; } /* Not likely to be used or useful beyond this depth */
+.menu-item-depth-9  { margin-right: 180px; }
+.menu-item-depth-10 { margin-right: 200px; }
+.menu-item-depth-11 { margin-right: 220px; }
+
+/* @todo handle .menu-item-settings width */
+.menu-item-depth-0  > .menu-item-bar { margin-left: 0;     }
+.menu-item-depth-1  > .menu-item-bar { margin-left: 20px;  }
+.menu-item-depth-2  > .menu-item-bar { margin-left: 40px;  }
+.menu-item-depth-3  > .menu-item-bar { margin-left: 60px;  }
+.menu-item-depth-4  > .menu-item-bar { margin-left: 80px;  }
+.menu-item-depth-5  > .menu-item-bar { margin-left: 100px; }
+.menu-item-depth-6  > .menu-item-bar { margin-left: 120px; }
+.menu-item-depth-7  > .menu-item-bar { margin-left: 140px; }
+.menu-item-depth-8  > .menu-item-bar { margin-left: 160px; }
+.menu-item-depth-9  > .menu-item-bar { margin-left: 180px; }
+.menu-item-depth-10 > .menu-item-bar { margin-left: 200px; }
+.menu-item-depth-11 > .menu-item-bar { margin-left: 220px; }
+
+/* Submenu left margin. */
+.menu-item-depth-0  .menu-item-transport { margin-right: 0;      }
+.menu-item-depth-1  .menu-item-transport { margin-right: -20px;  }
+.menu-item-depth-3  .menu-item-transport { margin-right: -60px;  }
+.menu-item-depth-4  .menu-item-transport { margin-right: -80px;  }
+.menu-item-depth-2  .menu-item-transport { margin-right: -40px;  }
+.menu-item-depth-5  .menu-item-transport { margin-right: -100px; }
+.menu-item-depth-6  .menu-item-transport { margin-right: -120px; }
+.menu-item-depth-7  .menu-item-transport { margin-right: -140px; }
+.menu-item-depth-8  .menu-item-transport { margin-right: -160px; }
+.menu-item-depth-9  .menu-item-transport { margin-right: -180px; }
+.menu-item-depth-10 .menu-item-transport { margin-right: -200px; }
+.menu-item-depth-11 .menu-item-transport { margin-right: -220px; }
+
+/* WARNING: The 20px factor is hard-coded in JS. */
+.reordering .menu-item-depth-0  { margin-right: 0;     }
+.reordering .menu-item-depth-1  { margin-right: 15px;  }
+.reordering .menu-item-depth-2  { margin-right: 30px;  }
+.reordering .menu-item-depth-3  { margin-right: 45px;  }
+.reordering .menu-item-depth-4  { margin-right: 60px;  }
+.reordering .menu-item-depth-5  { margin-right: 75px;  }
+.reordering .menu-item-depth-6  { margin-right: 90px;  }
+.reordering .menu-item-depth-7  { margin-right: 105px; }
+.reordering .menu-item-depth-8  { margin-right: 120px; } /* Not likely to be used or useful beyond this depth */
+.reordering .menu-item-depth-9  { margin-right: 135px; }
+.reordering .menu-item-depth-10 { margin-right: 150px; }
+.reordering .menu-item-depth-11 { margin-right: 165px; }
+
+.reordering .menu-item-depth-0  > .menu-item-bar { margin-left: 0;     }
+.reordering .menu-item-depth-1  > .menu-item-bar { margin-left: 15px;  }
+.reordering .menu-item-depth-2  > .menu-item-bar { margin-left: 30px;  }
+.reordering .menu-item-depth-3  > .menu-item-bar { margin-left: 45px;  }
+.reordering .menu-item-depth-4  > .menu-item-bar { margin-left: 60px;  }
+.reordering .menu-item-depth-5  > .menu-item-bar { margin-left: 75px;  }
+.reordering .menu-item-depth-6  > .menu-item-bar { margin-left: 90px;  }
+.reordering .menu-item-depth-7  > .menu-item-bar { margin-left: 105px; }
+.reordering .menu-item-depth-8  > .menu-item-bar { margin-left: 120px; }
+.reordering .menu-item-depth-9  > .menu-item-bar { margin-left: 135px; }
+.reordering .menu-item-depth-10 > .menu-item-bar { margin-left: 150px; }
+.reordering .menu-item-depth-11 > .menu-item-bar { margin-left: 165px; }
+
+.control-section-nav_menu.menu .menu-item-edit-active {
+	margin-right: 0;
+}
+
+.control-section-nav_menu.menu .menu-item-edit-active .menu-item-bar {
+	margin-left: 0;
+}
+
+.control-section-nav_menu.menu .sortable-placeholder {
+	margin-top: 0;
+	margin-bottom: 1px;
+	max-width: calc(100% - 2px);
+	float: right;
+	display: list-item;
+	border-color: #a0a5aa;
+}
+
+.menu-item-transport li.customize-control {
+	float: none;
+}
+
+.control-section-nav_menu.menu ul.menu-item-transport .menu-item-bar {
+	margin-top: 0;
+}
+
+/**
+ * Add-menu-items mode
+ */
+
+.adding-menu-items .control-section {
+	opacity: .4;
+}
+
+.adding-menu-items .control-panel.control-section,
+.adding-menu-items .control-section.open {
+	opacity: 1;
+}
+
+.menu-item-bar .item-delete {
+	color: #a00;
+	position: absolute;
+	top: 2px;
+	left: -19px;
+	width: 30px;
+	height: 38px;
+	cursor: pointer;
+	display: none;
+}
+
+.menu-item-bar .item-delete:before {
+	content: "\f335";
+	position: absolute;
+	top: 9px;
+	right: 5px;
+	border-radius: 50%;
+	font: normal 20px/1 dashicons;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.ie8 .menu-item-bar .item-delete:before {
+	top: -10px;
+}
+
+.menu-item-bar .item-delete:hover,
+.menu-item-bar .item-delete:focus {
+	box-shadow: none;
+	outline: none;
+	color: #dc3232;
+}
+
+.adding-menu-items .menu-item-bar .item-edit {
+	display: none;
+}
+
+.adding-menu-items .menu-item-bar .item-delete {
+	display: block;
+}
+
+/**
+ * Styles for menu-item addition panel
+ */
+
+#available-menu-items.opening {
+	overflow-y: hidden; /* avoid scrollbar jitter with animating heights */
+}
+
+#available-menu-items #available-menu-items-search.open {
+	height: 100%;
+	border-bottom: none;
+}
+
+#available-menu-items .accordion-section-title {
+	border-right: none;
+	border-left: none;
+	background: #fff;
+	transition: background-color 0.15s;
+	/* Reset the value inherited from the base .accordion-section-title style. Ticket #37589. */
+	-webkit-user-select: auto;
+	-moz-user-select: auto;
+	-ms-user-select: auto;
+	user-select: auto;
+}
+
+#available-menu-items .open .accordion-section-title,
+#available-menu-items #available-menu-items-search .accordion-section-title {
+	background: #eee;
+}
+
+/* rework the arrow indicator implementation for NVDA bug see #32715 */
+#available-menu-items .accordion-section-title:after {
+	content: none !important;
+}
+
+#available-menu-items .accordion-section-title:hover .toggle-indicator:before,
+#available-menu-items .button-link:hover .toggle-indicator:before,
+#available-menu-items .button-link:focus .toggle-indicator:before {
+	color: #23282d;
+}
+
+#available-menu-items .open .accordion-section-title .toggle-indicator:before {
+	content: "\f142";
+	color: #23282d;
+}
+
+#available-menu-items .available-menu-items-list {
+	overflow-y: auto;
+	max-height: 200px; /* This gets set in JS to fit the screen size, and based on # of sections. */
+	background: transparent;
+}
+
+#available-menu-items .accordion-section-title button {
+	display: block;
+	width: 28px;
+	height: 35px;
+	position: absolute;
+	top: 5px;
+	left: 5px;
+	box-shadow: none;
+	outline: none;
+	cursor: pointer;
+	text-align: center;
+}
+
+#available-menu-items .accordion-section-title .no-items,
+#available-menu-items .cannot-expand .accordion-section-title .spinner,
+#available-menu-items .cannot-expand .accordion-section-title > button {
+	display: none;
+}
+
+#available-menu-items-search.cannot-expand .accordion-section-title .spinner {
+	display: block;
+}
+
+#available-menu-items .cannot-expand .accordion-section-title .no-items {
+	float: left;
+	color: #555d66;
+	font-weight: 400;
+	margin-right: 5px;
+}
+
+#available-menu-items .accordion-section-content {
+	max-height: 290px;
+	margin: 0;
+	padding: 0;
+	position: relative;
+	background: transparent;
+}
+
+#available-menu-items .accordion-section-content .available-menu-items-list {
+	margin: 0 0 45px 0;
+	padding: 1px 15px 15px 15px;
+}
+
+#available-menu-items .accordion-section-content .available-menu-items-list:only-child { /* Types that do not support new items for the current user */
+	margin-bottom: 0;
+}
+
+#new-custom-menu-item .accordion-section-content {
+	padding: 0 15px 15px 15px;
+}
+
+#available-menu-items .menu-item-tpl {
+	margin: 0;
+}
+
+#custom-menu-item-name.invalid,
+#custom-menu-item-url.invalid,
+.edit-menu-item-url.invalid,
+.menu-name-field.invalid,
+.menu-name-field.invalid:focus,
+#available-menu-items .new-content-item .create-item-input.invalid,
+#available-menu-items .new-content-item .create-item-input.invalid:focus {
+	border: 1px solid #dc3232;
+}
+
+#available-menu-items .menu-item-handle .item-type {
+	padding-left: 0;
+}
+
+#available-menu-items .menu-item-handle .item-title {
+	padding-right: 20px;
+}
+
+#available-menu-items .menu-item-handle {
+	cursor: poi
