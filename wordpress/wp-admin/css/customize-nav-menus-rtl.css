@@ -620,4 +620,268 @@
 }
 
 #available-menu-items .menu-item-handle {
-	cursor: poi
+	cursor: pointer;
+}
+
+#available-menu-items .menu-item-handle {
+	box-shadow: none;
+	margin-top: -1px;
+}
+
+#available-menu-items .menu-item-handle:hover {
+	z-index: 1;
+}
+
+#available-menu-items .item-title h4 {
+	padding: 0 0 5px;
+	font-size: 14px;
+}
+
+#available-menu-items .item-add {
+	position: absolute;
+	top: 1px;
+	right: 1px;
+	color: #82878c;
+	width: 30px;
+	height: 38px;
+	box-shadow: none;
+	outline: none;
+	cursor: pointer;
+	text-align: center;
+}
+
+#available-menu-items .menu-item-handle .item-add:focus {
+	color: #23282d;
+}
+
+#available-menu-items .item-add:before {
+	content: "\f543";
+	position: relative;
+	right: 2px;
+	top: 3px;
+	display: inline-block;
+	height: 20px;
+	border-radius: 50%;
+	font: normal 20px/1.05 dashicons; /* line height is to account for the dashicon's vertical alignment */
+}
+
+#available-menu-items .menu-item-handle.item-added .item-type,
+#available-menu-items .menu-item-handle.item-added .item-title,
+#available-menu-items .menu-item-handle.item-added:hover .item-add,
+#available-menu-items .menu-item-handle.item-added .item-add:focus {
+	color: #82878c;
+}
+
+#available-menu-items .menu-item-handle.item-added .item-add:before {
+	content: "\f147";
+}
+
+#available-menu-items .accordion-section-title.loading .spinner,
+#available-menu-items-search.loading .accordion-section-title .spinner {
+	visibility: visible;
+	margin: 0 20px;
+}
+
+#available-menu-items-search .spinner {
+	position: absolute;
+	top: 20px; /* 13 container padding +1 input margin +6 ( ( 32 input height - 20 spinner height ) / 2 ) */
+	left: 21px;
+	margin: 0 !important;
+}
+
+/* search results list */
+#available-menu-items #available-menu-items-search .accordion-section-content {
+	position: absolute;
+	right: 0;
+	top: 60px; /* below title div / search input */
+	bottom: 0px; /* 100% height that still triggers lazy load */
+	max-height: none;
+	width: 100%;
+	padding: 1px 15px 15px;
+	box-sizing: border-box;
+}
+
+#available-menu-items-search .nothing-found {
+	/* Compensate the 1px top padding of the container. */
+	margin-top: -1px;
+}
+
+#available-menu-items-search .accordion-section-title:after {
+	display: none;
+}
+
+#available-menu-items-search .accordion-section-content:empty {
+	min-height: 0;
+	padding: 0;
+}
+
+#available-menu-items-search.loading .accordion-section-content div {
+	opacity: .5;
+}
+
+#available-menu-items-search.loading.loading-more .accordion-section-content div {
+	opacity: 1;
+}
+
+#customize-preview {
+	transition: all 0.2s;
+}
+
+body.adding-menu-items #available-menu-items {
+	right: 0;
+	visibility: visible;
+}
+
+body.adding-menu-items .wp-full-overlay-main {
+	right: 300px;
+}
+
+body.adding-menu-items #customize-preview {
+	opacity: 0.4;
+}
+
+body.adding-menu-items #customize-preview iframe {
+	pointer-events: none;
+}
+
+.menu-item-handle .spinner {
+	display: none;
+	float: right;
+	margin: 0 0 0 8px;
+}
+
+.nav-menu-inserted-item-loading .spinner {
+	display: block;
+}
+
+.nav-menu-inserted-item-loading .menu-item-handle .item-type {
+	padding: 0 8px 0 0;
+}
+
+.nav-menu-inserted-item-loading .menu-item-handle,
+.added-menu-item .menu-item-handle.loading {
+	padding: 10px 8px 10px 15px;
+	cursor: default;
+	opacity: .5;
+	background: #fff;
+	color: #727773;
+}
+
+.added-menu-item .menu-item-handle {
+	transition-property: opacity, background, color;
+	transition-duration: 1.25s;
+	transition-timing-function: cubic-bezier( .25, -2.5, .75, 8 ); /* Replacement for .hide().fadeIn('slow') in JS to add emphasis when it's loaded. */
+}
+
+/* Add/delete Menus */
+
+#customize-theme-controls .control-panel-content .control-section-nav_menu:nth-last-child(2) .accordion-section-title {
+	border-bottom-color: #ddd;
+}
+
+/* @todo update selector */
+#accordion-section-add_menu {
+	margin: 15px 12px;
+}
+
+#accordion-section-add_menu h3 {
+	text-align: left;
+}
+
+#accordion-section-add_menu h3,
+#accordion-section-add_menu .customize-add-menu-button {
+	margin: 0;
+}
+
+#accordion-section-add_menu .customize-add-menu-button {
+	font-weight: normal;
+}
+
+#create-new-menu-submit {
+	float: left;
+	margin: 0 0 12px 0;
+}
+
+.menu-delete-item {
+	float: right;
+	padding: 1em 0;
+	width: 100%;
+}
+
+.assigned-menu-locations-title p {
+	margin: 0 0 8px 0;
+}
+
+li.assigned-to-menu-location .menu-delete-item {
+	display: none;
+}
+
+li.assigned-to-menu-location .add-new-menu-item {
+	margin-bottom: 1em;
+}
+
+.menu-item-handle {
+	margin-top: -1px;
+}
+.ui-sortable-disabled .menu-item-handle {
+	cursor: default;
+}
+
+.menu-item-handle:hover {
+	position: relative;
+	z-index: 10;
+	color: #0073aa;
+}
+
+.menu-item-handle:hover .item-type,
+.menu-item-handle:hover .item-edit,
+#available-menu-items .menu-item-handle:hover .item-add {
+	color: #0073aa;
+}
+
+.menu-item-edit-active .menu-item-handle {
+	border-color: #999;
+	border-bottom: none;
+}
+
+.customize-control-nav_menu_item {
+	margin-bottom: 0;
+}
+
+.customize-control-nav_menu .new-menu-item-invitation {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.customize-control-nav_menu .customize-control-nav_menu-buttons {
+	margin-top: 12px;
+}
+
+/**
+ * box-shadows
+ */
+
+.wp-customizer .menu-item .submitbox .submitdelete:focus,
+.customize-screen-options-toggle:focus:before,
+#customize-controls .customize-info .customize-help-toggle:focus:before,
+.wp-customizer button:focus .toggle-indicator:before,
+.menu-delete:focus,
+.menu-item-bar .item-delete:focus:before,
+#available-menu-items .item-add:focus:before {
+	box-shadow:
+		0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+
+@media screen and ( max-width: 782px ) {
+	#available-menu-items #available-menu-items-search .accordion-section-content {
+		top: 63px;
+	}
+}
+
+@media screen and ( max-width: 640px ) {
+	#available-menu-items #available-menu-items-search .accordion-section-content {
+		top: 130px;
+	}
+}
