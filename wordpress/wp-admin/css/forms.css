@@ -295,4 +295,646 @@ input[type="radio"].disabled,
 input[type="checkbox"]:disabled:checked:before,
 input[type="checkbox"].disabled:checked:before,
 input[type="radio"]:disabled:checked:before,
-input[type="radio"].disabled:c
+input[type="radio"].disabled:checked:before {
+	opacity: 0.7;
+}
+
+/*------------------------------------------------------------------------------
+  2.0 - Forms
+------------------------------------------------------------------------------*/
+
+
+.wp-admin select {
+	padding: 2px;
+	line-height: 28px;
+	height: 28px;
+	vertical-align: middle;
+}
+
+.wp-admin .button-cancel {
+	padding: 0 5px;
+	line-height: 2;
+}
+
+.meta-box-sortables select {
+	max-width: 100%;
+}
+
+.wp-admin select[multiple] {
+	height: auto;
+}
+
+.submit {
+	padding: 1.5em 0;
+	margin: 5px 0;
+	border-bottom-left-radius: 3px;
+	border-bottom-right-radius: 3px;
+	border: none;
+}
+
+form p.submit a.cancel:hover {
+	text-decoration: none;
+}
+
+p.submit {
+	text-align: left;
+	max-width: 100%;
+	margin-top: 20px;
+	padding-top: 10px;
+}
+
+.textright p.submit {
+	border: none;
+	text-align: right;
+}
+
+table.form-table + p.submit,
+table.form-table + input + p.submit,
+table.form-table + input + input + p.submit {
+	border-top: none;
+	padding-top: 0;
+}
+
+#minor-publishing-actions input,
+#major-publishing-actions input,
+#minor-publishing-actions .preview {
+	text-align: center;
+}
+
+textarea.all-options,
+input.all-options {
+	width: 250px;
+}
+
+input.large-text,
+textarea.large-text {
+	width: 99%;
+}
+
+.regular-text {
+	width: 25em;
+}
+
+input.small-text {
+	width: 50px;
+	padding: 1px 6px;
+}
+
+input[type="number"].small-text {
+	width: 65px;
+}
+
+input.tiny-text {
+	width: 35px;
+}
+
+input[type="number"].tiny-text {
+	width: 45px;
+}
+
+#doaction,
+#doaction2,
+#post-query-submit {
+	margin: 1px 8px 0 0;
+}
+
+.tablenav #changeit,
+.tablenav #delete_all,
+.tablenav #clear-recent-list,
+.wp-filter #delete_all {
+	margin-top: 1px;
+}
+
+.tablenav .actions select {
+	float: left;
+	margin-right: 6px;
+	max-width: 200px;
+}
+
+.ie8 .tablenav .actions select {
+	width: 155px;
+}
+
+.ie8 .tablenav .actions select#cat {
+	width: 200px;
+}
+
+#timezone_string option {
+	margin-left: 1em;
+}
+
+button.wp-hide-pw > .dashicons {
+	position: relative;
+	top: 3px;
+}
+
+label,
+#your-profile label + a {
+	vertical-align: middle;
+}
+
+fieldset label,
+#your-profile label + a {
+	vertical-align: middle;
+}
+
+.options-media-php label[for*="_size_"],
+#misc-publishing-actions label {
+	vertical-align: baseline;
+}
+
+#pass-strength-result {
+	background-color: #eee;
+	border: 1px solid #ddd;
+	color: #23282d;
+	margin: -2px 5px 5px 1px;
+	padding: 3px 5px;
+	text-align: center;
+	width: 25em;
+	box-sizing: border-box;
+	opacity: 0;
+}
+
+#pass-strength-result.short {
+	background-color: #f1adad;
+	border-color: #e35b5b;
+	opacity: 1;
+}
+
+#pass-strength-result.bad {
+	background-color: #fbc5a9;
+	border-color: #f78b53;
+	opacity: 1;
+}
+
+#pass-strength-result.good {
+	background-color: #ffe399;
+	border-color: #ffc733;
+	opacity: 1;
+}
+
+#pass-strength-result.strong {
+	background-color: #c1e1b9;
+	border-color: #83c373;
+	opacity: 1;
+}
+
+#pass1.short, #pass1-text.short {
+	border-color: #e35b5b;
+}
+
+#pass1.bad, #pass1-text.bad {
+	border-color: #f78b53;
+}
+
+#pass1.good, #pass1-text.good {
+	border-color: #ffc733;
+}
+
+#pass1.strong, #pass1-text.strong {
+	border-color: #83c373;
+}
+
+.pw-weak {
+	display:none;
+}
+
+.indicator-hint {
+	padding-top: 8px;
+}
+
+#pass1-text,
+.show-password #pass1 {
+	display: none;
+}
+
+.show-password #pass1-text
+{
+	display: inline-block;
+}
+
+.form-table span.description.important {
+	font-size: 12px;
+}
+
+p.search-box {
+	float: right;
+	margin: 0;
+}
+
+.network-admin.themes-php p.search-box {
+	clear: left;
+}
+
+.search-box input[name="s"],
+.tablenav .search-plugins input[name="s"],
+.tagsdiv .newtag {
+	float: left;
+	height: 28px;
+	margin: 0 4px 0 0;
+}
+
+.js.plugins-php .search-box .wp-filter-search {
+	margin: 0;
+	width: 280px;
+	font-size: 16px;
+	font-weight: 300;
+	line-height: 1.5;
+	padding: 3px 5px;
+	height: 32px;
+}
+
+input[type="text"].ui-autocomplete-loading,
+input[type="email"].ui-autocomplete-loading {
+	background-image: url(../images/loading.gif);
+	background-repeat: no-repeat;
+	background-position: right center;
+	visibility: visible;
+}
+
+input.ui-autocomplete-input.open {
+	border-bottom-color: transparent;
+}
+
+ul#add-to-blog-users {
+	margin: 0 0 0 14px;
+}
+
+.ui-autocomplete {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+	position: absolute;
+	z-index: 10000;
+	border: 1px solid #5b9dd9;
+	box-shadow: 0 1px 2px rgba( 30, 140, 190, 0.8 );
+	background-color: #fff;
+}
+
+.ui-autocomplete li {
+	margin-bottom: 0;
+	padding: 4px 10px;
+	white-space: nowrap;
+	text-align: left;
+	cursor: pointer;
+}
+
+/* Colors for the wplink toolbar autocomplete. */
+.ui-autocomplete .ui-state-focus {
+	background-color: #ddd;
+}
+
+/* Colors for the tags autocomplete. */
+.wp-tags-autocomplete .ui-state-focus {
+	background-color: #0073aa;
+	color: #fff;
+}
+
+/*------------------------------------------------------------------------------
+  15.0 - Comments Screen
+------------------------------------------------------------------------------*/
+
+.form-table {
+	border-collapse: collapse;
+	margin-top: 0.5em;
+	width: 100%;
+	clear: both;
+}
+
+.form-table,
+.form-table td,
+.form-table th,
+.form-table td p {
+	font-size: 14px;
+}
+
+.form-table td {
+	margin-bottom: 9px;
+	padding: 15px 10px;
+	line-height: 1.3;
+	vertical-align: middle;
+}
+
+.form-table th,
+.form-wrap label {
+	color: #23282d;
+	font-weight: 400;
+	text-shadow: none;
+	vertical-align: baseline;
+}
+
+.form-table th {
+	vertical-align: top;
+	text-align: left;
+	padding: 20px 10px 20px 0;
+	width: 200px;
+	line-height: 1.3;
+	font-weight: 600;
+}
+
+.form-table th.th-full, /* Not used by core. Back-compat for pre-4.8 */
+.form-table .td-full {
+	width: auto;
+	padding: 20px 10px 20px 0;
+	font-weight: 400;
+}
+
+.form-table td p {
+	margin-top: 4px;
+	margin-bottom: 0;
+}
+
+.form-table .date-time-doc {
+	margin-top: 1em;
+}
+
+.form-table p.timezone-info {
+	margin: 1em 0;
+}
+
+.form-table td fieldset label {
+	margin: 0.25em 0 0.5em !important;
+	display: inline-block;
+}
+
+.form-table td fieldset label,
+.form-table td fieldset p,
+.form-table td fieldset li {
+	line-height: 1.4em;
+}
+
+.form-table input.tog,
+.form-table input[type="radio"] {
+	margin-top: -4px;
+	margin-right: 4px;
+	float: none;
+}
+
+.form-table .pre {
+	padding: 8px;
+	margin: 0;
+}
+
+table.form-table td .updated {
+	font-size: 13px;
+}
+
+table.form-table td .updated p {
+	font-size: 13px;
+	margin: 0.3em 0;
+}
+
+/*------------------------------------------------------------------------------
+  18.0 - Users
+------------------------------------------------------------------------------*/
+
+#profile-page .form-table textarea {
+	width: 500px;
+	margin-bottom: 6px;
+}
+
+#profile-page .form-table #rich_editing {
+	margin-right: 5px
+}
+
+#your-profile legend {
+	font-size: 22px;
+}
+
+#display_name {
+	width: 15em;
+}
+
+#adduser .form-field input,
+#createuser .form-field input {
+	width: 25em;
+}
+
+.color-option {
+	display: inline-block;
+	width: 24%;
+	padding: 5px 15px 15px;
+	box-sizing: border-box;
+	margin-bottom: 3px;
+}
+
+.color-option:hover,
+.color-option.selected {
+	background: #ddd;
+}
+
+.color-palette {
+	width: 100%;
+	border-spacing: 0;
+	border-collapse: collapse;
+}
+.color-palette td {
+	height: 20px;
+	padding: 0;
+	border: none;
+}
+
+.color-option {
+	cursor: pointer;
+}
+
+/*------------------------------------------------------------------------------
+  19.0 - Tools
+------------------------------------------------------------------------------*/
+
+.tool-box .title {
+	margin: 8px 0;
+	font-size: 18px;
+	font-weight: 400;
+	line-height: 24px;
+}
+
+.label-responsive {
+	vertical-align: middle;
+}
+
+#export-filters p {
+	margin: 0 0 1em;
+}
+
+#export-filters p.submit {
+	margin: 7px 0 5px;
+}
+
+/* Card styles */
+
+.card {
+	position: relative;
+	margin-top: 20px;
+	padding: 0.7em 2em 1em;
+	min-width: 255px;
+	max-width: 520px;
+	border: 1px solid #e5e5e5;
+	box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+	background: #fff;
+}
+
+/* Press this styles */
+
+.pressthis h4 {
+	margin: 2em 0 1em;
+}
+
+.pressthis textarea {
+	width: 100%;
+	font-size: 1em;
+}
+
+#pressthis-code-wrap {
+	overflow: auto;
+}
+
+.pressthis-bookmarklet-wrapper {
+	margin: 20px 0 8px;
+	vertical-align: top;
+	position: relative;
+	z-index: 1;
+}
+
+.pressthis-bookmarklet,
+.pressthis-bookmarklet:hover,
+.pressthis-bookmarklet:focus,
+.pressthis-bookmarklet:active {
+	display: inline-block;
+	position: relative;
+	cursor: move;
+	color: #32373c;
+	background: #e5e5e5;
+	border-radius: 5px;
+	border: 1px solid #b4b9be;
+	font-style: normal;
+	line-height: 16px;
+	font-size: 14px;
+	text-decoration: none;
+}
+
+.pressthis-bookmarklet:active {
+	outline: none;
+}
+
+.pressthis-bookmarklet:after {
+	content: "";
+	width: 70%;
+	height: 55%;
+	z-index: -1;
+	position: absolute;
+	right: 10px;
+	bottom: 9px;
+	background: transparent;
+	-webkit-transform: skew(20deg) rotate(6deg);
+	transform: skew(20deg) rotate(6deg);
+	box-shadow: 0 10px 8px rgba(0, 0, 0, 0.6);
+}
+
+.pressthis-bookmarklet:hover:after {
+	-webkit-transform: skew(20deg) rotate(9deg);
+	transform: skew(20deg) rotate(9deg);
+	box-shadow: 0 10px 8px rgba(0, 0, 0, 0.7);
+}
+
+.pressthis-bookmarklet span {
+	display: inline-block;
+	margin: 0px 0 0;
+	padding: 0px 12px 8px 9px;
+}
+
+.pressthis-bookmarklet span:before {
+	color: #72777c;
+	font: normal 20px/1 dashicons;
+	content: "\f157";
+	position: relative;
+	display: inline-block;
+	top: 4px;
+	margin-right: 4px;
+}
+
+.pressthis-js-toggle {
+	margin-left: 10px;
+	padding: 0;
+	height: auto;
+	vertical-align: top;
+}
+
+/* to override the button class being applied */
+.pressthis-js-toggle.button.button {
+	margin-left: 10px;
+	padding: 0;
+	height: auto;
+	vertical-align: top;
+}
+
+.pressthis-js-toggle .dashicons {
+	margin: 5px 8px 6px 7px;
+	color: #555d66;
+}
+
+/*------------------------------------------------------------------------------
+  20.0 - Settings
+------------------------------------------------------------------------------*/
+
+.timezone-info code {
+	white-space: nowrap;
+}
+
+.defaultavatarpicker .avatar {
+	margin: 2px 0;
+	vertical-align: middle;
+}
+
+.options-general-php .date-time-text {
+	display: inline-block;
+	min-width: 10em;
+}
+
+.options-general-php input.small-text {
+	width: 56px;
+}
+
+.options-general-php .spinner {
+	float: none;
+	margin: -3px 3px 0;
+}
+
+.settings-php .language-install-spinner,
+.options-general-php .language-install-spinner {
+	display: inline-block;
+	float: none;
+	margin: -3px 5px 0;
+	vertical-align: middle;
+}
+
+.form-table.permalink-structure .available-structure-tags li {
+	float: left;
+	margin-right: 5px;
+}
+
+/*------------------------------------------------------------------------------
+  21.0 - Network Admin
+------------------------------------------------------------------------------*/
+
+.setup-php textarea {
+	max-width: 100%;
+}
+
+.form-field #site-address {
+	max-width: 25em;
+}
+
+.form-field #domain {
+	max-width: 22em;
+}
+
+.form-field #site-title,
+.form-field #admin-email,
+.form-field #path,
+.form-field #blog_registered,
+.form-field #blog_last_updated {
+	max-width: 25em;
+}
+
+.form-field #path {
