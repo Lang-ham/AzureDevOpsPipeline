@@ -1,0 +1,47 @@
+
+/*------------------------------------------------------------------------------
+  27.0 - Localization
+------------------------------------------------------------------------------*/
+
+/* RTL except Hebrew (see below): Tahoma as the first font; */
+body.rtl,
+body.rtl .press-this a.wp-switch-editor {
+	font-family: Tahoma, Arial, sans-serif;
+}
+
+/* Arial is best for RTL headings. */
+.rtl h1,
+.rtl h2,
+.rtl h3,
+.rtl h4,
+.rtl h5,
+.rtl h6 {
+	font-family: Arial, sans-serif;
+	font-weight: 600;
+}
+
+/* he_IL: Remove Tahoma from the font stack. Arial is best for Hebrew. */
+body.locale-he-il,
+body.locale-he-il .press-this a.wp-switch-editor {
+	font-family: Arial, sans-serif;
+}
+
+/* he_IL: Have <em> be bold rather than italic. */
+.locale-he-il em {
+	font-style: normal;
+	font-weight: 600;
+}
+
+/* zh_CN: Remove italic properties. */
+.locale-zh-cn .howto,
+.locale-zh-cn .tablenav .displaying-num,
+.locale-zh-cn .js .input-with-default-title,
+.locale-zh-cn .link-to-original,
+.locale-zh-cn .inline-edit-row fieldset span.title,
+.locale-zh-cn .inline-edit-row fieldset span.checkbox-title,
+.locale-zh-cn #utc-time,
+.locale-zh-cn #local-time,
+.locale-zh-cn p.install-help,
+.locale-zh-cn p.help,
+.locale-zh-cn p.description,
+.locale-zh-cn span.description,
