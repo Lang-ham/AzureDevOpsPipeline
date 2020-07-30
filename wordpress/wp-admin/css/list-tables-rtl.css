@@ -1,0 +1,574 @@
+.response-links {
+	display: block;
+	margin-bottom: 1em;
+}
+
+.response-links a {
+	display: block;
+}
+
+.response-links a.comments-edit-item-link {
+	font-weight: 600;
+}
+
+.response-links a.comments-view-item-link {
+	font-size: 12px;
+}
+
+.post-com-count-wrapper strong {
+	font-weight: 400;
+}
+
+.comments-view-item-link {
+	display: inline-block;
+	clear: both;
+}
+
+.column-response .post-com-count-wrapper,
+.column-comments .post-com-count-wrapper {
+	white-space: nowrap;
+	word-wrap: normal;
+}
+
+/* comments bubble common */
+.column-response .post-com-count,
+.column-comments .post-com-count {
+	display: inline-block;
+	vertical-align: top;
+}
+
+/* comments bubble approved */
+.column-response .post-com-count-no-comments,
+.column-response .post-com-count-approved,
+.column-comments .post-com-count-no-comments,
+.column-comments .post-com-count-approved {
+	margin-top: 5px;
+}
+
+.column-response .comment-count-no-comments,
+.column-response .comment-count-approved,
+.column-comments .comment-count-no-comments,
+.column-comments .comment-count-approved {
+	box-sizing: border-box;
+	display: block;
+	padding: 0 8px;
+	min-width: 24px;
+	height: 2em;
+	border-radius: 5px;
+	background-color: #72777c;
+	color: #fff;
+	font-size: 11px;
+	line-height: 21px;
+	text-align: center;
+}
+
+.ie8 .column-response .comment-count-no-comments,
+.ie8 .column-response .comment-count-approved,
+.ie8 .column-comments .comment-count-no-comments,
+.ie8 .column-comments .comment-count-approved {
+	min-width: 0;
+}
+
+.column-response .post-com-count-no-comments:after,
+.column-response .post-com-count-approved:after,
+.column-comments .post-com-count-no-comments:after,
+.column-comments .post-com-count-approved:after {
+	content: "";
+	display: block;
+	margin-right: 8px;
+	width: 0;
+	height: 0;
+	border-top: 5px solid #72777c;
+	border-left: 5px solid transparent;
+}
+
+.column-response .post-com-count-approved:hover .comment-count-approved,
+.column-response .post-com-count-approved:focus .comment-count-approved,
+.column-comments .post-com-count-approved:hover .comment-count-approved,
+.column-comments .post-com-count-approved:focus .comment-count-approved {
+	background: #0073aa;
+}
+
+.column-response .post-com-count-approved:hover:after,
+.column-response .post-com-count-approved:focus:after,
+.column-comments .post-com-count-approved:hover:after,
+.column-comments .post-com-count-approved:focus:after {
+	border-top-color: #0073aa;
+}
+
+/* @todo: consider to use a single rule for these counters and the admin menu counters. */
+.column-response .post-com-count-pending,
+.column-comments .post-com-count-pending {
+	position: relative;
+	right: -3px;
+	padding: 0 5px;
+	min-width: 7px;
+	height: 17px;
+	border: 2px solid #fff;
+	border-radius: 11px;
+	background: #ca4a1f;
+	color: #fff;
+	font-size: 9px;
+	line-height: 17px;
+	text-align: center;
+}
+
+.column-response .post-com-count-no-pending,
+.column-comments .post-com-count-no-pending {
+	display: none;
+}
+
+/* comments */
+
+.commentlist li {
+	padding: 1em 1em .2em;
+	margin: 0;
+	border-bottom: 1px solid #ccc;
+}
+
+.commentlist li li {
+	border-bottom: 0;
+	padding: 0;
+}
+
+.commentlist p {
+	padding: 0;
+	margin: 0 0 .8em;
+}
+
+#submitted-on,
+.submitted-on {
+	color: #555d66;
+}
+
+/* reply to comments */
+#replyrow td {
+	padding: 2px;
+}
+
+#replysubmit {
+	margin: 0;
+	padding: 5px 7px 10px;
+	overflow: hidden;
+}
+
+#replysubmit .button {
+	margin-left: 5px;
+}
+
+#replyrow.inline-edit-row fieldset.comment-reply {
+	font-size: inherit;
+	line-height: inherit;
+}
+
+#replyrow legend {
+	margin: 0;
+	padding: .2em 5px 0;
+	font-size: 13px;
+	line-height: 1.4;
+	font-weight: 600;
+}
+
+#replyrow.inline-edit-row label {
+	display: inline;
+	vertical-align: baseline;
+	line-height: inherit;
+}
+
+#edithead .inside,
+#commentsdiv #edithead .inside {
+	float: right;
+	padding: 3px 5px 2px 0;
+	margin: 0;
+	text-align: center;
+}
+
+#edithead .inside input {
+	width: 180px;
+}
+
+#edithead label {
+	padding: 2px 0;
+}
+
+#replycontainer {
+	padding: 5px;
+}
+
+#replycontent {
+	height: 120px;
+	box-shadow: none;
+}
+
+#replyerror {
+	border-color: #ddd;
+	background-color: #f9f9f9;
+}
+
+/* @todo: is this used? */
+.commentlist .avatar {
+	vertical-align: text-top;
+}
+
+#the-comment-list tr.undo,
+#the-comment-list div.undo {
+	background-color: #f5f5f5;
+}
+
+#the-comment-list .unapproved th,
+#the-comment-list .unapproved td {
+	background-color: #fef7f1;
+}
+
+#the-comment-list .unapproved th.check-column {
+	border-right: 4px solid #d54e21;
+}
+
+#the-comment-list .unapproved th.check-column input {
+	margin-right: 4px;
+}
+
+#the-comment-list .approve a {
+	color: #006505;
+}
+
+#the-comment-list .unapprove a {
+	color: #d98500;
+}
+
+#the-comment-list th,
+#the-comment-list td {
+	box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+#the-comment-list tr:last-child th,
+#the-comment-list tr:last-child td {
+    box-shadow: none;
+}
+
+#the-comment-list tr.unapproved + tr.approved th,
+#the-comment-list tr.unapproved + tr.approved td {
+    border-top: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+/* table vim shortcuts */
+.vim-current,
+.vim-current th,
+.vim-current td {
+	background-color: #e4f2fd !important;
+}
+
+th .comment-grey-bubble {
+	height: 16px;
+	width: 16px;
+}
+
+th .comment-grey-bubble:before {
+	content: "\f101";
+	font: normal 20px/.5 dashicons;
+	speak: none;
+	display: inline-block;
+	padding: 0;
+	top: 4px;
+	right: -4px;
+	position: relative;
+	vertical-align: top;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-decoration: none !important;
+	color: #444;
+}
+
+/*------------------------------------------------------------------------------
+  10.0 - List Posts (/Pages/etc)
+------------------------------------------------------------------------------*/
+
+table.fixed {
+	table-layout: fixed;
+}
+
+.fixed .column-rating,
+.fixed .column-visible {
+	width: 8%;
+}
+
+.fixed .column-posts,
+.fixed .column-date,
+.fixed .column-parent,
+.fixed .column-links,
+.fixed .column-author,
+.fixed .column-format {
+	width: 10%;
+}
+
+.fixed .column-posts {
+	width: 74px;
+}
+
+.fixed .column-comment .comment-author {
+	display: none;
+}
+
+.fixed .column-response,
+.fixed .column-categories,
+.fixed .column-tags,
+.fixed .column-rel,
+.fixed .column-role {
+	width: 15%;
+}
+
+.fixed .column-slug {
+	width: 25%;
+}
+
+.fixed .column-locations {
+	width: 35%;
+}
+
+.fixed .column-comments {
+	width: 5.5em;
+	padding: 8px 0;
+	text-align: right;
+}
+
+.fixed .column-comments .vers {
+	padding-right: 3px;
+}
+
+td.column-title strong,
+td.plugin-title strong {
+	display: block;
+	margin-bottom: .2em;
+	font-size: 14px;
+}
+
+td.column-title p,
+td.plugin-title p {
+	margin: 6px 0;
+}
+
+/* Media file column */
+table.media .column-title .media-icon {
+	float: right;
+	min-height: 60px;
+ 	margin: 0 0 0 9px;
+}
+
+table.media .column-title .media-icon img {
+	max-width: 60px;
+	height: auto;
+	vertical-align: top; /* Remove descender white-space. */
+}
+
+table.media .column-title .has-media-icon ~ .row-actions {
+	margin-right: 70px; /* 60px image + margin */
+}
+
+table.media .column-title .filename {
+	margin-bottom: 0.2em;
+}
+
+/* @todo: pick a consistent list table selector */
+.wp-list-table a {
+	transition: none;
+}
+
+#the-list tr:last-child td,
+#the-list tr:last-child th {
+	border-bottom: none !important;
+	box-shadow: none;
+}
+
+#comments-form .fixed .column-author {
+	width: 20%;
+}
+
+#comments-form .fixed .column-date {
+	width: 14%;
+}
+
+#commentsdiv.postbox .inside {
+	margin: 0;
+	padding: 0;
+}
+
+#commentsdiv .inside .row-actions {
+	line-height:18px;
+}
+
+#commentsdiv .inside .column-author {
+	width: 25%;
+}
+
+#commentsdiv .column-comment p {
+	margin: 0.6em 0;
+	padding: 0;
+}
+
+#commentsdiv #replyrow td {
+	padding: 0;
+}
+
+#commentsdiv p {
+	padding: 8px 10px;
+	margin: 0;
+}
+
+#commentsdiv .comments-box {
+	border: 0 none;
+}
+
+#commentsdiv .comments-box thead th,
+#commentsdiv .comments-box thead td {
+	background: transparent;
+	padding: 0 7px 4px;
+	font-style: italic;
+}
+
+#commentsdiv .comments-box tr:last-child td {
+	border-bottom: 0 none;
+}
+
+#commentsdiv #edithead .inside input {
+	width: 160px;
+}
+
+.sorting-indicator {
+	display: block;
+	visibility: hidden;
+	width: 10px;
+	height: 4px;
+	margin-top: 8px;
+	margin-right: 7px;
+}
+
+.sorting-indicator:before {
+	content: "\f142";
+	font: normal 20px/1 dashicons;
+	speak: none;
+	display: inline-block;
+	padding: 0;
+	top: -4px;
+	right: -8px;
+	color: #444;
+	line-height: 10px;
+	position: relative;
+	vertical-align: top;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-decoration: none !important;
+	color: #444;
+}
+
+.column-comments .sorting-indicator:before {
+	top: 0;
+	right: -10px;
+}
+
+th.sorted.asc .sorting-indicator:before,
+th.desc:hover span.sorting-indicator:before,
+th.desc a:focus span.sorting-indicator:before {
+	content: "\f142";
+}
+
+th.sorted.desc .sorting-indicator:before,
+th.asc:hover span.sorting-indicator:before,
+th.asc a:focus span.sorting-indicator:before {
+	content: "\f140";
+}
+
+.wp-list-table .toggle-row {
+	position: absolute;
+	left: 8px;
+	top: 10px;
+	display: none;
+	padding: 0;
+	width: 40px;
+	height: 40px;
+	border: none;
+	outline: none;
+	background: transparent;
+}
+
+.wp-list-table .toggle-row:hover {
+	cursor: pointer;
+}
+
+.wp-list-table .toggle-row:focus:before {
+    box-shadow:
+    	0 0 0 1px #5b9dd9,
+		0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+.ie8 .wp-list-table .toggle-row:focus:before {
+	outline: #5b9dd9 solid 1px;
+}
+
+.wp-list-table .toggle-row:active {
+	box-shadow: none;
+}
+
+.wp-list-table .toggle-row:before {
+	position: absolute;
+	top: -5px;
+	right: 10px;
+	border-radius: 50%;
+	display: block;
+	padding: 1px 0 1px 2px;
+	color: #444; /* same as table headers sort arrows */
+	content: "\f140";
+	font: normal 20px/1 dashicons;
+	line-height: 1;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	speak: none;
+}
+
+.wp-list-table .is-expanded .toggle-row:before {
+	content: "\f142";
+}
+
+tr.wp-locked .locked-indicator {
+	margin-right: 6px;
+	height: 20px;
+	width: 16px;
+}
+
+tr.wp-locked .locked-indicator-icon:before {
+	color: #82878c;
+	content: "\f160";
+	display: inline-block;
+	font: normal 20px/1 dashicons;
+	speak: none;
+	vertical-align: middle;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+tr.wp-locked .check-column label,
+tr.wp-locked .check-column input[type="checkbox"],
+tr.wp-locked .row-actions .inline,
+tr.wp-locked .row-actions .trash {
+	display: none;
+}
+
+tr .locked-info {
+	height: 0;
+	opacity: 0;
+}
+
+tr.wp-locked .locked-info {
+	margin-top: 4px;
+	height: auto;
+	opacity: 1;
+}
+
+.locked-text {
+	vertical-align: top;
+}
+
+tr.locked-info, tr.wp-locked .locked-info {
+	transition: height 1s, opacity 0.5s;
+}
+
+.fixed .column-comments .s
