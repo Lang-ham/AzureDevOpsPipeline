@@ -1796,4 +1796,350 @@ div.action-links,
 		right: 10px; /* match padding of regular table cell */
 		display: block;
 		overflow: hidden;
-		width: 32%; /
+		width: 32%; /* leave a little space for a gutter */
+		content: attr(data-colname);
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.wp-list-table .is-expanded td:not(.hidden) {
+		display: block !important;
+		overflow: hidden; /* clearfix */
+	}
+
+	/* Special cases */
+	.widefat .num,
+	.column-posts {
+		text-align: right;
+	}
+
+	#comments-form .fixed .column-author,
+	#commentsdiv .fixed .column-author {
+		display: none !important;
+	}
+
+	.fixed .column-comment .comment-author {
+		display: block;
+	}
+
+	#the-comment-list .is-expanded td {
+		box-shadow: none;
+	}
+
+	#the-comment-list .is-expanded td:last-child {
+		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+	}
+
+	/* Show comment bubble as text instead */
+	.post-com-count .screen-reader-text {
+		position: static;
+		-webkit-clip-path: none;
+		clip-path: none;
+		width: auto;
+		height: auto;
+		margin: 0;
+	}
+
+	.column-response .post-com-count-no-comments:after,
+	.column-response .post-com-count-approved:after,
+	.column-comments .post-com-count-no-comments:after,
+	.column-comments .post-com-count-approved:after {
+		content: none;
+	}
+
+	.column-response .post-com-count [aria-hidden="true"],
+	.column-comments .post-com-count [aria-hidden="true"] {
+		display: none;
+	}
+
+	.column-response .post-com-count-wrapper,
+	.column-comments .post-com-count-wrapper {
+		white-space: normal;
+	}
+
+	.column-response .post-com-count-wrapper > a,
+	.column-comments .post-com-count-wrapper > a {
+		display: block;
+	}
+
+	.column-response .post-com-count-no-comments,
+	.column-response .post-com-count-approved,
+	.column-comments .post-com-count-no-comments,
+	.column-comments .post-com-count-approved {
+		margin-top: 0;
+		margin-left: 0.5em;
+	}
+
+	.column-response .post-com-count-pending,
+	.column-comments .post-com-count-pending {
+		position: static;
+		height: auto;
+		min-width: 0;
+		padding: 0;
+		border: none;
+		border-radius: 0;
+		background: none;
+		color: #bb2a2a;
+		font-size: inherit;
+		line-height: inherit;
+		text-align: right;
+	}
+
+	.column-response .post-com-count-pending:hover,
+	.column-comments .post-com-count-pending:hover {
+		color: #dc3232;
+	}
+
+	.widefat thead td.check-column,
+	.widefat tfoot td.check-column {
+		padding-top: 10px;
+	}
+
+	.widefat * {
+		word-wrap: normal;
+	}
+
+	/* Quick Edit and Bulk Edit */
+	#wpbody-content .quick-edit-row-post .inline-edit-col-left,
+	#wpbody-content .quick-edit-row-post .inline-edit-col-right,
+	#wpbody-content .inline-edit-row-post .inline-edit-col-center,
+	#wpbody-content .quick-edit-row-page .inline-edit-col-left,
+	#wpbody-content .quick-edit-row-page .inline-edit-col-right,
+	#wpbody-content .bulk-edit-row-post .inline-edit-col-right,
+	#wpbody-content .bulk-edit-row .inline-edit-col-left,
+	#wpbody-content .bulk-edit-row-page .inline-edit-col-right,
+	#wpbody-content .bulk-edit-row .inline-edit-col-bottom {
+		float: none;
+		width: 100%;
+	}
+
+	#wpbody-content .quick-edit-row fieldset .inline-edit-col label,
+	#wpbody-content .quick-edit-row fieldset .inline-edit-group label,
+	#wpbody-content .bulk-edit-row fieldset .inline-edit-col label,
+	#wpbody-content .bulk-edit-row fieldset .inline-edit-group label {
+		max-width: none;
+		float: none;
+		margin-bottom: 5px;
+	}
+
+	#wpbody .bulk-edit-row fieldset select {
+		display: block;
+		width: 100%;
+		max-width: none;
+		box-sizing: border-box;
+	}
+
+	.inline-edit-row fieldset ul.cat-checklist label,
+	.inline-edit-row #bulk-titles div {
+		font-size: 16px;
+	}
+
+	.inline-edit-row fieldset label span.title,
+	.inline-edit-row fieldset.inline-edit-date legend {
+		float: none;
+	}
+
+	.inline-edit-row fieldset label.inline-edit-tags {
+		padding: 0 0.5em;
+	}
+
+	.inline-edit-row fieldset .inline-edit-col label.inline-edit-tags {
+		padding: 0;
+	}
+
+	.inline-edit-row fieldset label span.input-text-wrap,
+	.inline-edit-row fieldset .timestamp-wrap {
+		margin-right: 0;
+	}
+
+	.inline-edit-row fieldset input[name=jj],
+	.inline-edit-row fieldset input[name=hh],
+	.inline-edit-row fieldset input[name=mn] {
+		width: 3em;
+	}
+
+	.inline-edit-row fieldset input[name=aa] {
+		width: 4.5em;
+	}
+
+	.inline-edit-row .inline-edit-or {
+		margin: 0 0 0 6px;
+	}
+
+	#edithead .inside,
+	#commentsdiv #edithead .inside {
+		float: none;
+		text-align: right;
+		padding: 3px 5px;
+	}
+
+	#commentsdiv #edithead .inside input,
+	#edithead .inside input {
+		width: 100%;
+	}
+
+	#edithead label {
+		display: block;
+	}
+
+	#bulk-titles div {
+		margin: 0.8em 0.3em;
+	}
+
+	#bulk-titles div a {
+		height: 22px;
+	}
+
+	/* Updates */
+	#wpbody-content .updates-table .plugin-title {
+		width: auto;
+		white-space: normal;
+	}
+
+	/* Links */
+	.link-manager-php #posts-filter {
+		margin-top: 25px;
+	}
+
+	.link-manager-php .tablenav.bottom {
+		overflow: hidden;
+	}
+
+	/* List tables that don't toggle rows */
+	.comments-box .toggle-row,
+	.wp-list-table.plugins .toggle-row {
+		display: none;
+	}
+
+	/* Plugin/Theme Management */
+	#wpbody-content .wp-list-table.plugins td {
+		display: block;
+		width: auto;
+		padding: 10px 9px; /* reset from other list tables that have a label at this width */
+	}
+
+	#wpbody-content .wp-list-table.plugins .column-description {
+		padding-top: 2px;
+	}
+
+	#wpbody-content .wp-list-table.plugins .plugin-title,
+	#wpbody-content .wp-list-table.plugins .theme-title {
+		padding-left: 12px;
+		white-space: normal;
+	}
+
+	.wp-list-table.plugins .plugin-title,
+	.wp-list-table.plugins .theme-title {
+		padding-top: 13px;
+		padding-bottom: 4px;
+	}
+
+	.plugins #the-list tr > td:not(:last-child),
+	.plugins #the-list .update th,
+	.plugins #the-list .update td,
+	.wp-list-table.plugins #the-list .theme-title {
+		box-shadow: none;
+		border-top: none;
+	}
+
+	.plugins #the-list tr td {
+		border-top: none;
+	}
+
+	.plugins tbody {
+		padding: 1px 0 0;
+	}
+
+	.plugins tr.active + tr.inactive th.check-column,
+	.plugins tr.active + tr.inactive td.column-description,
+	.plugins .plugin-update-tr:before {
+		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+	}
+
+	.plugins tr.active + tr.inactive th.check-column,
+	.plugins tr.active + tr.inactive td {
+		border-top: none;
+	}
+
+	/* mimic the checkbox th */
+	.plugins .plugin-update-tr:before {
+		content: "";
+		display: table-cell;
+	}
+
+	.plugins .active.update + .plugin-update-tr:before {
+		border-right: 4px solid #d54e21;
+		background-color: #fef7f1;
+	}
+
+	.plugins #the-list .plugin-update-tr .plugin-update {
+		border-right: none;
+	}
+
+	.plugin-update-tr .update-message {
+		margin-right: 0;
+	}
+
+	.plugins .active.update + .plugin-update-tr:before {
+		background-color: #f7fcfe;
+		border-right: 4px solid #00a0d2;
+	}
+
+	.plugins .plugin-update-tr .update-message {
+		margin-right: 0;
+	}
+
+	.wp-list-table.plugins .plugin-title strong,
+	.wp-list-table.plugins .theme-title strong {
+		font-size: 1.4em;
+		line-height: 1.5;
+	}
+
+	/* Add New plugins page */
+	table.plugin-install .column-name,
+	table.plugin-install .column-version,
+	table.plugin-install .column-rating,
+	table.plugin-install .column-description {
+		display: block;
+		width: auto;
+	}
+
+	table.plugin-install th.column-name,
+	table.plugin-install th.column-version,
+	table.plugin-install th.column-rating,
+	table.plugin-install th.column-description {
+		display: none;
+	}
+
+	table.plugin-install td.column-name strong {
+		font-size: 1.4em;
+		line-height: 1.6em;
+	}
+
+	table.plugin-install #the-list td {
+		box-shadow: none;
+	}
+
+	table.plugin-install #the-list tr {
+		display: block;
+		box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
+	}
+
+	.plugin-card {
+		margin-right: 0;
+		margin-left: 0;
+		width: 100%;
+	}
+}
+
+@media screen and ( max-width: 480px ) {
+	.tablenav-pages .current-page {
+		margin: 0;
+	}
+
+	.tablenav-pages .tablenav-paging-text {
+		float: right;
+		width: 100%;
+		padding-top: 0.5em;
+	}
+}
