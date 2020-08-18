@@ -1,0 +1,187 @@
+.response-links {
+	display: block;
+	margin-bottom: 1em;
+}
+
+.response-links a {
+	display: block;
+}
+
+.response-links a.comments-edit-item-link {
+	font-weight: 600;
+}
+
+.response-links a.comments-view-item-link {
+	font-size: 12px;
+}
+
+.post-com-count-wrapper strong {
+	font-weight: 400;
+}
+
+.comments-view-item-link {
+	display: inline-block;
+	clear: both;
+}
+
+.column-response .post-com-count-wrapper,
+.column-comments .post-com-count-wrapper {
+	white-space: nowrap;
+	word-wrap: normal;
+}
+
+/* comments bubble common */
+.column-response .post-com-count,
+.column-comments .post-com-count {
+	display: inline-block;
+	vertical-align: top;
+}
+
+/* comments bubble approved */
+.column-response .post-com-count-no-comments,
+.column-response .post-com-count-approved,
+.column-comments .post-com-count-no-comments,
+.column-comments .post-com-count-approved {
+	margin-top: 5px;
+}
+
+.column-response .comment-count-no-comments,
+.column-response .comment-count-approved,
+.column-comments .comment-count-no-comments,
+.column-comments .comment-count-approved {
+	box-sizing: border-box;
+	display: block;
+	padding: 0 8px;
+	min-width: 24px;
+	height: 2em;
+	border-radius: 5px;
+	background-color: #72777c;
+	color: #fff;
+	font-size: 11px;
+	line-height: 21px;
+	text-align: center;
+}
+
+.ie8 .column-response .comment-count-no-comments,
+.ie8 .column-response .comment-count-approved,
+.ie8 .column-comments .comment-count-no-comments,
+.ie8 .column-comments .comment-count-approved {
+	min-width: 0;
+}
+
+.column-response .post-com-count-no-comments:after,
+.column-response .post-com-count-approved:after,
+.column-comments .post-com-count-no-comments:after,
+.column-comments .post-com-count-approved:after {
+	content: "";
+	display: block;
+	margin-left: 8px;
+	width: 0;
+	height: 0;
+	border-top: 5px solid #72777c;
+	border-right: 5px solid transparent;
+}
+
+.column-response .post-com-count-approved:hover .comment-count-approved,
+.column-response .post-com-count-approved:focus .comment-count-approved,
+.column-comments .post-com-count-approved:hover .comment-count-approved,
+.column-comments .post-com-count-approved:focus .comment-count-approved {
+	background: #0073aa;
+}
+
+.column-response .post-com-count-approved:hover:after,
+.column-response .post-com-count-approved:focus:after,
+.column-comments .post-com-count-approved:hover:after,
+.column-comments .post-com-count-approved:focus:after {
+	border-top-color: #0073aa;
+}
+
+/* @todo: consider to use a single rule for these counters and the admin menu counters. */
+.column-response .post-com-count-pending,
+.column-comments .post-com-count-pending {
+	position: relative;
+	left: -3px;
+	padding: 0 5px;
+	min-width: 7px;
+	height: 17px;
+	border: 2px solid #fff;
+	border-radius: 11px;
+	background: #ca4a1f;
+	color: #fff;
+	font-size: 9px;
+	line-height: 17px;
+	text-align: center;
+}
+
+.column-response .post-com-count-no-pending,
+.column-comments .post-com-count-no-pending {
+	display: none;
+}
+
+/* comments */
+
+.commentlist li {
+	padding: 1em 1em .2em;
+	margin: 0;
+	border-bottom: 1px solid #ccc;
+}
+
+.commentlist li li {
+	border-bottom: 0;
+	padding: 0;
+}
+
+.commentlist p {
+	padding: 0;
+	margin: 0 0 .8em;
+}
+
+#submitted-on,
+.submitted-on {
+	color: #555d66;
+}
+
+/* reply to comments */
+#replyrow td {
+	padding: 2px;
+}
+
+#replysubmit {
+	margin: 0;
+	padding: 5px 7px 10px;
+	overflow: hidden;
+}
+
+#replysubmit .button {
+	margin-right: 5px;
+}
+
+#replyrow.inline-edit-row fieldset.comment-reply {
+	font-size: inherit;
+	line-height: inherit;
+}
+
+#replyrow legend {
+	margin: 0;
+	padding: .2em 5px 0;
+	font-size: 13px;
+	line-height: 1.4;
+	font-weight: 600;
+}
+
+#replyrow.inline-edit-row label {
+	display: inline;
+	vertical-align: baseline;
+	line-height: inherit;
+}
+
+#edithead .inside,
+#commentsdiv #edithead .inside {
+	float: left;
+	padding: 3px 0 2px 5px;
+	margin: 0;
+	text-align: center;
+}
+
+#edithead .inside input {
+	widt
