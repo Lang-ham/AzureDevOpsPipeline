@@ -820,4 +820,606 @@ classes exist in paginate_links() but not seen in list table output. */
 }
 
 #posts-filter fieldset legend {
-	padding: 0 0 .2em
+	padding: 0 0 .2em 1px;
+}
+
+p.pagenav {
+	margin: 0;
+	display: inline;
+}
+
+.pagenav span {
+	font-weight: 600;
+	margin: 0 6px;
+}
+
+.row-title {
+	font-size: 14px !important;
+	font-weight: 600;
+}
+
+.column-comment .comment-author {
+	margin-bottom: 0.6em;
+}
+
+.column-author img,
+.column-username img,
+.column-comment .comment-author img {
+	float: left;
+	margin-right: 10px;
+	margin-top: 1px;
+}
+
+.row-actions {
+	color: #ddd;
+	font-size: 13px;
+	padding: 2px 0 0;
+	position: relative;
+	left: -9999em;
+}
+
+/* ticket #34150 */
+.rtl .row-actions a {
+	display: inline-block;
+}
+
+.row-actions .network_only,
+.row-actions .network_active {
+	color: #000;
+}
+
+.no-js .row-actions,
+tr:hover .row-actions,
+.mobile .row-actions,
+.row-actions.visible,
+.comment-item:hover .row-actions {
+	position: static;
+}
+
+/* deprecated */
+.row-actions-visible {
+	padding: 2px 0 0;
+}
+
+
+/*------------------------------------------------------------------------------
+  10.1 - Inline Editing
+------------------------------------------------------------------------------*/
+
+/*
+.quick-edit* is for Quick Edit
+.bulk-edit* is for Bulk Edit
+.inline-edit* is for everything
+*/
+
+/*	Layout */
+
+#wpbody-content .inline-edit-row fieldset {
+	font-size: 12px;
+	float: left;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+}
+
+tr.inline-edit-row td,
+#wpbody-content .inline-edit-row fieldset .inline-edit-col {
+	padding: 0 0.5em;
+}
+
+#wpbody-content .quick-edit-row-post .inline-edit-col-left {
+	width: 40%;
+}
+
+#wpbody-content .quick-edit-row-post .inline-edit-col-right {
+	width: 39%;
+}
+
+#wpbody-content .inline-edit-row-post .inline-edit-col-center {
+	width: 20%;
+}
+
+#wpbody-content .quick-edit-row-page .inline-edit-col-left {
+	width: 50%;
+}
+
+#wpbody-content .quick-edit-row-page .inline-edit-col-right,
+#wpbody-content .bulk-edit-row-post .inline-edit-col-right {
+	width: 49%;
+}
+
+#wpbody-content .bulk-edit-row .inline-edit-col-left {
+	width: 30%;
+}
+
+#wpbody-content .bulk-edit-row-page .inline-edit-col-right {
+	width: 69%;
+}
+
+#wpbody-content .bulk-edit-row .inline-edit-col-bottom {
+	float: right;
+	width: 69%;
+}
+
+#wpbody-content .inline-edit-row-page .inline-edit-col-right {
+	margin-top: 27px;
+}
+
+.inline-edit-row fieldset .inline-edit-group {
+	clear: both;
+	line-height: 2.5;
+}
+
+.inline-edit-row .submit {
+	clear: both;
+	padding: 0.5em;
+	margin: 0.5em 0 0;
+}
+
+.inline-edit-row .notice-error {
+	margin-top: 1em;
+}
+
+.inline-edit-row .notice-error .error {
+	margin: 0.5em 0;
+	padding: 2px;
+}
+
+/*	Positioning */
+
+/* Needs higher specificity for the padding */
+#the-list .inline-edit-row .inline-edit-legend {
+	margin: 0;
+	padding: 0.2em 0.5em 0;
+	line-height: 2.5;
+	font-weight: 600;
+}
+
+#the-list #bulk-edit.inline-edit-row .inline-edit-legend {
+	padding: 0.2em 0.5em;
+}
+
+.inline-edit-row fieldset span.title,
+.inline-edit-row fieldset span.checkbox-title {
+	margin: 0;
+	padding: 0;
+}
+
+.inline-edit-row fieldset label,
+.inline-edit-row fieldset span.inline-edit-categories-label {
+	display: block;
+	margin: .2em 0;
+	line-height: 2.5;
+}
+
+.inline-edit-row fieldset.inline-edit-date label {
+	display: inline-block;
+	margin: 0;
+	line-height: 1.5;
+	vertical-align: baseline;
+}
+
+.inline-edit-row fieldset label.inline-edit-tags {
+	margin-top: 0;
+}
+
+.inline-edit-row fieldset label.inline-edit-tags span.title {
+	margin: .2em 0;
+	width: auto;
+}
+
+.inline-edit-row fieldset label span.title,
+.inline-edit-row fieldset.inline-edit-date legend {
+	display: block;
+	float: left;
+	width: 6em;
+	line-height: 2.5;
+}
+
+#posts-filter fieldset.inline-edit-date legend {
+	padding: 0;
+}
+
+.inline-edit-row fieldset.inline-edit-date select {
+	margin: 1px;
+	line-height: 28px;
+}
+
+.inline-edit-row fieldset label span.input-text-wrap,
+.inline-edit-row fieldset .timestamp-wrap {
+	display: block;
+	margin-left: 6em;
+}
+
+.quick-edit-row-post fieldset.inline-edit-col-right label span.title {
+	width: auto;
+	padding-right: 0.5em;
+}
+
+.inline-edit-row .inline-edit-or {
+	margin: .2em 6px .2em 0;
+	line-height: 2.5;
+}
+
+.inline-edit-row .input-text-wrap input[type=text] {
+	width: 100%;
+}
+
+.inline-edit-row fieldset label input[type=checkbox] {
+	vertical-align: middle;
+}
+
+.inline-edit-row fieldset label textarea {
+	width: 100%;
+	height: 4em;
+	vertical-align: top;
+}
+
+#wpbody-content .bulk-edit-row fieldset .inline-edit-group label {
+	max-width: 50%;
+}
+
+#wpbody-content .quick-edit-row fieldset .inline-edit-group label.alignleft:first-child {
+	margin-right: 0.5em
+}
+
+.inline-edit-col-right .input-text-wrap input.inline-edit-menu-order-input {
+	width: 6em;
+}
+
+/*	Styling */
+.inline-edit-row .inline-edit-legend {
+	text-transform: uppercase;
+}
+
+.inline-edit-row fieldset span.title,
+.inline-edit-row fieldset span.checkbox-title {
+	font-style: italic;
+}
+
+/*	Specific Elements */
+.inline-edit-row fieldset .inline-edit-date {
+	float: left;
+}
+
+.inline-edit-row fieldset input[name=jj],
+.inline-edit-row fieldset input[name=hh],
+.inline-edit-row fieldset input[name=mn] {
+	font-size: 12px;
+	width: 2.3em;
+}
+
+.inline-edit-row fieldset input[name=aa] {
+	font-size: 12px;
+	width: 3.5em;
+}
+
+.inline-edit-row fieldset label input.inline-edit-password-input {
+	width: 8em;
+}
+
+ul.cat-checklist {
+	height: 12em;
+	border: solid 1px #ddd;
+	overflow-y: scroll;
+	padding: 0 5px;
+	margin: 0;
+	background-color: #fff;
+}
+
+#bulk-titles {
+	display: block;
+	height: 12em;
+	border: 1px solid #ddd;
+	overflow-y: scroll;
+	padding: 0 5px;
+	margin: 0 0 5px;
+}
+
+.inline-edit-row fieldset ul.cat-checklist li,
+.inline-edit-row fieldset ul.cat-checklist input {
+	margin: 0;
+	position: relative; /* RTL fix, #WP27629 */
+}
+
+.inline-edit-row fieldset ul.cat-checklist label,
+.inline-edit-row #bulk-titles div {
+	font-style: normal;
+	font-size: 11px;
+}
+
+.inline-edit-row fieldset label input.inline-edit-menu-order-input {
+	width: 3em;
+}
+
+.inline-edit-row fieldset label input.inline-edit-slug-input {
+	width: 75%;
+}
+
+.inline-edit-row #post_parent,
+.inline-edit-row select[name="page_template"] {
+	max-width: 80%;
+}
+
+.ie8 .inline-edit-row #post_parent,
+.ie8 .inline-edit-row select[name="page_template"] {
+	width: 250px;
+}
+
+.quick-edit-row-post fieldset label.inline-edit-status {
+	float: left;
+}
+
+#bulk-titles {
+	line-height: 140%;
+}
+#bulk-titles div {
+	margin: 0.2em 0.3em;
+}
+
+#bulk-titles div a {
+	cursor: pointer;
+	display: block;
+	float: left;
+	height: 18px;
+	margin: 0 3px 0 -2px;
+	overflow: hidden;
+	position: relative;
+	width: 20px;
+}
+
+#bulk-titles div a:before {
+	position: relative;
+	top: -3px;
+}
+
+/*------------------------------------------------------------------------------
+  17.0 - Plugins
+------------------------------------------------------------------------------*/
+
+.plugins tbody th.check-column,
+.plugins tbody {
+	padding: 8px 0 0 2px;
+}
+
+.plugins tbody th.check-column input[type=checkbox] {
+	margin-top: 4px;
+}
+
+.updates-table .plugin-title p {
+	margin-top: 0;
+}
+
+.plugins thead td.check-column,
+.plugins tfoot td.check-column,
+.plugins .inactive th.check-column {
+	padding-left: 6px;
+}
+
+.plugins,
+.plugins th,
+.plugins td {
+	color: #000;
+}
+
+.plugins tr {
+	background: #fff;
+}
+
+.plugins p {
+	margin: 0 4px;
+	padding: 0;
+}
+
+.plugins .desc p {
+	margin: 0 0 8px;
+}
+
+.plugins td.desc {
+	line-height: 1.5em;
+}
+
+.plugins .desc ul,
+.plugins .desc ol {
+	margin: 0 0 0 2em;
+}
+
+.plugins .desc ul {
+	list-style-type: disc;
+}
+
+.plugins .row-actions {
+	font-size: 13px;
+	padding: 0;
+}
+
+.plugins .inactive td,
+.plugins .inactive th,
+.plugins .active td,
+.plugins .active th {
+	padding: 10px 9px;
+}
+
+.plugins .active td,
+.plugins .active th {
+	background-color: #f7fcfe;
+}
+
+.plugins .update th,
+.plugins .update td {
+	border-bottom: 0;
+}
+
+.plugins .inactive td,
+.plugins .inactive th,
+.plugins .active td,
+.plugins .active th,
+.plugin-install #the-list td,
+.upgrade .plugins td,
+.upgrade .plugins th {
+	box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
+}
+
+.plugins tr.active.plugin-update-tr + tr.inactive th,
+.plugins tr.active.plugin-update-tr + tr.inactive td,
+.plugins tr.active + tr.inactive th,
+.plugins tr.active + tr.inactive td {
+	border-top: 1px solid rgba(0,0,0,0.03);
+	box-shadow: inset 0 1px 0 rgba(0,0,0,0.02), inset 0 -1px 0 #e1e1e1;
+}
+
+.plugins .update td,
+.plugins .update th,
+.upgrade .plugins tr:last-of-type td,
+.upgrade .plugins tr:last-of-type th,
+.plugins tr.active + tr.inactive.update th,
+.plugins tr.active + tr.inactive.update td,
+.plugins .updated td,
+.plugins .updated th,
+.plugins tr.active + tr.inactive.updated th,
+.plugins tr.active + tr.inactive.updated td {
+	box-shadow: none;
+}
+
+.plugins .active th.check-column,
+.plugin-update-tr.active td {
+	border-left: 4px solid #00a0d2;
+}
+
+.wp-list-table.plugins .plugin-title,
+.wp-list-table.plugins .theme-title {
+	padding-right: 12px;
+	white-space: nowrap;
+}
+
+.plugins .plugin-title img,
+.plugins .plugin-title .dashicons {
+	float: left;
+	padding: 0 10px 0 0;
+	width: 64px;
+	height: 64px;
+}
+
+.plugins .plugin-title .dashicons:before {
+	padding: 2px;
+	background-color: #eee;
+	box-shadow: inset 0 0 10px rgba(160,165,170,.15);
+	font-size: 60px;
+	color: #B4B9BE;
+}
+
+#update-themes-table .plugin-title img,
+#update-themes-table .plugin-title .dashicons {
+	width: 85px;
+}
+
+.plugins .inactive .plugin-title strong {
+	font-weight: 400;
+}
+
+.plugins .second,
+.plugins .row-actions {
+	padding: 0 0 5px;
+}
+
+.plugins .update .second,
+.plugins .update .row-actions,
+.plugins .updated .second,
+.plugins .updated .row-actions {
+	padding-bottom: 0;
+}
+
+.plugins-php .widefat tfoot th,
+.plugins-php .widefat tfoot td {
+	border-top-style: solid;
+	border-top-width: 1px;
+}
+
+.plugins .plugin-update-tr .plugin-update {
+	box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
+	overflow: hidden; /* clearfix */
+	padding: 0;
+}
+
+.plugins .plugin-update-tr .notice,
+.plugins .plugin-update-tr div[class="update-message"] { /* back-compat for pre-4.6 */
+	margin: 5px 20px 15px 40px;
+}
+
+.plugins .notice p {
+	margin: 0.5em 0;
+}
+
+.plugin-card .update-now:before {
+	color: #f56e28;
+	content: "\f463";
+	display: inline-block;
+	font: normal 20px/1 dashicons;
+	margin: 3px 5px 0 -2px;
+	speak: none;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	vertical-align: top;
+}
+
+.plugin-card .updating-message:before {
+	content: "\f463";
+	-webkit-animation: rotation 2s infinite linear;
+	animation: rotation 2s infinite linear;
+}
+
+@-webkit-keyframes rotation {
+	0% {
+		-webkit-transform: rotate(0deg);
+		transform: rotate(0deg);
+	}
+	100% {
+		-webkit-transform: rotate(359deg);
+		transform: rotate(359deg);
+	}
+}
+
+@keyframes rotation {
+	0% {
+		-webkit-transform: rotate(0deg);
+		transform: rotate(0deg);
+	}
+	100% {
+		-webkit-transform: rotate(359deg);
+		transform: rotate(359deg);
+	}
+}
+
+.plugin-card .updated-message:before {
+	color: #79ba49;
+	content: "\f147";
+}
+
+.plugin-install-php h2 {
+	clear: both;
+}
+
+.plugin-install-php h3 {
+	margin: 2.5em 0 8px;
+}
+
+.plugin-install-php .wp-filter {
+	margin-bottom: 0;
+}
+
+/* Plugin card table view */
+.plugin-group {
+	overflow: hidden; /* clearfix */
+	margin-top: 1.5em;
+}
+
+.plugin-group h3 {
+	margin-top: 0;
+}
+
+.plugin-card {
+	float: left;
+	margin: 0 8px 16px;
+	width: 48.5%;
+	width: calc( 50% - 8px );
+	bac
