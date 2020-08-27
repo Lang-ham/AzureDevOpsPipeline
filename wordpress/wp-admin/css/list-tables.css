@@ -1968,4 +1968,178 @@ div.action-links,
 
 	#edithead .inside,
 	#commentsdiv #edithead .inside {
-		float: no
+		float: none;
+		text-align: left;
+		padding: 3px 5px;
+	}
+
+	#commentsdiv #edithead .inside input,
+	#edithead .inside input {
+		width: 100%;
+	}
+
+	#edithead label {
+		display: block;
+	}
+
+	#bulk-titles div {
+		margin: 0.8em 0.3em;
+	}
+
+	#bulk-titles div a {
+		height: 22px;
+	}
+
+	/* Updates */
+	#wpbody-content .updates-table .plugin-title {
+		width: auto;
+		white-space: normal;
+	}
+
+	/* Links */
+	.link-manager-php #posts-filter {
+		margin-top: 25px;
+	}
+
+	.link-manager-php .tablenav.bottom {
+		overflow: hidden;
+	}
+
+	/* List tables that don't toggle rows */
+	.comments-box .toggle-row,
+	.wp-list-table.plugins .toggle-row {
+		display: none;
+	}
+
+	/* Plugin/Theme Management */
+	#wpbody-content .wp-list-table.plugins td {
+		display: block;
+		width: auto;
+		padding: 10px 9px; /* reset from other list tables that have a label at this width */
+	}
+
+	#wpbody-content .wp-list-table.plugins .column-description {
+		padding-top: 2px;
+	}
+
+	#wpbody-content .wp-list-table.plugins .plugin-title,
+	#wpbody-content .wp-list-table.plugins .theme-title {
+		padding-right: 12px;
+		white-space: normal;
+	}
+
+	.wp-list-table.plugins .plugin-title,
+	.wp-list-table.plugins .theme-title {
+		padding-top: 13px;
+		padding-bottom: 4px;
+	}
+
+	.plugins #the-list tr > td:not(:last-child),
+	.plugins #the-list .update th,
+	.plugins #the-list .update td,
+	.wp-list-table.plugins #the-list .theme-title {
+		box-shadow: none;
+		border-top: none;
+	}
+
+	.plugins #the-list tr td {
+		border-top: none;
+	}
+
+	.plugins tbody {
+		padding: 1px 0 0;
+	}
+
+	.plugins tr.active + tr.inactive th.check-column,
+	.plugins tr.active + tr.inactive td.column-description,
+	.plugins .plugin-update-tr:before {
+		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+	}
+
+	.plugins tr.active + tr.inactive th.check-column,
+	.plugins tr.active + tr.inactive td {
+		border-top: none;
+	}
+
+	/* mimic the checkbox th */
+	.plugins .plugin-update-tr:before {
+		content: "";
+		display: table-cell;
+	}
+
+	.plugins .active.update + .plugin-update-tr:before {
+		border-left: 4px solid #d54e21;
+		background-color: #fef7f1;
+	}
+
+	.plugins #the-list .plugin-update-tr .plugin-update {
+		border-left: none;
+	}
+
+	.plugin-update-tr .update-message {
+		margin-left: 0;
+	}
+
+	.plugins .active.update + .plugin-update-tr:before {
+		background-color: #f7fcfe;
+		border-left: 4px solid #00a0d2;
+	}
+
+	.plugins .plugin-update-tr .update-message {
+		margin-left: 0;
+	}
+
+	.wp-list-table.plugins .plugin-title strong,
+	.wp-list-table.plugins .theme-title strong {
+		font-size: 1.4em;
+		line-height: 1.5;
+	}
+
+	/* Add New plugins page */
+	table.plugin-install .column-name,
+	table.plugin-install .column-version,
+	table.plugin-install .column-rating,
+	table.plugin-install .column-description {
+		display: block;
+		width: auto;
+	}
+
+	table.plugin-install th.column-name,
+	table.plugin-install th.column-version,
+	table.plugin-install th.column-rating,
+	table.plugin-install th.column-description {
+		display: none;
+	}
+
+	table.plugin-install td.column-name strong {
+		font-size: 1.4em;
+		line-height: 1.6em;
+	}
+
+	table.plugin-install #the-list td {
+		box-shadow: none;
+	}
+
+	table.plugin-install #the-list tr {
+		display: block;
+		box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
+	}
+
+	.plugin-card {
+		margin-left: 0;
+		margin-right: 0;
+		width: 100%;
+	}
+}
+
+@media screen and ( max-width: 480px ) {
+	.tablenav-pages .current-page {
+		margin: 0;
+	}
+
+	.tablenav-pages .tablenav-paging-text {
+		float: left;
+		width: 100%;
+		padding-top: 0.5em;
+	}
+}
