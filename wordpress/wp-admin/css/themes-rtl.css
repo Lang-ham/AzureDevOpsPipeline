@@ -1717,4 +1717,213 @@ body.full-overlay-active {
 .no-customize-support.wp-core-ui .hide-if-no-customize,
 .no-customize-support .wp-core-ui .hide-if-no-customize,
 .customize-support.wp-core-ui .hide-if-customize,
-.customize-support .wp-
+.customize-support .wp-core-ui .hide-if-customize {
+	display: none;
+}
+
+#customize-container,
+#customize-controls .notice.notification-overlay {
+	background: #eee;
+	z-index: 500000;
+	position: fixed;
+	overflow: visible;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	left: 0;
+	height: 100%;
+}
+#customize-container {
+	display: none;
+}
+
+/* Make the Customizer and Theme installer overlays the only available content. */
+#customize-container,
+.theme-install-overlay {
+	visibility: visible;
+}
+
+.customize-loading #customize-container iframe {
+	opacity: 0;
+}
+
+#customize-container iframe,
+.theme-install-overlay iframe {
+	height: 100%;
+	width: 100%;
+	z-index: 20;
+	transition: opacity 0.3s;
+}
+
+#customize-controls {
+	margin-top: 0;
+}
+
+.theme-install-overlay {
+	display: none;
+}
+
+.theme-install-overlay.single-theme {
+	display: block;
+}
+
+.install-theme-info {
+	display: none;
+	padding: 10px 20px 60px;
+}
+
+.single-theme .install-theme-info {
+	padding-top: 15px;
+}
+
+.theme-install-overlay .install-theme-info {
+	display: block;
+}
+
+.install-theme-info .theme-install {
+	float: left;
+	margin-top: 18px;
+}
+
+.install-theme-info .theme-name {
+	font-size: 16px;
+	line-height: 24px;
+	margin-bottom: 0;
+	margin-top: 0;
+}
+
+.install-theme-info .theme-screenshot {
+	margin: 15px 0;
+	width: 258px;
+	border: 1px solid #ccc;
+}
+
+.install-theme-info .theme-details {
+	overflow: hidden;
+}
+
+.theme-details .theme-version {
+	margin: 15px 0;
+}
+
+.theme-details .theme-description {
+	float: right;
+	color: #72777c;
+	line-height: 20px;
+	max-width: 100%;
+}
+
+.theme-install-overlay .wp-full-overlay-header .button {
+	float: left;
+	margin: 8px 0 0 10px;
+	/* For when .theme-install is a span rather than a.button-primary (already installed theme) */
+	line-height: 26px;
+}
+
+.theme-install-overlay .wp-full-overlay-sidebar {
+	background: #eee;
+	border-left: 1px solid #ddd;
+}
+
+.theme-install-overlay .wp-full-overlay-sidebar-content {
+	background: #fff;
+	border-top: 1px solid #ddd;
+	border-bottom: 1px solid #ddd;
+}
+
+.theme-install-overlay .wp-full-overlay-main {
+	position: absolute;
+	z-index: 0;
+	background-color: #f1f1f1;
+}
+
+.customize-loading #customize-container {
+	background-color: #f1f1f1;
+}
+
+#customize-preview.wp-full-overlay-main:before,
+.customize-loading #customize-container:before,
+#customize-controls .notice.notification-overlay.notification-loading:before,
+.theme-install-overlay .wp-full-overlay-main:before {
+	content: "";
+	display: block;
+	width: 20px;
+	height: 20px;
+	position: absolute;
+	right: 50%;
+	top: 50%;
+	z-index: -1;
+	margin: -10px -10px 0 0;
+	-webkit-transform: translateZ(0);
+	transform: translateZ(0);
+	background: transparent url(../images/spinner.gif) no-repeat center center;
+	background-size: 20px 20px;
+}
+
+#customize-preview.wp-full-overlay-main.iframe-ready:before,
+.theme-install-overlay.iframe-ready .wp-full-overlay-main:before {
+	background-image: none;
+}
+
+/* =Media Queries
+-------------------------------------------------------------- */
+
+/**
+ * HiDPI Displays
+ */
+@media print,
+  (-webkit-min-device-pixel-ratio: 1.25),
+  (min-resolution: 120dpi) {
+	.wp-full-overlay .collapse-sidebar-arrow {
+		background-image: url(../images/arrows-2x.png);
+		background-size: 15px 123px;
+	}
+
+	#customize-preview.wp-full-overlay-main:before,
+	.customize-loading #customize-container:before,
+	#customize-controls .notice.notification-overlay.notification-loading:before,
+	.theme-install-overlay .wp-full-overlay-main:before {
+		background-image: url(../images/spinner-2x.gif);
+	}
+}
+
+@media screen and ( max-width: 782px ) {
+	.available-theme .action-links .delete-theme {
+		float: none;
+		margin: 0;
+		padding: 0;
+		clear: both;
+	}
+
+	.available-theme .action-links .delete-theme a {
+		padding: 0;
+	}
+
+	.broken-themes table {
+		width: 100%;
+	}
+
+	.theme-install-overlay .wp-full-overlay-header .theme-install {
+		margin-top: 6px;
+		line-height: normal;
+	}
+
+	.theme-browser .theme .theme-actions .button {
+		margin-bottom: 0;
+	}
+
+	.theme-browser .theme.active .theme-actions,
+	.theme-browser .theme .theme-actions {
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+}
+
+@media aural {
+	.theme .notice:before,
+	.theme-info .updating-message:before,
+	.theme-info .updated-message:before,
+	.theme-install.updating-message:before {
+		speak: none;
+	}
+}
