@@ -187,4 +187,523 @@ body.js .theme-browser.search-loading {
 }
 
 /* Current theme needs to have its action always on view */
-.th
+.theme-browser .theme.active:focus .theme-actions {
+	display: block;
+}
+
+.theme-browser.rendered .theme:hover .more-details,
+.theme-browser.rendered .theme:focus .more-details {
+	-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)";
+	opacity: 1;
+}
+
+/**
+ * The currently active theme
+ */
+.theme-browser .theme.active .theme-name {
+	background: #23282d;
+	color: #fff;
+	padding-left: 110px;
+	font-weight: 300;
+	box-shadow: inset 0 1px 1px rgba(0,0,0,0.5);
+}
+
+.theme-browser .customize-control .theme.active .theme-name {
+	padding-left: 15px;
+}
+
+.theme-browser .theme.active .theme-name span {
+	font-weight: 600;
+}
+
+.theme-browser .theme.active .theme-actions {
+	background: rgba(49,49,49,0.7);
+	border-right: none;
+	opacity: 1;
+}
+
+.theme-id-container {
+	position: relative;
+}
+
+.theme-browser .theme.active .theme-actions,
+.theme-browser .theme .theme-actions {
+	position: absolute;
+	top: 50%;
+	-webkit-transform: translateY(-50%);
+	transform: translateY(-50%);
+	left: 0;
+	padding: 10px 15px;
+	box-shadow: inset 0 1px 0 rgba(0,0,0,0.1);
+}
+
+.theme-browser .theme.active .theme-actions .button-primary {
+	margin-left: 0;
+}
+
+.theme-browser .theme .theme-author {
+	background: #23282d;
+	color: #eee;
+	display: none;
+	font-size: 14px;
+	margin: 0 10px;
+	padding: 5px 10px;
+	position: absolute;
+	bottom: 56px;
+}
+
+.theme-browser .theme.display-author .theme-author {
+	display: block;
+}
+
+.theme-browser .theme.display-author .theme-author a {
+	color: inherit;
+	text-decoration: none;
+}
+
+/**
+ * Add new theme
+ */
+.theme-browser .theme.add-new-theme {
+	border: none;
+	box-shadow: none;
+}
+
+.theme-browser .theme.add-new-theme a {
+	text-decoration: none;
+	display: block;
+	position: relative;
+	z-index: 1;
+}
+
+.theme-browser .theme.add-new-theme a:after {
+	display: block;
+	content: "";
+	background: transparent;
+	background: rgba(0, 0, 0, 0);
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	padding: 0;
+	text-shadow: none;
+	border: 5px dashed #d5d2ca;
+	border: 5px dashed rgba(0, 0, 0, 0.1);
+	box-sizing: border-box;
+}
+
+.theme-browser .theme.add-new-theme span:after {
+	background: #e5e5e5;
+	background: rgba(153, 153, 153, 0.1);
+	border-radius: 50%;
+	display: inline-block;
+	content: "\f132";
+	-webkit-font-smoothing: antialiased;
+	font: normal 74px/115px dashicons;
+	width: 100px;
+	height: 100px;
+	vertical-align: middle;
+	text-align: center;
+	color: rgb(153, 153, 153);
+	position: absolute;
+	top: 30%;
+	right: 50%;
+	margin-right: -50px;
+	text-indent: -4px;
+	padding: 0;
+	text-shadow: none;
+	z-index:4;
+}
+
+.rtl .theme-browser .theme.add-new-theme span:after {
+	text-indent: 4px;
+}
+
+.theme-browser .theme.add-new-theme a:hover .theme-screenshot,
+.theme-browser .theme.add-new-theme a:focus .theme-screenshot {
+	background: none;
+}
+
+.theme-browser .theme.add-new-theme a:hover span:after,
+.theme-browser .theme.add-new-theme a:focus span:after {
+	background: #fff;
+	color: #0073aa;
+}
+
+.theme-browser .theme.add-new-theme a:hover:after,
+.theme-browser .theme.add-new-theme a:focus:after {
+	border-color: transparent;
+	color: #fff;
+	background: #0073aa;
+	content: "";
+}
+
+.theme-browser .theme.add-new-theme .theme-name {
+	background: none;
+	text-align: center;
+	box-shadow: none;
+	font-weight: 400;
+	position: relative;
+	top: 0;
+	margin-top: -18px;
+	padding-top: 0;
+	padding-bottom: 48px;
+}
+
+.theme-browser .theme.add-new-theme a:hover .theme-name,
+.theme-browser .theme.add-new-theme a:focus .theme-name {
+	color: #fff;
+	z-index: 2;
+}
+
+/**
+ * Theme Overlay
+ * Shown when clicking a theme
+ */
+.theme-overlay .theme-backdrop {
+	position: absolute;
+	right: -20px;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	background: #f1f1f1;
+	background: rgba( 238, 238, 238, 0.9 );
+	z-index: 10000; /* Over WP Pointers. */
+}
+
+.theme-overlay .theme-header {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	height: 48px;
+	border-bottom: 1px solid #ddd;
+}
+
+.theme-overlay .theme-header button {
+	padding: 0;
+}
+
+.theme-overlay .theme-header .close {
+	cursor: pointer;
+	height: 48px;
+	width: 50px;
+	text-align: center;
+	float: left;
+	border: 0;
+	border-right: 1px solid #ddd;
+	background-color: transparent;
+	transition: color .1s ease-in-out, background .1s ease-in-out;
+}
+
+.theme-overlay .theme-header .close:before {
+	font: normal 22px/50px dashicons !important;
+	color: #72777c;
+	display: inline-block;
+	content: "\f335";
+	font-weight: 300;
+}
+
+/* Left and right navigation */
+.theme-overlay .theme-header .right,
+.theme-overlay .theme-header .left {
+	cursor: pointer;
+	color: #72777c;
+	background-color: transparent;
+	height: 48px;
+	width: 54px;
+	float: right;
+	text-align: center;
+	border: 0;
+	border-left: 1px solid #ddd;
+	transition: color .1s ease-in-out, background .1s ease-in-out;
+}
+
+.theme-overlay .theme-header .close:focus,
+.theme-overlay .theme-header .close:hover,
+.theme-overlay .theme-header .right:focus,
+.theme-overlay .theme-header .right:hover,
+.theme-overlay .theme-header .left:focus,
+.theme-overlay .theme-header .left:hover {
+	background: #ddd;
+	border-color: #ccc;
+	color: #000;
+}
+
+.theme-overlay .theme-header .close:focus:before,
+.theme-overlay .theme-header .close:hover:before {
+	color: #000;
+}
+
+.theme-overlay .theme-header .close:focus,
+.theme-overlay .theme-header .right:focus,
+.theme-overlay .theme-header .left:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.theme-overlay .theme-header .left.disabled,
+.theme-overlay .theme-header .right.disabled,
+.theme-overlay .theme-header .left.disabled:hover,
+.theme-overlay .theme-header .right.disabled:hover {
+	color: #ccc;
+	background: inherit;
+	cursor: inherit;
+}
+
+.theme-overlay .theme-header .right:before,
+.theme-overlay .theme-header .left:before {
+	font: normal 20px/50px dashicons !important;
+	display: inline;
+	font-weight: 300;
+}
+
+.theme-overlay .theme-header .left:before {
+	content: "\f345";
+}
+
+.theme-overlay .theme-header .right:before {
+	content: "\f341";
+}
+
+.theme-overlay .theme-wrap {
+	clear: both;
+	position: fixed;
+	top: 9%;
+	right: 190px;
+	left: 30px;
+	bottom: 3%;
+	background: #fff;
+	box-shadow: 0 1px 20px 5px rgba(0, 0, 0, 0.1);
+	z-index: 10000; /* Over WP Pointers. */
+	box-sizing: border-box;
+	-webkit-overflow-scrolling: touch;
+}
+
+body.folded .theme-browser ~ .theme-overlay .theme-wrap {
+	right: 70px;
+}
+
+.theme-overlay .theme-about {
+	position: absolute;
+	top: 49px;
+	bottom: 57px;
+	right: 0;
+	left: 0;
+	overflow: auto;
+	padding: 2% 4%;
+}
+
+.theme-overlay .theme-actions {
+	position: absolute;
+	text-align: center;
+	bottom: 0;
+	right: 0;
+	left: 0;
+	padding: 10px 25px 5px;
+	background: #f3f3f3;
+	z-index: 30;
+	box-sizing: border-box;
+	border-top: 1px solid #eee;
+}
+
+.ie8 .theme-overlay .theme-actions {
+	border: 1px solid #eee;
+}
+
+.theme-overlay .theme-actions a {
+	margin-left: 5px;
+	margin-bottom: 5px;
+}
+
+/* Hide-if-customize for items we can't add classes to */
+.customize-support .theme-overlay .theme-actions a[href="themes.php?page=custom-header"],
+.customize-support .theme-overlay .theme-actions a[href="themes.php?page=custom-background"] {
+	display: none;
+}
+
+.broken-themes a.delete-theme,
+.theme-overlay .theme-actions .delete-theme {
+	color: #a00;
+	text-decoration: none;
+	border-color: transparent;
+	box-shadow: none;
+	background: transparent;
+}
+
+.theme-overlay .theme-actions .delete-theme {
+	position: absolute;
+	left: 10px;
+	bottom: 5px;
+}
+
+.broken-themes a.delete-theme:hover,
+.broken-themes a.delete-theme:focus,
+.theme-overlay .theme-actions .delete-theme:hover,
+.theme-overlay .theme-actions .delete-theme:focus {
+	background: #d54e21;
+	color: #fff;
+	border-color: #d54e21;
+}
+
+.theme-overlay .theme-actions .active-theme,
+.theme-overlay.active .theme-actions .inactive-theme {
+	display: none;
+}
+
+.theme-overlay .theme-actions .inactive-theme,
+.theme-overlay.active .theme-actions .active-theme {
+	display: block;
+}
+
+/**
+ * Theme Screenshots gallery
+ */
+.theme-overlay .theme-screenshots {
+	float: right;
+	margin: 0 0 0 30px;
+	width: 55%;
+	max-width: 1200px; /* Recommended theme screenshot width, set here to avoid stretching */
+	text-align: center;
+}
+
+/* First screenshot, shown big */
+.theme-overlay .screenshot {
+	border: 1px solid #fff;
+	box-sizing: border-box;
+	overflow: hidden;
+	position: relative;
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+}
+
+.theme-overlay .screenshot:after {
+	content: "";
+	display: block;
+	padding-top: 75%; /* using a 4/3 aspect ratio */
+}
+
+.theme-overlay .screenshot img {
+	height: auto;
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 100%;
+}
+/* Handles old 300px screenshots */
+.theme-overlay.small-screenshot .theme-screenshots {
+	position: absolute;
+	width: 302px;
+}
+.theme-overlay.small-screenshot .theme-info {
+	margin-right: 350px;
+	width: auto;
+}
+
+/* Other screenshots, shown small and square */
+.theme-overlay .screenshot.thumb {
+	background: #ccc;
+	border: 1px solid #eee;
+	float: none;
+	display: inline-block;
+	margin: 10px 5px 0;
+	width: 140px;
+	height: 80px;
+	cursor: pointer;
+}
+
+.theme-overlay .screenshot.thumb:after {
+	content: "";
+	display: block;
+	padding-top: 100%; /* using a 1/1 aspect ratio */
+}
+
+.theme-overlay .screenshot.thumb img {
+	cursor: pointer;
+	height: auto;
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 100%;
+	height: auto;
+}
+
+.theme-overlay .screenshot.selected {
+	background: transparent;
+	border: 2px solid #00a0d2;
+}
+
+.theme-overlay .screenshot.selected img {
+	opacity: 0.8;
+}
+
+/* No screenshot placeholder */
+.theme-browser .theme .theme-screenshot.blank,
+.theme-overlay .screenshot.blank {
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAALElEQVQYGWO8d+/efwYkoKioiMRjYGBC4WHhUK6A8T8QIJt8//59ZC493AAAQssKpBK4F5AAAAAASUVORK5CYII=);
+}
+
+/**
+ * Theme heading information
+ */
+.theme-overlay .theme-info {
+	width: 40%;
+	float: right;
+}
+
+.theme-overlay .current-label {
+	background: #32373c;
+	color: #fff;
+	font-size: 11px;
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 2px;
+	margin: 0 0 -10px;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.theme-overlay .theme-name {
+	color: #23282d;
+	font-size: 32px;
+	font-weight: 100;
+	margin: 10px 0 0;
+	line-height: 1.3;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+.theme-overlay .theme-version {
+	color: #72777c;
+	font-size: 13px;
+	font-weight: 400;
+	float: none;
+	display: inline-block;
+	margin-right: 10px;
+}
+
+.theme-overlay .theme-author {
+	margin: 15px 0 25px;
+	color: #72777c;
+	font-size: 16px;
+	font-weight: 400;
+	line-height: inherit;
+}
+
+.theme-overlay .theme-author a {
+	text-decoration: none;
+}
+
+.theme-overlay .theme-description {
+	color: #555;
+	font-size: 15px;
+	font-weight: 400;
+	line-height: 1.5;
+	margin: 30px 0 0 0;
+}
+
+.theme-overlay .theme-tags {
+	border-top: 3px solid #eee;
+	color: #82878
