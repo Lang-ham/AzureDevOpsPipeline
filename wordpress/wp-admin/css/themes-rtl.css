@@ -706,4 +706,533 @@ body.folded .theme-browser ~ .theme-overlay .theme-wrap {
 
 .theme-overlay .theme-tags {
 	border-top: 3px solid #eee;
-	color: #82878
+	color: #82878c;
+	font-size: 13px;
+	font-weight: 400;
+	margin: 30px 0 0 0;
+	padding-top: 20px;
+}
+
+.theme-overlay .theme-tags span {
+	color: #444;
+	font-weight: 600;
+	margin-left: 5px;
+}
+
+.theme-overlay .parent-theme {
+	background: #f7fcfe;
+	border: 1px solid #eee;
+	border-right: 4px solid #00a0d2;
+	font-size: 14px;
+	font-weight: 400;
+	margin-top: 30px;
+	padding: 10px 20px 10px 10px;
+}
+
+.theme-overlay .parent-theme strong {
+	font-weight: 700;
+}
+
+/**
+ * Single Theme Mode
+ * Displays detailed view inline when a user has no switch capabilities
+ */
+.single-theme .theme-overlay .theme-backdrop,
+.single-theme .theme-overlay .theme-header,
+.single-theme .theme {
+	display: none;
+}
+
+.single-theme .theme-overlay .theme-wrap {
+	clear: both;
+	min-height: 330px;
+	position: relative;
+	right: auto;
+	left: auto;
+	top: auto;
+	bottom: auto;
+	z-index: 10;
+}
+
+.single-theme .theme-overlay .theme-about {
+	padding: 30px 30px 70px;
+	position: static;
+}
+
+.single-theme .theme-overlay .theme-actions {
+	position: absolute;
+}
+
+/**
+ * Basic Responsive structure...
+ *
+ * Shuffles theme columns around based on screen width
+ */
+
+@media only screen and (min-width: 2000px) {
+	#wpwrap .theme-browser .theme {
+		width: 17.6%;
+		margin: 0 0 3% 3%;
+	}
+
+	#wpwrap .theme-browser .theme:nth-child(3n),
+	#wpwrap .theme-browser .theme:nth-child(4n) {
+		margin-left: 3%;
+	}
+
+	#wpwrap .theme-browser .theme:nth-child(5n) {
+		margin-left: 0;
+	}
+}
+
+@media only screen and (min-width: 1680px) {
+	.theme-overlay .theme-wrap {
+		width: 1450px;
+		margin: 0 auto;
+	}
+}
+
+/* Maximum screenshot width reaches 440px */
+@media only screen and (min-width: 1640px) {
+	.theme-browser .theme {
+		width: 22.7%;
+		margin: 0 0 3% 3%;
+	}
+	.theme-browser .theme .theme-screenshot:after {
+		padding-top: 75%; /* using a 4/3 aspect ratio */
+	}
+
+	.theme-browser .theme:nth-child(3n) {
+		margin-left: 3%;
+	}
+
+	.theme-browser .theme:nth-child(4n) {
+		margin-left: 0;
+	}
+}
+/* Maximum screenshot width reaches 440px */
+@media only screen and (max-width: 1120px) {
+	.theme-browser .theme {
+		width: 47.5%;
+		margin-left: 0;
+	}
+
+	.theme-browser .theme:nth-child(even) {
+		margin-left: 0;
+	}
+
+	.theme-browser .theme:nth-child(odd) {
+		margin-left: 5%;
+	}
+}
+
+/* Admin menu is folded */
+@media only screen and (max-width: 900px) {
+	.theme-overlay .theme-wrap {
+		right: 65px;
+	}
+}
+
+@media only screen and (max-width: 780px) {
+	body.folded .theme-overlay .theme-wrap,
+	.theme-overlay .theme-wrap {
+		top: 0; /* The adminmenu isn't fixed on mobile, so this can use the full viewport height */
+		left: 0;
+		bottom: 0;
+		right: 0;
+		padding: 70px 20px 20px;
+		border: none;
+		z-index: 100000; /* should overlap #wpadminbar. */
+		position: fixed;
+	}
+
+	.theme-browser .theme.active .theme-name span {
+		/* Hide the "Active: " label on smaller screens. */
+		display: none;
+	}
+
+	.theme-overlay .theme-screenshots {
+		width: 40%;
+	}
+
+	.theme-overlay .theme-info {
+		width: 50%;
+	}
+	.single-theme .theme-wrap {
+		padding: 10px;
+	}
+
+	.theme-browser .theme .theme-actions {
+		padding: 5px 10px 4px 10px;
+	}
+
+	.theme-overlay.small-screenshot .theme-screenshots {
+		position: static;
+		float: none;
+		max-width: 302px;
+	}
+
+	.theme-overlay.small-screenshot .theme-info {
+		margin-right: 0;
+		width: auto;
+	}
+
+	.theme:not(.active):hover .theme-actions,
+	.theme:not(.active):focus .theme-actions,
+	.theme:hover .more-details,
+	.theme:focus .more-details {
+		display: none;
+	}
+
+	.theme-browser.rendered .theme:hover .theme-screenshot img,
+	.theme-browser.rendered .theme:focus .theme-screenshot img {
+		opacity: 1.0;
+	}
+}
+
+@media only screen and (max-width: 480px) {
+	.theme-browser .theme {
+		width: 100%;
+		margin-left: 0;
+	}
+
+	.theme-browser .theme:nth-child(2n),
+	.theme-browser .theme:nth-child(3n) {
+		margin-left: 0;
+	}
+}
+
+@media only screen and (max-width: 650px) {
+	.theme-overlay .theme-description {
+		margin-right: 0;
+	}
+
+	.theme-overlay .theme-actions .delete-theme {
+		position: relative;
+		left: auto;
+		bottom: auto;
+	}
+
+	.theme-overlay .theme-actions .inactive-theme {
+		display: inline;
+	}
+
+	.theme-overlay .theme-screenshots {
+		width: 100%;
+		float: none;
+	}
+
+	.theme-overlay .theme-info {
+		width: 100%;
+	}
+
+	.theme-overlay .theme-author {
+		margin: 5px 0 15px 0;
+	}
+
+	.theme-overlay .current-label {
+		margin-top: 10px;
+		font-size: 13px;
+	}
+
+	.themes-php .wp-filter-search {
+		float: none;
+		clear: both;
+		right: 0;
+		left: 0;
+		margin: -5px 0 20px 0;
+		width: 100%;
+		max-width: 280px;
+	}
+
+	.theme-browser .theme.add-new-theme span:after {
+		font: normal 60px/90px dashicons;
+		width: 80px;
+		height: 80px;
+		top: 30%;
+		right: 50%;
+		text-indent: 0;
+		margin-right: -40px;
+	}
+
+	.single-theme .theme-wrap {
+		margin: 0 -10px 0 -12px;
+		padding: 10px;
+	}
+	.single-theme .theme-overlay .theme-about {
+		padding: 10px;
+		overflow: visible;
+	}
+	.single-theme .current-label {
+		display: none;
+	}
+	.single-theme .theme-overlay .theme-actions {
+		position: static;
+	}
+}
+
+.broken-themes {
+	clear: both;
+}
+
+.broken-themes table {
+	text-align: right;
+	width: 50%;
+	border-spacing: 3px;
+	padding: 3px;
+}
+
+
+/*------------------------------------------------------------------------------
+  16.2 - Install Themes
+------------------------------------------------------------------------------*/
+
+/* Already installed theme */
+.theme-browser .theme .theme-installed {
+	background: #0073aa;
+}
+.theme-browser .theme .notice-success p:before {
+	color: #79ba49;
+	content: "\f147";
+	display: inline-block;
+	font: normal 20px/1 'dashicons';
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	vertical-align: top;
+}
+
+.theme-install.updated-message:before {
+	content: '';
+}
+
+.theme-install-php .wp-filter {
+	padding-right: 20px;
+}
+
+.theme-install-php a.upload,
+.theme-install-php a.browse-themes {
+	cursor: pointer;
+}
+
+.upload-view-toggle .browse,
+.plugin-install-tab-upload .upload-view-toggle .upload {
+	display: none;
+}
+
+.plugin-install-tab-upload .upload-view-toggle .browse {
+	display: inline;
+}
+
+.upload-theme,
+.upload-plugin {
+	box-sizing: border-box;
+	display: none;
+	margin: 0;
+	padding: 50px 0;
+	width: 100%;
+	overflow: hidden;
+	position: relative;
+	top: 10px;
+}
+
+.upload-plugin-wrap {
+	display: none;
+}
+
+.show-upload-view .upload-theme,
+.show-upload-view .upload-plugin,
+.show-upload-view .upload-plugin-wrap,
+.plugin-install-tab-upload .upload-plugin {
+	display: block;
+}
+
+.upload-theme .wp-upload-form,
+.upload-plugin .wp-upload-form {
+	background: #fafafa;
+	border: 1px solid #e5e5e5;
+	padding: 30px;
+	margin: 30px auto;
+	max-width: 380px;
+}
+.upload-theme .install-help,
+.upload-plugin .install-help {
+	color: #555d66; /* #f1f1f1 background */
+	font-size: 18px;
+	font-style: normal;
+	margin: 0;
+	padding: 0;
+	text-align: center;
+}
+
+p.no-themes,
+p.no-themes-local {
+	clear: both;
+	color: #666;
+	font-size: 18px;
+	font-style: normal;
+	margin: 0;
+	padding: 100px 0;
+	text-align: center;
+	display: none;
+}
+
+.no-results p.no-themes {
+	display: block;
+}
+
+.theme-install-php .add-new-theme {
+	display: none !important;
+}
+
+@media only screen and (max-width: 1120px) {
+	.upload-theme .wp-upload-form {
+		margin: 20px 0;
+		max-width: 100%;
+	}
+	.upload-theme .install-help {
+		font-size: 15px;
+		padding: 20px 0 0;
+		text-align: right;
+	}
+}
+
+.theme-details .theme-rating {
+	line-height: 23px;
+}
+
+.theme-details .star-rating {
+	display: inline;
+}
+
+.theme-details .num-ratings,
+.theme-details .no-rating {
+	font-size: 11px;
+	color: #72777c;
+}
+
+.theme-details .no-rating {
+	display: block;
+	line-height: 20px;
+}
+
+/*------------------------------------------------------------------------------
+  16.3 - Custom Header Screen
+------------------------------------------------------------------------------*/
+
+.appearance_page_custom-header #headimg {
+	border: 1px solid #ddd;
+	overflow: hidden;
+	width: 100%;
+}
+
+.appearance_page_custom-header #upload-form p label {
+	font-size: 12px;
+}
+
+.appearance_page_custom-header .available-headers .default-header {
+	float: right;
+	margin: 0 0 20px 20px;
+}
+
+.appearance_page_custom-header .random-header {
+	clear: both;
+	margin: 0 0 20px 20px;
+	vertical-align: middle;
+}
+
+.appearance_page_custom-header .available-headers label input,
+.appearance_page_custom-header .random-header label input {
+	margin-left: 10px;
+}
+
+.appearance_page_custom-header .available-headers label img {
+	vertical-align: middle;
+}
+
+
+/*------------------------------------------------------------------------------
+  16.4 - Custom Background Screen
+------------------------------------------------------------------------------*/
+
+div#custom-background-image {
+	min-height: 100px;
+	border: 1px solid #ddd;
+}
+
+div#custom-background-image img {
+	max-width: 400px;
+	max-height: 300px;
+}
+
+.background-position-control input[type="radio"]:checked ~ .button {
+	background: #eee;
+	border-color: #999;
+	box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, .5 );
+	z-index: 1;
+}
+
+.background-position-control input[type="radio"]:focus ~ .button {
+	border-color: #5b9dd9;
+	box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, .5 ), 0 0 3px rgba( 0, 115, 170, .8 );
+	color: #23282d;
+}
+
+.background-position-control .background-position-center-icon,
+.background-position-control .background-position-center-icon:before {
+	display: inline-block;
+	line-height: 1;
+	text-align: center;
+	transition: background-color .1s ease-in 0;
+}
+
+.background-position-control .background-position-center-icon {
+	height: 20px;
+	margin-top: 13px;
+	vertical-align: top;
+	width: 20px;
+}
+
+.background-position-control .background-position-center-icon:before {
+	background-color: #555;
+	border-radius: 50%;
+	content: "";
+	height: 12px;
+	width: 12px;
+}
+
+.background-position-control .button:hover .background-position-center-icon:before,
+.background-position-control input[type="radio"]:focus ~ .button .background-position-center-icon:before {
+	background-color: #23282d;
+}
+
+.background-position-control .button-group {
+	display: block;
+}
+
+.background-position-control .button-group .button {
+	border-radius: 0;
+	box-shadow: none;
+	/* Following properties are overridden by buttons responsive styles (see: wp-includes/css/buttons.css). */
+	height: 40px !important;
+	line-height: 37px !important;
+	margin: 0 0 0 -1px !important;
+	padding: 0 10px 1px !important;
+	position: relative;
+}
+
+.background-position-control .button-group .button:active,
+.background-position-control .button-group .button:hover,
+.background-position-control .button-group .button:focus {
+	z-index: 1;
+}
+
+.background-position-control .button-group:last-child .button {
+	box-shadow: 0 1px 0 #ccc;
+}
+
+.background-position-control .button-group > label {
+	margin: 0 !important;
+}
+
+.background-position-control .button-group:first-child > label:first-child .button {
+	border-radius: 0 
