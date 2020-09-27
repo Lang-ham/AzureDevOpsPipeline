@@ -321,4 +321,239 @@ class Custom_Background {
 		<?php submit_button( __( 'Upload' ), '', 'submit', false ); ?>
 	</p>
 	<p>
-		<label for="choose-from-library-lin
+		<label for="choose-from-library-link"><?php _e( 'Or choose an image from your media library:' ); ?></label><br />
+		<button id="choose-from-library-link" class="button"
+			data-choose="<?php esc_attr_e( 'Choose a Background Image' ); ?>"
+			data-update="<?php esc_attr_e( 'Set as background' ); ?>"><?php _e( 'Choose Image' ); ?></button>
+	</p>
+	</form>
+</td>
+</tr>
+<?php endif; ?>
+</tbody>
+</table>
+
+<h3><?php _e( 'Display Options' ); ?></h3>
+<form method="post">
+<table class="form-table">
+<tbody>
+<?php if ( get_background_image() ) : ?>
+<input name="background-preset" type="hidden" value="custom">
+
+<?php
+$background_position = sprintf(
+	'%s %s',
+	get_theme_mod( 'background_position_x', get_theme_support( 'custom-background', 'default-position-x' ) ),
+	get_theme_mod( 'background_position_y', get_theme_support( 'custom-background', 'default-position-y' ) )
+);
+
+$background_position_options = array(
+	array(
+		'left top'   => array( 'label' => __( 'Top Left' ), 'icon' => 'dashicons dashicons-arrow-left-alt' ),
+		'center top' => array( 'label' => __( 'Top' ), 'icon' => 'dashicons dashicons-arrow-up-alt' ),
+		'right top'  => array( 'label' => __( 'Top Right' ), 'icon' => 'dashicons dashicons-arrow-right-alt' ),
+	),
+	array(
+		'left center'   => array( 'label' => __( 'Left' ), 'icon' => 'dashicons dashicons-arrow-left-alt' ),
+		'center center' => array( 'label' => __( 'Center' ), 'icon' => 'background-position-center-icon' ),
+		'right center'  => array( 'label' => __( 'Right' ), 'icon' => 'dashicons dashicons-arrow-right-alt' ),
+	),
+	array(
+		'left bottom'   => array( 'label' => __( 'Bottom Left' ), 'icon' => 'dashicons dashicons-arrow-left-alt' ),
+		'center bottom' => array( 'label' => __( 'Bottom' ), 'icon' => 'dashicons dashicons-arrow-down-alt' ),
+		'right bottom'  => array( 'label' => __( 'Bottom Right' ), 'icon' => 'dashicons dashicons-arrow-right-alt' ),
+	),
+);
+?>
+<tr>
+<th scope="row"><?php _e( 'Image Position' ); ?></th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _e( 'Image Position' ); ?></span></legend>
+<div class="background-position-control">
+<?php foreach ( $background_position_options as $group ) : ?>
+	<div class="button-group">
+	<?php foreach ( $group as $value => $input ) : ?>
+		<label>
+			<input class="screen-reader-text" name="background-position" type="radio" value="<?php echo esc_attr( $value ); ?>"<?php checked( $value, $background_position ); ?>>
+			<span class="button display-options position"><span class="<?php echo esc_attr( $input['icon'] ); ?>" aria-hidden="true"></span></span>
+			<span class="screen-reader-text"><?php echo $input['label']; ?></span>
+		</label>
+	<?php endforeach; ?>
+	</div>
+<?php endforeach; ?>
+</div>
+</fieldset></td>
+</tr>
+
+<tr>
+<th scope="row"><label for="background-size"><?php _e( 'Image Size' ); ?></label></th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _e( 'Image Size' ); ?></span></legend>
+<select id="background-size" name="background-size">
+<option value="auto"<?php selected( 'auto', get_theme_mod( 'background_size', get_theme_support( 'custom-background', 'default-size' ) ) ); ?>><?php _ex( 'Original', 'Original Size' ); ?></option>
+<option value="contain"<?php selected( 'contain', get_theme_mod( 'background_size', get_theme_support( 'custom-background', 'default-size' ) ) ); ?>><?php _e( 'Fit to Screen' ); ?></option>
+<option value="cover"<?php selected( 'cover', get_theme_mod( 'background_size', get_theme_support( 'custom-background', 'default-size' ) ) ); ?>><?php _e( 'Fill Screen' ); ?></option>
+</select>
+</fieldset></td>
+</tr>
+
+<tr>
+<th scope="row"><?php _ex( 'Repeat', 'Background Repeat' ); ?></th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _ex( 'Repeat', 'Background Repeat' ); ?></span></legend>
+<input name="background-repeat" type="hidden" value="no-repeat">
+<label><input type="checkbox" name="background-repeat" value="repeat"<?php checked( 'repeat', get_theme_mod( 'background_repeat', get_theme_support( 'custom-background', 'default-repeat' ) ) ); ?>> <?php _e( 'Repeat Background Image' ); ?></label>
+</fieldset></td>
+</tr>
+
+<tr>
+<th scope="row"><?php _ex( 'Scroll', 'Background Scroll' ); ?></th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _ex( 'Scroll', 'Background Scroll' ); ?></span></legend>
+<input name="background-attachment" type="hidden" value="fixed">
+<label><input name="background-attachment" type="checkbox" value="scroll" <?php checked( 'scroll', get_theme_mod( 'background_attachment', get_theme_support( 'custom-background', 'default-attachment' ) ) ); ?>> <?php _e( 'Scroll with Page' ); ?></label>
+</fieldset></td>
+</tr>
+<?php endif; // get_background_image() ?>
+<tr>
+<th scope="row"><?php _e( 'Background Color' ); ?></th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _e( 'Background Color' ); ?></span></legend>
+<?php
+$default_color = '';
+if ( current_theme_supports( 'custom-background', 'default-color' ) )
+	$default_color = ' data-default-color="#' . esc_attr( get_theme_support( 'custom-background', 'default-color' ) ) . '"';
+?>
+<input type="text" name="background-color" id="background-color" value="#<?php echo esc_attr( get_background_color() ); ?>"<?php echo $default_color ?>>
+</fieldset></td>
+</tr>
+</tbody>
+</table>
+
+<?php wp_nonce_field('custom-background'); ?>
+<?php submit_button( null, 'primary', 'save-background-options' ); ?>
+</form>
+
+</div>
+<?php
+	}
+
+	/**
+	 * Handle an Image upload for the background image.
+	 *
+	 * @since 3.0.0
+	 */
+	public function handle_upload() {
+		if ( empty($_FILES) )
+			return;
+
+		check_admin_referer('custom-background-upload', '_wpnonce-custom-background-upload');
+		$overrides = array('test_form' => false);
+
+		$uploaded_file = $_FILES['import'];
+		$wp_filetype = wp_check_filetype_and_ext( $uploaded_file['tmp_name'], $uploaded_file['name'] );
+		if ( ! wp_match_mime_types( 'image', $wp_filetype['type'] ) )
+			wp_die( __( 'The uploaded file is not a valid image. Please try again.' ) );
+
+		$file = wp_handle_upload($uploaded_file, $overrides);
+
+		if ( isset($file['error']) )
+			wp_die( $file['error'] );
+
+		$url = $file['url'];
+		$type = $file['type'];
+		$file = $file['file'];
+		$filename = basename($file);
+
+		// Construct the object array
+		$object = array(
+			'post_title' => $filename,
+			'post_content' => $url,
+			'post_mime_type' => $type,
+			'guid' => $url,
+			'context' => 'custom-background'
+		);
+
+		// Save the data
+		$id = wp_insert_attachment($object, $file);
+
+		// Add the meta-data
+		wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $file ) );
+		update_post_meta( $id, '_wp_attachment_is_custom_background', get_option('stylesheet' ) );
+
+		set_theme_mod('background_image', esc_url_raw($url));
+
+		$thumbnail = wp_get_attachment_image_src( $id, 'thumbnail' );
+		set_theme_mod('background_image_thumb', esc_url_raw( $thumbnail[0] ) );
+
+		/** This action is documented in wp-admin/custom-header.php */
+		do_action( 'wp_create_file_in_uploads', $file, $id ); // For replication
+		$this->updated = true;
+	}
+
+	/**
+	 * Ajax handler for adding custom background context to an attachment.
+	 *
+	 * Triggered when the user adds a new background image from the
+	 * Media Manager.
+	 *
+	 * @since 4.1.0
+	 */
+	public function ajax_background_add() {
+		check_ajax_referer( 'background-add', 'nonce' );
+
+		if ( ! current_user_can( 'edit_theme_options' ) ) {
+			wp_send_json_error();
+		}
+
+		$attachment_id = absint( $_POST['attachment_id'] );
+		if ( $attachment_id < 1 ) {
+			wp_send_json_error();
+		}
+
+		update_post_meta( $attachment_id, '_wp_attachment_is_custom_background', get_stylesheet() );
+
+		wp_send_json_success();
+	}
+
+	/**
+	 *
+	 * @since 3.4.0
+	 * @deprecated 3.5.0
+	 *
+	 * @param array $form_fields
+	 * @return array $form_fields
+	 */
+	public function attachment_fields_to_edit( $form_fields ) {
+		return $form_fields;
+	}
+
+	/**
+	 *
+	 * @since 3.4.0
+	 * @deprecated 3.5.0
+	 *
+	 * @param array $tabs
+	 * @return array $tabs
+	 */
+	public function filter_upload_tabs( $tabs ) {
+		return $tabs;
+	}
+
+	/**
+	 *
+	 * @since 3.4.0
+	 * @deprecated 3.5.0
+	 */
+	public function wp_set_background_image() {
+		if ( ! current_user_can('edit_theme_options') || ! isset( $_POST['attachment_id'] ) ) exit;
+		$attachment_id = absint($_POST['attachment_id']);
+		/** This filter is documented in wp-admin/includes/media.php */
+		$sizes = array_keys(apply_filters( 'image_size_names_choose', array('thumbnail' => __('Thumbnail'), 'medium' => __('Medium'), 'large' => __('Large'), 'full' => __('Full Size')) ));
+		$size = 'thumbnail';
+		if ( in_array( $_POST['size'], $sizes ) )
+			$size = esc_attr( $_POST['size'] );
+
+		update_post_meta( $attachment_id, '_wp_attachment_is_custom_background', get_option('stylesheet' ) );
+		$url = wp_get_attachment_image_src( $attachment_id, $size );
+		$thumbnail = wp_get_attachment_image_src( $attachment_id, 'thumbnail' );
+		set_theme_mod( 'background_image', esc_url_raw( $url[0] ) );
+		set_theme_mod( 'background_image_thumb', esc_url_raw( $thumbnail[0] ) );
+		exit;
+	}
+}
