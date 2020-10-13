@@ -683,4 +683,325 @@ class Custom_Image_Header {
 		$header_textcolor = '#' . $header_textcolor;
 	}
 
-	echo '<input type="text" name="text-color" id="text-color" value="' . esc_attr( $header_textcolor ) 
+	echo '<input type="text" name="text-color" id="text-color" value="' . esc_attr( $header_textcolor ) . '"' . $default_color_attr . ' />';
+	if ( $default_color ) {
+		echo ' <span class="description hide-if-js">' . sprintf( _x( 'Default: %s', 'color' ), esc_html( $default_color ) ) . '</span>';
+	}
+	?>
+	</p>
+</td>
+</tr>
+</tbody>
+</table>
+<?php endif;
+
+/**
+ * Fires just before the submit button in the custom header options form.
+ *
+ * @since 3.1.0
+ */
+do_action( 'custom_header_options' );
+
+wp_nonce_field( 'custom-header-options', '_wpnonce-custom-header-options' ); ?>
+
+<?php submit_button( null, 'primary', 'save-header-options' ); ?>
+</form>
+</div>
+
+<?php }
+
+	/**
+	 * Display second step of custom header image page.
+	 *
+	 * @since 2.1.0
+	 */
+	public function step_2() {
+		check_admin_referer('custom-header-upload', '_wpnonce-custom-header-upload');
+		if ( ! current_theme_supports( 'custom-header', 'uploads' ) ) {
+			wp_die(
+				'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
+				'<p>' . __( 'The current theme does not support uploading a custom header image.' ) . '</p>',
+				403
+			);
+		}
+
+		if ( empty( $_POST ) && isset( $_GET['file'] ) ) {
+			$attachment_id = absint( $_GET['file'] );
+			$file = get_attached_file( $attachment_id, true );
+			$url = wp_get_attachment_image_src( $attachment_id, 'full' );
+			$url = $url[0];
+		} elseif ( isset( $_POST ) ) {
+			$data = $this->step_2_manage_upload();
+			$attachment_id = $data['attachment_id'];
+			$file = $data['file'];
+			$url = $data['url'];
+		}
+
+		if ( file_exists( $file ) ) {
+			list( $width, $height, $type, $attr ) = getimagesize( $file );
+		} else {
+			$data = wp_get_attachment_metadata( $attachment_id );
+			$height = isset( $data[ 'height' ] ) ? $data[ 'height' ] : 0;
+			$width = isset( $data[ 'width' ] ) ? $data[ 'width' ] : 0;
+			unset( $data );
+		}
+
+		$max_width = 0;
+		// For flex, limit size of image displayed to 1500px unless theme says otherwise
+		if ( current_theme_supports( 'custom-header', 'flex-width' ) )
+			$max_width = 1500;
+
+		if ( current_theme_supports( 'custom-header', 'max-width' ) )
+			$max_width = max( $max_width, get_theme_support( 'custom-header', 'max-width' ) );
+		$max_width = max( $max_width, get_theme_support( 'custom-header', 'width' ) );
+
+		// If flexible height isn't supported and the image is the exact right size
+		if ( ! current_theme_supports( 'custom-header', 'flex-height' ) && ! current_theme_supports( 'custom-header', 'flex-width' )
+			&& $width == get_theme_support( 'custom-header', 'width' ) && $height == get_theme_support( 'custom-header', 'height' ) )
+		{
+			// Add the meta-data
+			if ( file_exists( $file ) )
+				wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $file ) );
+
+			$this->set_header_image( compact( 'url', 'attachment_id', 'width', 'height' ) );
+
+			/**
+			 * Fires after the header image is set or an error is returned.
+			 *
+			 * @since 2.1.0
+			 *
+			 * @param string $file          Path to the file.
+			 * @param int    $attachment_id Attachment ID.
+			 */
+			do_action( 'wp_create_file_in_uploads', $file, $attachment_id ); // For replication
+
+			return $this->finished();
+		} elseif ( $width > $max_width ) {
+			$oitar = $width / $max_width;
+			$image = wp_crop_image($attachment_id, 0, 0, $width, $height, $max_width, $height / $oitar, false, str_replace(basename($file), 'midsize-'.basename($file), $file));
+			if ( ! $image || is_wp_error( $image ) )
+				wp_die( __( 'Image could not be processed. Please go back and try again.' ), __( 'Image Processing Error' ) );
+
+			/** This filter is documented in wp-admin/custom-header.php */
+			$image = apply_filters( 'wp_create_file_in_uploads', $image, $attachment_id ); // For replication
+
+			$url = str_replace(basename($url), basename($image), $url);
+			$width = $width / $oitar;
+			$height = $height / $oitar;
+		} else {
+			$oitar = 1;
+		}
+		?>
+
+<div class="wrap">
+<h1><?php _e( 'Crop Header Image' ); ?></h1>
+
+<form method="post" action="<?php echo esc_url(add_query_arg('step', 3)); ?>">
+	<p class="hide-if-no-js"><?php _e('Choose the part of the image you want to use as your header.'); ?></p>
+	<p class="hide-if-js"><strong><?php _e( 'You need JavaScript to choose a part of the image.'); ?></strong></p>
+
+	<div id="crop_image" style="position: relative">
+		<img src="<?php echo esc_url( $url ); ?>" id="upload" width="<?php echo $width; ?>" height="<?php echo $height; ?>" alt="" />
+	</div>
+
+	<input type="hidden" name="x1" id="x1" value="0"/>
+	<input type="hidden" name="y1" id="y1" value="0"/>
+	<input type="hidden" name="width" id="width" value="<?php echo esc_attr( $width ); ?>"/>
+	<input type="hidden" name="height" id="height" value="<?php echo esc_attr( $height ); ?>"/>
+	<input type="hidden" name="attachment_id" id="attachment_id" value="<?php echo esc_attr( $attachment_id ); ?>" />
+	<input type="hidden" name="oitar" id="oitar" value="<?php echo esc_attr( $oitar ); ?>" />
+	<?php if ( empty( $_POST ) && isset( $_GET['file'] ) ) { ?>
+	<input type="hidden" name="create-new-attachment" value="true" />
+	<?php } ?>
+	<?php wp_nonce_field( 'custom-header-crop-image' ) ?>
+
+	<p class="submit">
+	<?php submit_button( __( 'Crop and Publish' ), 'primary', 'submit', false ); ?>
+	<?php
+	if ( isset( $oitar ) && 1 == $oitar && ( current_theme_supports( 'custom-header', 'flex-height' ) || current_theme_supports( 'custom-header', 'flex-width' ) ) )
+		submit_button( __( 'Skip Cropping, Publish Image as Is' ), '', 'skip-cropping', false );
+	?>
+	</p>
+</form>
+</div>
+		<?php
+	}
+
+
+	/**
+	 * Upload the file to be cropped in the second step.
+	 *
+	 * @since 3.4.0
+	 */
+	public function step_2_manage_upload() {
+		$overrides = array('test_form' => false);
+
+		$uploaded_file = $_FILES['import'];
+		$wp_filetype = wp_check_filetype_and_ext( $uploaded_file['tmp_name'], $uploaded_file['name'] );
+		if ( ! wp_match_mime_types( 'image', $wp_filetype['type'] ) )
+			wp_die( __( 'The uploaded file is not a valid image. Please try again.' ) );
+
+		$file = wp_handle_upload($uploaded_file, $overrides);
+
+		if ( isset($file['error']) )
+			wp_die( $file['error'],  __( 'Image Upload Error' ) );
+
+		$url = $file['url'];
+		$type = $file['type'];
+		$file = $file['file'];
+		$filename = basename($file);
+
+		// Construct the object array
+		$object = array(
+			'post_title'     => $filename,
+			'post_content'   => $url,
+			'post_mime_type' => $type,
+			'guid'           => $url,
+			'context'        => 'custom-header'
+		);
+
+		// Save the data
+		$attachment_id = wp_insert_attachment( $object, $file );
+		return compact( 'attachment_id', 'file', 'filename', 'url', 'type' );
+	}
+
+	/**
+	 * Display third step of custom header image page.
+	 *
+	 * @since 2.1.0
+	 * @since 4.4.0 Switched to using wp_get_attachment_url() instead of the guid
+	 *              for retrieving the header image URL.
+	 */
+	public function step_3() {
+		check_admin_referer( 'custom-header-crop-image' );
+
+		if ( ! current_theme_supports( 'custom-header', 'uploads' ) ) {
+			wp_die(
+				'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
+				'<p>' . __( 'The current theme does not support uploading a custom header image.' ) . '</p>',
+				403
+			);
+		}
+
+		if ( ! empty( $_POST['skip-cropping'] ) && ! ( current_theme_supports( 'custom-header', 'flex-height' ) || current_theme_supports( 'custom-header', 'flex-width' ) ) ) {
+			wp_die(
+				'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
+				'<p>' . __( 'The current theme does not support a flexible sized header image.' ) . '</p>',
+				403
+			);
+		}
+
+		if ( $_POST['oitar'] > 1 ) {
+			$_POST['x1'] = $_POST['x1'] * $_POST['oitar'];
+			$_POST['y1'] = $_POST['y1'] * $_POST['oitar'];
+			$_POST['width'] = $_POST['width'] * $_POST['oitar'];
+			$_POST['height'] = $_POST['height'] * $_POST['oitar'];
+		}
+
+		$attachment_id = absint( $_POST['attachment_id'] );
+		$original = get_attached_file($attachment_id);
+
+		$dimensions = $this->get_header_dimensions( array(
+			'height' => $_POST['height'],
+			'width'  => $_POST['width'],
+		) );
+		$height = $dimensions['dst_height'];
+		$width = $dimensions['dst_width'];
+
+		if ( empty( $_POST['skip-cropping'] ) )
+			$cropped = wp_crop_image( $attachment_id, (int) $_POST['x1'], (int) $_POST['y1'], (int) $_POST['width'], (int) $_POST['height'], $width, $height );
+		elseif ( ! empty( $_POST['create-new-attachment'] ) )
+			$cropped = _copy_image_file( $attachment_id );
+		else
+			$cropped = get_attached_file( $attachment_id );
+
+		if ( ! $cropped || is_wp_error( $cropped ) )
+			wp_die( __( 'Image could not be processed. Please go back and try again.' ), __( 'Image Processing Error' ) );
+
+		/** This filter is documented in wp-admin/custom-header.php */
+		$cropped = apply_filters( 'wp_create_file_in_uploads', $cropped, $attachment_id ); // For replication
+
+		$object = $this->create_attachment_object( $cropped, $attachment_id );
+
+		if ( ! empty( $_POST['create-new-attachment'] ) )
+			unset( $object['ID'] );
+
+		// Update the attachment
+		$attachment_id = $this->insert_attachment( $object, $cropped );
+
+		$url = wp_get_attachment_url( $attachment_id );
+		$this->set_header_image( compact( 'url', 'attachment_id', 'width', 'height' ) );
+
+		// Cleanup.
+		$medium = str_replace( basename( $original ), 'midsize-' . basename( $original ), $original );
+		if ( file_exists( $medium ) ) {
+			wp_delete_file( $medium );
+		}
+
+		if ( empty( $_POST['create-new-attachment'] ) && empty( $_POST['skip-cropping'] ) ) {
+			wp_delete_file( $original );
+		}
+
+		return $this->finished();
+	}
+
+	/**
+	 * Display last step of custom header image page.
+	 *
+	 * @since 2.1.0
+	 */
+	public function finished() {
+		$this->updated = true;
+		$this->step_1();
+	}
+
+	/**
+	 * Display the page based on the current step.
+	 *
+	 * @since 2.1.0
+	 */
+	public function admin_page() {
+		if ( ! current_user_can('edit_theme_options') )
+			wp_die(__('Sorry, you are not allowed to customize headers.'));
+		$step = $this->step();
+		if ( 2 == $step )
+			$this->step_2();
+		elseif ( 3 == $step )
+			$this->step_3();
+		else
+			$this->step_1();
+	}
+
+	/**
+	 * Unused since 3.5.0.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param array $form_fields
+	 * @return array $form_fields
+	 */
+	public function attachment_fields_to_edit( $form_fields ) {
+		return $form_fields;
+	}
+
+	/**
+	 * Unused since 3.5.0.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param array $tabs
+	 * @return array $tabs
+	 */
+	public function filter_upload_tabs( $tabs ) {
+		return $tabs;
+	}
+
+	/**
+	 * Choose a header image, selected from existing uploaded and default headers,
+	 * or provide an array of uploaded header data (either new, or from media library).
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param mixed $choice Which header image to select. Allows for values of 'random-default-image',
+	 * 	for randomly cycling among the default images; 'random-uploaded-image', for randomly cycling
+	 * 	among the uploaded images; the key of a
