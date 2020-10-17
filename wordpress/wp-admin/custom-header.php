@@ -1371,4 +1371,75 @@ wp_nonce_field( 'custom-header-options', '_wpnonce-custom-header-options' ); ?>
 		$default = sprintf( $default, get_template_directory_uri(), get_stylesheet_directory_uri() );
 		$already_has_default = false;
 
-		f
+		foreach ( $this->default_headers as $k => $h ) {
+			if ( $h['url'] === $default ) {
+				$already_has_default = true;
+				break;
+			}
+		}
+
+		if ( $already_has_default ) {
+			return $this->default_headers;
+		}
+
+		// If the one true image isn't included in the default set, prepend it.
+		$header_images = array();
+		$header_images['default'] = array(
+			'url'           => $default,
+			'thumbnail_url' => $default,
+			'description'   => 'Default'
+		);
+
+		// The rest of the set comes after.
+		return array_merge( $header_images, $this->default_headers );
+	}
+
+	/**
+	 * Gets the previously uploaded header images.
+	 *
+	 * @since 3.9.0
+	 *
+	 * @return array Uploaded header images.
+	 */
+	public function get_uploaded_header_images() {
+		$header_images = get_uploaded_header_images();
+		$timestamp_key = '_wp_attachment_custom_header_last_used_' . get_stylesheet();
+		$alt_text_key = '_wp_attachment_image_alt';
+
+		foreach ( $header_images as &$header_image ) {
+			$header_meta = get_post_meta( $header_image['attachment_id'] );
+			$header_image['timestamp'] = isset( $header_meta[ $timestamp_key ] ) ? $header_meta[ $timestamp_key ] : '';
+			$header_image['alt_text'] = isset( $header_meta[ $alt_text_key ] ) ? $header_meta[ $alt_text_key ] : '';
+		}
+
+		return $header_images;
+	}
+
+	/**
+	 * Get the ID of a previous crop from the same base image.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param  array $object A crop attachment object.
+	 * @return int|false An attachment ID if one exists. False if none.
+	 */
+	public function get_previous_crop( $object ) {
+		$header_images = $this->get_uploaded_header_images();
+
+		// Bail early if there are no header images.
+		if ( empty( $header_images ) ) {
+			return false;
+		}
+
+		$previous = false;
+
+		foreach ( $header_images as $image ) {
+			if ( $image['attachment_parent'] === $object['post_parent'] ) {
+				$previous = $image['attachment_id'];
+				break;
+			}
+		}
+
+		return $previous;
+	}
+}
