@@ -193,4 +193,85 @@ do_action( "{$taxonomy}_term_edit_form_top", $tag, $taxonomy );
 			 * Fires after the Edit Link Category form fields are displayed.
 			 *
 			 * @since 2.9.0
-			 * @deprecated 3.0.0 Use {$taxonomy}_edit_form_fields 
+			 * @deprecated 3.0.0 Use {$taxonomy}_edit_form_fields instead.
+			 *
+			 * @param object $tag Current link category term object.
+			 */
+			do_action( 'edit_link_category_form_fields', $tag );
+		} else {
+			/**
+			 * Fires after the Edit Tag form fields are displayed.
+			 *
+			 * @since 2.9.0
+			 * @deprecated 3.0.0 Use {$taxonomy}_edit_form_fields instead.
+			 *
+			 * @param object $tag Current tag term object.
+			 */
+			do_action( 'edit_tag_form_fields', $tag );
+		}
+		/**
+		 * Fires after the Edit Term form fields are displayed.
+		 *
+		 * The dynamic portion of the hook name, `$taxonomy`, refers to
+		 * the taxonomy slug.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param object $tag      Current taxonomy term object.
+		 * @param string $taxonomy Current taxonomy slug.
+		 */
+		do_action( "{$taxonomy}_edit_form_fields", $tag, $taxonomy );
+		?>
+	</table>
+<?php
+// Back compat hooks
+if ( 'category' == $taxonomy ) {
+	/** This action is documented in wp-admin/edit-tags.php */
+	do_action( 'edit_category_form', $tag );
+} elseif ( 'link_category' == $taxonomy ) {
+	/** This action is documented in wp-admin/edit-tags.php */
+	do_action( 'edit_link_category_form', $tag );
+} else {
+	/**
+	 * Fires at the end of the Edit Term form.
+	 *
+	 * @since 2.5.0
+	 * @deprecated 3.0.0 Use {$taxonomy}_edit_form instead.
+	 *
+	 * @param object $tag Current taxonomy term object.
+	 */
+	do_action( 'edit_tag_form', $tag );
+}
+/**
+ * Fires at the end of the Edit Term form for all taxonomies.
+ *
+ * The dynamic portion of the hook name, `$taxonomy`, refers to the taxonomy slug.
+ *
+ * @since 3.0.0
+ *
+ * @param object $tag      Current taxonomy term object.
+ * @param string $taxonomy Current taxonomy slug.
+ */
+do_action( "{$taxonomy}_edit_form", $tag, $taxonomy );
+?>
+
+<div class="edit-tag-actions">
+
+	<?php submit_button( __( 'Update' ), 'primary', null, false ); ?>
+
+	<?php if ( current_user_can( 'delete_term', $tag->term_id ) ) : ?>
+		<span id="delete-link">
+			<a class="delete" href="<?php echo admin_url( wp_nonce_url( "edit-tags.php?action=delete&taxonomy=$taxonomy&tag_ID=$tag->term_id", 'delete-tag_' . $tag->term_id ) ) ?>"><?php _e( 'Delete' ); ?></a>
+		</span>
+	<?php endif; ?>
+
+</div>
+
+</form>
+</div>
+
+<?php if ( ! wp_is_mobile() ) : ?>
+<script type="text/javascript">
+try{document.forms.edittag.name.focus();}catch(e){}
+</script>
+<?php endif;
