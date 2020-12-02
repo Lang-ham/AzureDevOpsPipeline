@@ -791,4 +791,123 @@ class WP_Automatic_Updater {
 		foreach ( array( 'plugin', 'theme', 'translation' ) as $type ) {
 			if ( ! isset( $this->update_results[ $type ] ) )
 				continue;
-			$success_items = wp_list_filter( $this->update_results[ $typ
+			$success_items = wp_list_filter( $this->update_results[ $type ], array( 'result' => true ) );
+			if ( $success_items ) {
+				$messages = array(
+					'plugin'      => __( 'The following plugins were successfully updated:' ),
+					'theme'       => __( 'The following themes were successfully updated:' ),
+					'translation' => __( 'The following translations were successfully updated:' ),
+				);
+
+				$body[] = $messages[ $type ];
+				foreach ( wp_list_pluck( $success_items, 'name' ) as $name ) {
+					$body[] = ' * ' . sprintf( __( 'SUCCESS: %s' ), $name );
+				}
+			}
+			if ( $success_items != $this->update_results[ $type ] ) {
+				// Failed updates
+				$messages = array(
+					'plugin'      => __( 'The following plugins failed to update:' ),
+					'theme'       => __( 'The following themes failed to update:' ),
+					'translation' => __( 'The following translations failed to update:' ),
+				);
+
+				$body[] = $messages[ $type ];
+				foreach ( $this->update_results[ $type ] as $item ) {
+					if ( ! $item->result || is_wp_error( $item->result ) ) {
+						$body[] = ' * ' . sprintf( __( 'FAILED: %s' ), $item->name );
+						$failures++;
+					}
+				}
+			}
+			$body[] = '';
+		}
+
+		$site_title = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		if ( $failures ) {
+			$body[] = trim( __(
+"BETA TESTING?
+=============
+
+This debugging email is sent when you are using a development version of WordPress.
+
+If you think these failures might be due to a bug in WordPress, could you report it?
+ * Open a thread in the support forums: https://wordpress.org/support/forum/alphabeta
+ * Or, if you're comfortable writing a bug report: https://core.trac.wordpress.org/
+
+Thanks! -- The WordPress Team" ) );
+			$body[] = '';
+
+			$subject = sprintf( __( '[%s] There were failures during background updates' ), $site_title );
+		} else {
+			$subject = sprintf( __( '[%s] Background updates have finished' ), $site_title );
+		}
+
+		$body[] = trim( __(
+'UPDATE LOG
+==========' ) );
+		$body[] = '';
+
+		foreach ( array( 'core', 'plugin', 'theme', 'translation' ) as $type ) {
+			if ( ! isset( $this->update_results[ $type ] ) )
+				continue;
+			foreach ( $this->update_results[ $type ] as $update ) {
+				$body[] = $update->name;
+				$body[] = str_repeat( '-', strlen( $update->name ) );
+				foreach ( $update->messages as $message )
+					$body[] = "  " . html_entity_decode( str_replace( '&#8230;', '...', $message ) );
+				if ( is_wp_error( $update->result ) ) {
+					$results = array( 'update' => $update->result );
+					// If we rolled back, we want to know an error that occurred then too.
+					if ( 'rollback_was_required' === $update->result->get_error_code() )
+						$results = (array) $update->result->get_error_data();
+					foreach ( $results as $result_type => $result ) {
+						if ( ! is_wp_error( $result ) )
+							continue;
+
+						if ( 'rollback' === $result_type ) {
+							/* translators: 1: Error code, 2: Error message. */
+							$body[] = '  ' . sprintf( __( 'Rollback Error: [%1$s] %2$s' ), $result->get_error_code(), $result->get_error_message() );
+						} else {
+							/* translators: 1: Error code, 2: Error message. */
+							$body[] = '  ' . sprintf( __( 'Error: [%1$s] %2$s' ), $result->get_error_code(), $result->get_error_message() );
+						}
+
+						if ( $result->get_error_data() )
+							$body[] = '         ' . implode( ', ', (array) $result->get_error_data() );
+					}
+				}
+				$body[] = '';
+			}
+		}
+
+		$email = array(
+			'to'      => get_site_option( 'admin_email' ),
+			'subject' => $subject,
+			'body'    => implode( "\n", $body ),
+			'headers' => ''
+		);
+
+		/**
+		 * Filters the debug email that can be sent following an automatic
+		 * background core update.
+		 *
+		 * @since 3.8.0
+		 *
+		 * @param array $email {
+		 *     Array of email arguments that will be passed to wp_mail().
+		 *
+		 *     @type string $to      The email recipient. An array of emails
+		 *                           can be returned, as handled by wp_mail().
+		 *     @type string $subject Email subject.
+		 *     @type string $body    Email message body.
+		 *     @type string $headers Any email headers. Default empty.
+		 * }
+		 * @param int   $failures The number of failures encountered while upgrading.
+		 * @param mixed $results  The results of all attempted updates.
+		 */
+		$email = apply_filters( 'automatic_updates_debug_email', $email, $failures, $this->update_results );
+
+		wp_mail( $email['to'], wp_specialchars_decode( $email['subject'] ), $email['body'], $email['headers'] );
+	}
+}
