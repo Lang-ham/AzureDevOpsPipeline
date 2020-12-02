@@ -466,4 +466,8 @@ class WP_Community_Events {
 		error_log( sprintf(
 			'%s: %s. Details: %s',
 			__METHOD__,
-			trim( $
+			trim( $message, '.' ),
+			wp_json_encode( $details )
+		) );
+	}
+}
