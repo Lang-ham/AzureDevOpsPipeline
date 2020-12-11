@@ -181,4 +181,141 @@ class WP_Links_List_Table extends WP_List_Table {
 		$edit_link = get_edit_bookmark_link( $link );
 		printf( '<strong><a class="row-title" href="%s" aria-label="%s">%s</a></strong>',
 			$edit_link,
-		
+			/* translators: %s: link name */
+			esc_attr( sprintf( __( 'Edit &#8220;%s&#8221;' ), $link->link_name ) ),
+			$link->link_name
+		);
+	}
+
+	/**
+	 * Handles the link URL column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link The current link object.
+	 */
+	public function column_url( $link ) {
+		$short_url = url_shorten( $link->link_url );
+		echo "<a href='$link->link_url'>$short_url</a>";
+	}
+
+	/**
+	 * Handles the link categories column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @global int $cat_id
+	 *
+	 * @param object $link The current link object.
+	 */
+	public function column_categories( $link ) {
+		global $cat_id;
+
+		$cat_names = array();
+		foreach ( $link->link_category as $category ) {
+			$cat = get_term( $category, 'link_category', OBJECT, 'display' );
+			if ( is_wp_error( $cat ) ) {
+				echo $cat->get_error_message();
+			}
+			$cat_name = $cat->name;
+			if ( $cat_id != $category ) {
+				$cat_name = "<a href='link-manager.php?cat_id=$category'>$cat_name</a>";
+			}
+			$cat_names[] = $cat_name;
+		}
+		echo implode( ', ', $cat_names );
+	}
+
+	/**
+	 * Handles the link relation column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link The current link object.
+	 */
+	public function column_rel( $link ) {
+		echo empty( $link->link_rel ) ? '<br />' : $link->link_rel;
+	}
+
+	/**
+	 * Handles the link visibility column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link The current link object.
+	 */
+	public function column_visible( $link ) {
+		if ( 'Y' === $link->link_visible ) {
+			_e( 'Yes' );
+		} else {
+			_e( 'No' );
+		}
+	}
+
+	/**
+	 * Handles the link rating column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link The current link object.
+	 */
+	public function column_rating( $link ) {
+		echo $link->link_rating;
+	}
+
+	/**
+	 * Handles the default column output.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link        Link object.
+	 * @param string $column_name Current column name.
+	 */
+	public function column_default( $link, $column_name ) {
+		/**
+		 * Fires for each registered custom link column.
+		 *
+		 * @since 2.1.0
+		 *
+		 * @param string $column_name Name of the custom column.
+		 * @param int    $link_id     Link ID.
+		 */
+		do_action( 'manage_link_custom_column', $column_name, $link->link_id );
+	}
+
+	public function display_rows() {
+		foreach ( $this->items as $link ) {
+			$link = sanitize_bookmark( $link );
+			$link->link_name = esc_attr( $link->link_name );
+			$link->link_category = wp_get_link_cats( $link->link_id );
+?>
+		<tr id="link-<?php echo $link->link_id; ?>">
+			<?php $this->single_row_columns( $link ) ?>
+		</tr>
+<?php
+		}
+	}
+
+	/**
+	 * Generates and displays row action links.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param object $link        Link being acted upon.
+	 * @param string $column_name Current column name.
+	 * @param string $primary     Primary column name.
+	 * @return string Row action output for links.
+	 */
+	protected function handle_row_actions( $link, $column_name, $primary ) {
+		if ( $primary !== $column_name ) {
+			return '';
+		}
+
+		$edit_link = get_edit_bookmark_link( $link );
+
+		$actions = array();
+		$actions['edit'] = '<a href="' . $edit_link . '">' . __('Edit') . '</a>';
+		$actions['delete'] = "<a class='submitdelete' href='" . wp_nonce_url("link.php?action=delete&amp;link_id=$link->link_id", 'delete-bookmark_' . $link->link_id) . "' onclick=\"if ( confirm( '" . esc_js(sprintf(__("You are about to delete this link '%s'\n  'Cancel' to stop, 'OK' to delete."), $link->link_name)) . "' ) ) { return true;}return false;\">" . __('Delete') . "</a>";
+		return $this->row_actions( $actions );
+	}
+}
