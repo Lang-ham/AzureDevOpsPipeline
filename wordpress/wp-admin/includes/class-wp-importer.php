@@ -227,4 +227,97 @@ class WP_Importer {
 	 *
 	 * @return bool
 	 */
-	public function is_
+	public function is_user_over_quota() {
+		if ( function_exists( 'upload_is_user_over_quota' ) ) {
+			if ( upload_is_user_over_quota() ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Replace newlines, tabs, and multiple spaces with a single space
+	 *
+	 * @param string $string
+	 * @return string
+	 */
+	public function min_whitespace( $string ) {
+		return preg_replace( '|[\r\n\t ]+|', ' ', $string );
+	}
+
+	/**
+	 * Resets global variables that grow out of control during imports.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @global wpdb  $wpdb       WordPress database abstraction object.
+	 * @global array $wp_actions
+	 */
+	public function stop_the_insanity() {
+		global $wpdb, $wp_actions;
+		// Or define( 'WP_IMPORTING', true );
+		$wpdb->queries = array();
+		// Reset $wp_actions to keep it from growing out of control
+		$wp_actions = array();
+	}
+}
+
+/**
+ * Returns value of command line params.
+ * Exits when a required param is not set.
+ *
+ * @param string $param
+ * @param bool   $required
+ * @return mixed
+ */
+function get_cli_args( $param, $required = false ) {
+	$args = $_SERVER['argv'];
+
+	$out = array();
+
+	$last_arg = null;
+	$return = null;
+
+	$il = sizeof( $args );
+
+	for ( $i = 1, $il; $i < $il; $i++ ) {
+		if ( (bool) preg_match( "/^--(.+)/", $args[$i], $match ) ) {
+			$parts = explode( "=", $match[1] );
+			$key = preg_replace( "/[^a-z0-9]+/", "", $parts[0] );
+
+			if ( isset( $parts[1] ) ) {
+				$out[$key] = $parts[1];
+			} else {
+				$out[$key] = true;
+			}
+
+			$last_arg = $key;
+		} elseif ( (bool) preg_match( "/^-([a-zA-Z0-9]+)/", $args[$i], $match ) ) {
+			for ( $j = 0, $jl = strlen( $match[1] ); $j < $jl; $j++ ) {
+				$key = $match[1]{$j};
+				$out[$key] = true;
+			}
+
+			$last_arg = $key;
+		} elseif ( $last_arg !== null ) {
+			$out[$last_arg] = $args[$i];
+		}
+	}
+
+	// Check array for specified param
+	if ( isset( $out[$param] ) ) {
+		// Set return value
+		$return = $out[$param];
+	}
+
+	// Check for missing required param
+	if ( !isset( $out[$param] ) && $required ) {
+		// Display message and exit
+		echo "\"$param\" parameter is required but was not specified\n";
+		exit();
+	}
+
+	return $return;
+}
