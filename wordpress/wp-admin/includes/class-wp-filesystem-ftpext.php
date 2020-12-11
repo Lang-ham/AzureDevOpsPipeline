@@ -427,4 +427,155 @@ class WP_Filesystem_FTPext extends WP_Filesystem_Base {
 
 	/**
 	 *
-	 * @param string $pa
+	 * @param string $path
+	 * @param bool $recursive
+	 * @return bool
+	 */
+	public function rmdir($path, $recursive = false) {
+		return $this->delete($path, $recursive);
+	}
+
+	/**
+	 *
+	 * @staticvar bool $is_windows
+	 * @param string $line
+	 * @return array
+	 */
+	public function parselisting($line) {
+		static $is_windows = null;
+		if ( is_null($is_windows) )
+			$is_windows = stripos( ftp_systype($this->link), 'win') !== false;
+
+		if ( $is_windows && preg_match('/([0-9]{2})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2})(AM|PM) +([0-9]+|<DIR>) +(.+)/', $line, $lucifer) ) {
+			$b = array();
+			if ( $lucifer[3] < 70 )
+				$lucifer[3] +=2000;
+			else
+				$lucifer[3] += 1900; // 4digit year fix
+			$b['isdir'] = ( $lucifer[7] == '<DIR>');
+			if ( $b['isdir'] )
+				$b['type'] = 'd';
+			else
+				$b['type'] = 'f';
+			$b['size'] = $lucifer[7];
+			$b['month'] = $lucifer[1];
+			$b['day'] = $lucifer[2];
+			$b['year'] = $lucifer[3];
+			$b['hour'] = $lucifer[4];
+			$b['minute'] = $lucifer[5];
+			$b['time'] = @mktime($lucifer[4] + (strcasecmp($lucifer[6], "PM") == 0 ? 12 : 0), $lucifer[5], 0, $lucifer[1], $lucifer[2], $lucifer[3]);
+			$b['am/pm'] = $lucifer[6];
+			$b['name'] = $lucifer[8];
+		} elseif ( !$is_windows && $lucifer = preg_split('/[ ]/', $line, 9, PREG_SPLIT_NO_EMPTY)) {
+			//echo $line."\n";
+			$lcount = count($lucifer);
+			if ( $lcount < 8 )
+				return '';
+			$b = array();
+			$b['isdir'] = $lucifer[0]{0} === 'd';
+			$b['islink'] = $lucifer[0]{0} === 'l';
+			if ( $b['isdir'] )
+				$b['type'] = 'd';
+			elseif ( $b['islink'] )
+				$b['type'] = 'l';
+			else
+				$b['type'] = 'f';
+			$b['perms'] = $lucifer[0];
+			$b['permsn'] = $this->getnumchmodfromh( $b['perms'] );
+			$b['number'] = $lucifer[1];
+			$b['owner'] = $lucifer[2];
+			$b['group'] = $lucifer[3];
+			$b['size'] = $lucifer[4];
+			if ( $lcount == 8 ) {
+				sscanf($lucifer[5], '%d-%d-%d', $b['year'], $b['month'], $b['day']);
+				sscanf($lucifer[6], '%d:%d', $b['hour'], $b['minute']);
+				$b['time'] = @mktime($b['hour'], $b['minute'], 0, $b['month'], $b['day'], $b['year']);
+				$b['name'] = $lucifer[7];
+			} else {
+				$b['month'] = $lucifer[5];
+				$b['day'] = $lucifer[6];
+				if ( preg_match('/([0-9]{2}):([0-9]{2})/', $lucifer[7], $l2) ) {
+					$b['year'] = date("Y");
+					$b['hour'] = $l2[1];
+					$b['minute'] = $l2[2];
+				} else {
+					$b['year'] = $lucifer[7];
+					$b['hour'] = 0;
+					$b['minute'] = 0;
+				}
+				$b['time'] = strtotime( sprintf('%d %s %d %02d:%02d', $b['day'], $b['month'], $b['year'], $b['hour'], $b['minute']) );
+				$b['name'] = $lucifer[8];
+			}
+		}
+
+		// Replace symlinks formatted as "source -> target" with just the source name
+		if ( isset( $b['islink'] ) && $b['islink'] ) {
+			$b['name'] = preg_replace( '/(\s*->\s*.*)$/', '', $b['name'] );
+		}
+
+		return $b;
+	}
+
+	/**
+	 *
+	 * @param string $path
+	 * @param bool $include_hidden
+	 * @param bool $recursive
+	 * @return bool|array
+	 */
+	public function dirlist($path = '.', $include_hidden = true, $recursive = false) {
+		if ( $this->is_file($path) ) {
+			$limit_file = basename($path);
+			$path = dirname($path) . '/';
+		} else {
+			$limit_file = false;
+		}
+
+		$pwd = @ftp_pwd($this->link);
+		if ( ! @ftp_chdir($this->link, $path) ) // Cant change to folder = folder doesn't exist
+			return false;
+		$list = @ftp_rawlist($this->link, '-a', false);
+		@ftp_chdir($this->link, $pwd);
+
+		if ( empty($list) ) // Empty array = non-existent folder (real folder will show . at least)
+			return false;
+
+		$dirlist = array();
+		foreach ( $list as $k => $v ) {
+			$entry = $this->parselisting($v);
+			if ( empty($entry) )
+				continue;
+
+			if ( '.' == $entry['name'] || '..' == $entry['name'] )
+				continue;
+
+			if ( ! $include_hidden && '.' == $entry['name'][0] )
+				continue;
+
+			if ( $limit_file && $entry['name'] != $limit_file)
+				continue;
+
+			$dirlist[ $entry['name'] ] = $entry;
+		}
+
+		$ret = array();
+		foreach ( (array)$dirlist as $struc ) {
+			if ( 'd' == $struc['type'] ) {
+				if ( $recursive )
+					$struc['files'] = $this->dirlist($path . '/' . $struc['name'], $include_hidden, $recursive);
+				else
+					$struc['files'] = array();
+			}
+
+			$ret[ $struc['name'] ] = $struc;
+		}
+		return $ret;
+	}
+
+	/**
+	 */
+	public function __destruct() {
+		if ( $this->link )
+			ftp_close($this->link);
+	}
+}
