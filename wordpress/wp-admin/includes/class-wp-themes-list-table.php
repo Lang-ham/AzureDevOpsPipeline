@@ -157,3 +157,146 @@ class WP_Themes_List_Table extends WP_List_Table {
 		} else {
 			echo '<div class="no-items">';
 			$this->no_items();
+			echo '</div>';
+		}
+	}
+
+	/**
+	 */
+	public function display_rows() {
+		$themes = $this->items;
+
+		foreach ( $themes as $theme ):
+			?><div class="available-theme"><?php
+
+			$template   = $theme->get_template();
+			$stylesheet = $theme->get_stylesheet();
+			$title      = $theme->display('Name');
+			$version    = $theme->display('Version');
+			$author     = $theme->display('Author');
+
+			$activate_link = wp_nonce_url( "themes.php?action=activate&amp;template=" . urlencode( $template ) . "&amp;stylesheet=" . urlencode( $stylesheet ), 'switch-theme_' . $stylesheet );
+
+			$actions = array();
+			$actions['activate'] = '<a href="' . $activate_link . '" class="activatelink" title="'
+				. esc_attr( sprintf( __( 'Activate &#8220;%s&#8221;' ), $title ) ) . '">' . __( 'Activate' ) . '</a>';
+
+			if ( current_user_can( 'edit_theme_options' ) && current_user_can( 'customize' ) ) {
+				$actions['preview'] .= '<a href="' . wp_customize_url( $stylesheet ) . '" class="load-customize hide-if-no-customize">'
+					. __( 'Live Preview' ) . '</a>';
+			}
+
+			if ( ! is_multisite() && current_user_can( 'delete_themes' ) )
+				$actions['delete'] = '<a class="submitdelete deletion" href="' . wp_nonce_url( 'themes.php?action=delete&amp;stylesheet=' . urlencode( $stylesheet ), 'delete-theme_' . $stylesheet )
+					. '" onclick="' . "return confirm( '" . esc_js( sprintf( __( "You are about to delete this theme '%s'\n  'Cancel' to stop, 'OK' to delete." ), $title ) )
+					. "' );" . '">' . __( 'Delete' ) . '</a>';
+
+			/** This filter is documented in wp-admin/includes/class-wp-ms-themes-list-table.php */
+			$actions       = apply_filters( 'theme_action_links', $actions, $theme, 'all' );
+
+			/** This filter is documented in wp-admin/includes/class-wp-ms-themes-list-table.php */
+			$actions       = apply_filters( "theme_action_links_$stylesheet", $actions, $theme, 'all' );
+			$delete_action = isset( $actions['delete'] ) ? '<div class="delete-theme">' . $actions['delete'] . '</div>' : '';
+			unset( $actions['delete'] );
+
+			?>
+
+			<span class="screenshot hide-if-customize">
+				<?php if ( $screenshot = $theme->get_screenshot() ) : ?>
+					<img src="<?php echo esc_url( $screenshot ); ?>" alt="" />
+				<?php endif; ?>
+			</span>
+			<a href="<?php echo wp_customize_url( $stylesheet ); ?>" class="screenshot load-customize hide-if-no-customize">
+				<?php if ( $screenshot = $theme->get_screenshot() ) : ?>
+					<img src="<?php echo esc_url( $screenshot ); ?>" alt="" />
+				<?php endif; ?>
+			</a>
+
+			<h3><?php echo $title; ?></h3>
+			<div class="theme-author"><?php printf( __( 'By %s' ), $author ); ?></div>
+			<div class="action-links">
+				<ul>
+					<?php foreach ( $actions as $action ): ?>
+						<li><?php echo $action; ?></li>
+					<?php endforeach; ?>
+					<li class="hide-if-no-js"><a href="#" class="theme-detail"><?php _e('Details') ?></a></li>
+				</ul>
+				<?php echo $delete_action; ?>
+
+				<?php theme_update_available( $theme ); ?>
+			</div>
+
+			<div class="themedetaildiv hide-if-js">
+				<p><strong><?php _e('Version:'); ?></strong> <?php echo $version; ?></p>
+				<p><?php echo $theme->display('Description'); ?></p>
+				<?php if ( $theme->parent() ) {
+					printf( ' <p class="howto">' . __( 'This <a href="%1$s">child theme</a> requires its parent theme, %2$s.' ) . '</p>',
+						__( 'https://codex.wordpress.org/Child_Themes' ),
+						$theme->parent()->display( 'Name' ) );
+				} ?>
+			</div>
+
+			</div>
+		<?php
+		endforeach;
+	}
+
+	/**
+	 * @param WP_Theme $theme
+	 * @return bool
+	 */
+	public function search_theme( $theme ) {
+		// Search the features
+		foreach ( $this->features as $word ) {
+			if ( ! in_array( $word, $theme->get('Tags') ) )
+				return false;
+		}
+
+		// Match all phrases
+		foreach ( $this->search_terms as $word ) {
+			if ( in_array( $word, $theme->get('Tags') ) )
+				continue;
+
+			foreach ( array( 'Name', 'Description', 'Author', 'AuthorURI' ) as $header ) {
+				// Don't mark up; Do translate.
+				if ( false !== stripos( strip_tags( $theme->display( $header, false, true ) ), $word ) ) {
+					continue 2;
+				}
+			}
+
+			if ( false !== stripos( $theme->get_stylesheet(), $word ) )
+				continue;
+
+			if ( false !== stripos( $theme->get_template(), $word ) )
+				continue;
+
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Send required variables to JavaScript land
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param array $extra_args
+	 */
+	public function _js_vars( $extra_args = array() ) {
+		$search_string = isset( $_REQUEST['s'] ) ? esc_attr( wp_unslash( $_REQUEST['s'] ) ) : '';
+
+		$args = array(
+			'search' => $search_string,
+			'features' => $this->features,
+			'paged' => $this->get_pagenum(),
+			'total_pages' => ! empty( $this->_pagination_args['total_pages'] ) ? $this->_pagination_args['total_pages'] : 1,
+		);
+
+		if ( is_array( $extra_args ) )
+			$args = array_merge( $args, $extra_args );
+
+		printf( "<script type='text/javascript'>var theme_list_args = %s;</script>\n", wp_json_encode( $args ) );
+		parent::_js_vars();
+	}
+}
