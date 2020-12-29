@@ -450,4 +450,264 @@ function format_code_lang( $code = '' ) {
 		'cs' => 'Czech', 'da' => 'Danish', 'dv' => 'Divehi; Dhivehi; Maldivian', 'nl' => 'Dutch; Flemish', 'dz' => 'Dzongkha', 'en' => 'English', 'eo' => 'Esperanto', 'et' => 'Estonian', 'ee' => 'Ewe', 'fo' => 'Faroese', 'fj' => 'Fijjian', 'fi' => 'Finnish', 'fr' => 'French', 'fy' => 'Western Frisian', 'ff' => 'Fulah', 'ka' => 'Georgian', 'de' => 'German', 'gd' => 'Gaelic; Scottish Gaelic',
 		'ga' => 'Irish', 'gl' => 'Galician', 'gv' => 'Manx', 'el' => 'Greek, Modern', 'gn' => 'Guarani', 'gu' => 'Gujarati', 'ht' => 'Haitian; Haitian Creole', 'ha' => 'Hausa', 'he' => 'Hebrew', 'hz' => 'Herero', 'hi' => 'Hindi', 'ho' => 'Hiri Motu', 'hu' => 'Hungarian', 'ig' => 'Igbo', 'is' => 'Icelandic', 'io' => 'Ido', 'ii' => 'Sichuan Yi', 'iu' => 'Inuktitut', 'ie' => 'Interlingue',
 		'ia' => 'Interlingua (International Auxiliary Language Association)', 'id' => 'Indonesian', 'ik' => 'Inupiaq', 'it' => 'Italian', 'jv' => 'Javanese', 'ja' => 'Japanese', 'kl' => 'Kalaallisut; Greenlandic', 'kn' => 'Kannada', 'ks' => 'Kashmiri', 'kr' => 'Kanuri', 'kk' => 'Kazakh', 'km' => 'Central Khmer', 'ki' => 'Kikuyu; Gikuyu', 'rw' => 'Kinyarwanda', 'ky' => 'Kirghiz; Kyrgyz',
-		'kv' => 'Komi', 'kg' => 'Kon
+		'kv' => 'Komi', 'kg' => 'Kongo', 'ko' => 'Korean', 'kj' => 'Kuanyama; Kwanyama', 'ku' => 'Kurdish', 'lo' => 'Lao', 'la' => 'Latin', 'lv' => 'Latvian', 'li' => 'Limburgan; Limburger; Limburgish', 'ln' => 'Lingala', 'lt' => 'Lithuanian', 'lb' => 'Luxembourgish; Letzeburgesch', 'lu' => 'Luba-Katanga', 'lg' => 'Ganda', 'mk' => 'Macedonian', 'mh' => 'Marshallese', 'ml' => 'Malayalam',
+		'mi' => 'Maori', 'mr' => 'Marathi', 'ms' => 'Malay', 'mg' => 'Malagasy', 'mt' => 'Maltese', 'mo' => 'Moldavian', 'mn' => 'Mongolian', 'na' => 'Nauru', 'nv' => 'Navajo; Navaho', 'nr' => 'Ndebele, South; South Ndebele', 'nd' => 'Ndebele, North; North Ndebele', 'ng' => 'Ndonga', 'ne' => 'Nepali', 'nn' => 'Norwegian Nynorsk; Nynorsk, Norwegian', 'nb' => 'Bokmål, Norwegian, Norwegian Bokmål',
+		'no' => 'Norwegian', 'ny' => 'Chichewa; Chewa; Nyanja', 'oc' => 'Occitan, Provençal', 'oj' => 'Ojibwa', 'or' => 'Oriya', 'om' => 'Oromo', 'os' => 'Ossetian; Ossetic', 'pa' => 'Panjabi; Punjabi', 'fa' => 'Persian', 'pi' => 'Pali', 'pl' => 'Polish', 'pt' => 'Portuguese', 'ps' => 'Pushto', 'qu' => 'Quechua', 'rm' => 'Romansh', 'ro' => 'Romanian', 'rn' => 'Rundi', 'ru' => 'Russian',
+		'sg' => 'Sango', 'sa' => 'Sanskrit', 'sr' => 'Serbian', 'hr' => 'Croatian', 'si' => 'Sinhala; Sinhalese', 'sk' => 'Slovak', 'sl' => 'Slovenian', 'se' => 'Northern Sami', 'sm' => 'Samoan', 'sn' => 'Shona', 'sd' => 'Sindhi', 'so' => 'Somali', 'st' => 'Sotho, Southern', 'es' => 'Spanish; Castilian', 'sc' => 'Sardinian', 'ss' => 'Swati', 'su' => 'Sundanese', 'sw' => 'Swahili',
+		'sv' => 'Swedish', 'ty' => 'Tahitian', 'ta' => 'Tamil', 'tt' => 'Tatar', 'te' => 'Telugu', 'tg' => 'Tajik', 'tl' => 'Tagalog', 'th' => 'Thai', 'bo' => 'Tibetan', 'ti' => 'Tigrinya', 'to' => 'Tonga (Tonga Islands)', 'tn' => 'Tswana', 'ts' => 'Tsonga', 'tk' => 'Turkmen', 'tr' => 'Turkish', 'tw' => 'Twi', 'ug' => 'Uighur; Uyghur', 'uk' => 'Ukrainian', 'ur' => 'Urdu', 'uz' => 'Uzbek',
+		've' => 'Venda', 'vi' => 'Vietnamese', 'vo' => 'Volapük', 'cy' => 'Welsh','wa' => 'Walloon','wo' => 'Wolof', 'xh' => 'Xhosa', 'yi' => 'Yiddish', 'yo' => 'Yoruba', 'za' => 'Zhuang; Chuang', 'zu' => 'Zulu' );
+
+	/**
+	 * Filters the language codes.
+	 *
+	 * @since MU (3.0.0)
+	 *
+	 * @param array  $lang_codes Key/value pair of language codes where key is the short version.
+	 * @param string $code       A two-letter designation of the language.
+	 */
+	$lang_codes = apply_filters( 'lang_codes', $lang_codes, $code );
+	return strtr( $code, $lang_codes );
+}
+
+/**
+ * Synchronize category and post tag slugs when global terms are enabled.
+ *
+ * @since 3.0.0
+ *
+ * @param object $term     The term.
+ * @param string $taxonomy The taxonomy for `$term`. Should be 'category' or 'post_tag', as these are
+ *                         the only taxonomies which are processed by this function; anything else
+ *                         will be returned untouched.
+ * @return object|array Returns `$term`, after filtering the 'slug' field with sanitize_title()
+ *                      if $taxonomy is 'category' or 'post_tag'.
+ */
+function sync_category_tag_slugs( $term, $taxonomy ) {
+	if ( global_terms_enabled() && ( $taxonomy == 'category' || $taxonomy == 'post_tag' ) ) {
+		if ( is_object( $term ) ) {
+			$term->slug = sanitize_title( $term->name );
+		} else {
+			$term['slug'] = sanitize_title( $term['name'] );
+		}
+	}
+	return $term;
+}
+
+/**
+ * Displays an access denied message when a user tries to view a site's dashboard they
+ * do not have access to.
+ *
+ * @since 3.2.0
+ * @access private
+ */
+function _access_denied_splash() {
+	if ( ! is_user_logged_in() || is_network_admin() )
+		return;
+
+	$blogs = get_blogs_of_user( get_current_user_id() );
+
+	if ( wp_list_filter( $blogs, array( 'userblog_id' => get_current_blog_id() ) ) )
+		return;
+
+	$blog_name = get_bloginfo( 'name' );
+
+	if ( empty( $blogs ) )
+		wp_die( sprintf( __( 'You attempted to access the "%1$s" dashboard, but you do not currently have privileges on this site. If you believe you should be able to access the "%1$s" dashboard, please contact your network administrator.' ), $blog_name ), 403 );
+
+	$output = '<p>' . sprintf( __( 'You attempted to access the "%1$s" dashboard, but you do not currently have privileges on this site. If you believe you should be able to access the "%1$s" dashboard, please contact your network administrator.' ), $blog_name ) . '</p>';
+	$output .= '<p>' . __( 'If you reached this screen by accident and meant to visit one of your own sites, here are some shortcuts to help you find your way.' ) . '</p>';
+
+	$output .= '<h3>' . __('Your Sites') . '</h3>';
+	$output .= '<table>';
+
+	foreach ( $blogs as $blog ) {
+		$output .= '<tr>';
+		$output .= "<td>{$blog->blogname}</td>";
+		$output .= '<td><a href="' . esc_url( get_admin_url( $blog->userblog_id ) ) . '">' . __( 'Visit Dashboard' ) . '</a> | ' .
+			'<a href="' . esc_url( get_home_url( $blog->userblog_id ) ). '">' . __( 'View Site' ) . '</a></td>';
+		$output .= '</tr>';
+	}
+
+	$output .= '</table>';
+
+	wp_die( $output, 403 );
+}
+
+/**
+ * Checks if the current user has permissions to import new users.
+ *
+ * @since 3.0.0
+ *
+ * @param string $permission A permission to be checked. Currently not used.
+ * @return bool True if the user has proper permissions, false if they do not.
+ */
+function check_import_new_users( $permission ) {
+	if ( ! current_user_can( 'manage_network_users' ) ) {
+		return false;
+	}
+
+	return true;
+}
+// See "import_allow_fetch_attachments" and "import_attachment_size_limit" filters too.
+
+/**
+ * Generates and displays a drop-down of available languages.
+ *
+ * @since 3.0.0
+ *
+ * @param array  $lang_files Optional. An array of the language files. Default empty array.
+ * @param string $current    Optional. The current language code. Default empty.
+ */
+function mu_dropdown_languages( $lang_files = array(), $current = '' ) {
+	$flag = false;
+	$output = array();
+
+	foreach ( (array) $lang_files as $val ) {
+		$code_lang = basename( $val, '.mo' );
+
+		if ( $code_lang == 'en_US' ) { // American English
+			$flag = true;
+			$ae = __( 'American English' );
+			$output[$ae] = '<option value="' . esc_attr( $code_lang ) . '"' . selected( $current, $code_lang, false ) . '> ' . $ae . '</option>';
+		} elseif ( $code_lang == 'en_GB' ) { // British English
+			$flag = true;
+			$be = __( 'British English' );
+			$output[$be] = '<option value="' . esc_attr( $code_lang ) . '"' . selected( $current, $code_lang, false ) . '> ' . $be . '</option>';
+		} else {
+			$translated = format_code_lang( $code_lang );
+			$output[$translated] = '<option value="' . esc_attr( $code_lang ) . '"' . selected( $current, $code_lang, false ) . '> ' . esc_html ( $translated ) . '</option>';
+		}
+
+	}
+
+	if ( $flag === false ) // WordPress english
+		$output[] = '<option value=""' . selected( $current, '', false ) . '>' . __( 'English' ) . "</option>";
+
+	// Order by name
+	uksort( $output, 'strnatcasecmp' );
+
+	/**
+	 * Filters the languages available in the dropdown.
+	 *
+	 * @since MU (3.0.0)
+	 *
+	 * @param array $output     HTML output of the dropdown.
+	 * @param array $lang_files Available language files.
+	 * @param string $current   The current language code.
+	 */
+	$output = apply_filters( 'mu_dropdown_languages', $output, $lang_files, $current );
+
+	echo implode( "\n\t", $output );
+}
+
+/**
+ * Displays an admin notice to upgrade all sites after a core upgrade.
+ *
+ * @since 3.0.0
+ *
+ * @global int    $wp_db_version The version number of the database.
+ * @global string $pagenow
+ *
+ * @return false False if the current user is not a super admin.
+ */
+function site_admin_notice() {
+	global $wp_db_version, $pagenow;
+
+	if ( ! current_user_can( 'upgrade_network' ) ) {
+		return false;
+	}
+
+	if ( 'upgrade.php' == $pagenow ) {
+		return;
+	}
+
+	if ( get_site_option( 'wpmu_upgrade_site' ) != $wp_db_version ) {
+		echo "<div class='update-nag'>" . sprintf( __( 'Thank you for Updating! Please visit the <a href="%s">Upgrade Network</a> page to update all your sites.' ), esc_url( network_admin_url( 'upgrade.php' ) ) ) . "</div>";
+	}
+}
+
+/**
+ * Avoids a collision between a site slug and a permalink slug.
+ *
+ * In a subdirectory installation this will make sure that a site and a post do not use the
+ * same subdirectory by checking for a site with the same name as a new post.
+ *
+ * @since 3.0.0
+ *
+ * @param array $data    An array of post data.
+ * @param array $postarr An array of posts. Not currently used.
+ * @return array The new array of post data after checking for collisions.
+ */
+function avoid_blog_page_permalink_collision( $data, $postarr ) {
+	if ( is_subdomain_install() )
+		return $data;
+	if ( $data['post_type'] != 'page' )
+		return $data;
+	if ( !isset( $data['post_name'] ) || $data['post_name'] == '' )
+		return $data;
+	if ( !is_main_site() )
+		return $data;
+
+	$post_name = $data['post_name'];
+	$c = 0;
+	while( $c < 10 && get_id_from_blogname( $post_name ) ) {
+		$post_name .= mt_rand( 1, 10 );
+		$c ++;
+	}
+	if ( $post_name != $data['post_name'] ) {
+		$data['post_name'] = $post_name;
+	}
+	return $data;
+}
+
+/**
+ * Handles the display of choosing a user's primary site.
+ *
+ * This displays the user's primary site and allows the user to choose
+ * which site is primary.
+ *
+ * @since 3.0.0
+ */
+function choose_primary_blog() {
+	?>
+	<table class="form-table">
+	<tr>
+	<?php /* translators: My sites label */ ?>
+		<th scope="row"><label for="primary_blog"><?php _e( 'Primary Site' ); ?></label></th>
+		<td>
+		<?php
+		$all_blogs = get_blogs_of_user( get_current_user_id() );
+		$primary_blog = get_user_meta( get_current_user_id(), 'primary_blog', true );
+		if ( count( $all_blogs ) > 1 ) {
+			$found = false;
+			?>
+			<select name="primary_blog" id="primary_blog">
+				<?php foreach ( (array) $all_blogs as $blog ) {
+					if ( $primary_blog == $blog->userblog_id )
+						$found = true;
+					?><option value="<?php echo $blog->userblog_id ?>"<?php selected( $primary_blog, $blog->userblog_id ); ?>><?php echo esc_url( get_home_url( $blog->userblog_id ) ) ?></option><?php
+				} ?>
+			</select>
+			<?php
+			if ( !$found ) {
+				$blog = reset( $all_blogs );
+				update_user_meta( get_current_user_id(), 'primary_blog', $blog->userblog_id );
+			}
+		} elseif ( count( $all_blogs ) == 1 ) {
+			$blog = reset( $all_blogs );
+			echo esc_url( get_home_url( $blog->userblog_id ) );
+			if ( $primary_blog != $blog->userblog_id ) // Set the primary blog again if it's out of sync with blog list.
+				update_user_meta( get_current_user_id(), 'primary_blog', $blog->userblog_id );
+		} else {
+			echo "N/A";
+		}
+		?>
+		</td>
+	</tr>
+	</table>
+	<?php
+}
+
+/**
+ * Whether or not we can edit this network from this page.
+ *
+ * By default editing of network is restricted to the Network
