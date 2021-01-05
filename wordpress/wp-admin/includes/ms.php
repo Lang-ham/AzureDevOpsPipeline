@@ -710,4 +710,288 @@ function choose_primary_blog() {
 /**
  * Whether or not we can edit this network from this page.
  *
- * By default editing of network is restricted to the Network
+ * By default editing of network is restricted to the Network Admin for that `$network_id`.
+ * This function allows for this to be overridden.
+ *
+ * @since 3.1.0
+ *
+ * @param int $network_id The network ID to check.
+ * @return bool True if network can be edited, otherwise false.
+ */
+function can_edit_network( $network_id ) {
+	if ( $network_id == get_current_network_id() )
+		$result = true;
+	else
+		$result = false;
+
+	/**
+	 * Filters whether this network can be edited from this page.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param bool $result     Whether the network can be edited from this page.
+	 * @param int  $network_id The network ID to check.
+	 */
+	return apply_filters( 'can_edit_network', $result, $network_id );
+}
+
+/**
+ * Thickbox image paths for Network Admin.
+ *
+ * @since 3.1.0
+ *
+ * @access private
+ */
+function _thickbox_path_admin_subfolder() {
+?>
+<script type="text/javascript">
+var tb_pathToImage = "<?php echo includes_url( 'js/thickbox/loadingAnimation.gif', 'relative' ); ?>";
+</script>
+<?php
+}
+
+/**
+ *
+ * @param array $users
+ */
+function confirm_delete_users( $users ) {
+	$current_user = wp_get_current_user();
+	if ( ! is_array( $users ) || empty( $users ) ) {
+		return false;
+	}
+	?>
+	<h1><?php esc_html_e( 'Users' ); ?></h1>
+
+	<?php if ( 1 == count( $users ) ) : ?>
+		<p><?php _e( 'You have chosen to delete the user from all networks and sites.' ); ?></p>
+	<?php else : ?>
+		<p><?php _e( 'You have chosen to delete the following users from all networks and sites.' ); ?></p>
+	<?php endif; ?>
+
+	<form action="users.php?action=dodelete" method="post">
+	<input type="hidden" name="dodelete" />
+	<?php
+	wp_nonce_field( 'ms-users-delete' );
+	$site_admins = get_super_admins();
+	$admin_out = '<option value="' . esc_attr( $current_user->ID ) . '">' . $current_user->user_login . '</option>'; ?>
+	<table class="form-table">
+	<?php foreach ( ( $allusers = (array) $_POST['allusers'] ) as $user_id ) {
+		if ( $user_id != '' && $user_id != '0' ) {
+			$delete_user = get_userdata( $user_id );
+
+			if ( ! current_user_can( 'delete_user', $delete_user->ID ) ) {
+				wp_die( sprintf( __( 'Warning! User %s cannot be deleted.' ), $delete_user->user_login ) );
+			}
+
+			if ( in_array( $delete_user->user_login, $site_admins ) ) {
+				wp_die( sprintf( __( 'Warning! User cannot be deleted. The user %s is a network administrator.' ), '<em>' . $delete_user->user_login . '</em>' ) );
+			}
+			?>
+			<tr>
+				<th scope="row"><?php echo $delete_user->user_login; ?>
+					<?php echo '<input type="hidden" name="user[]" value="' . esc_attr( $user_id ) . '" />' . "\n"; ?>
+				</th>
+			<?php $blogs = get_blogs_of_user( $user_id, true );
+
+			if ( ! empty( $blogs ) ) {
+				?>
+				<td><fieldset><p><legend><?php printf(
+					/* translators: user login */
+					__( 'What should be done with content owned by %s?' ),
+					'<em>' . $delete_user->user_login . '</em>'
+				); ?></legend></p>
+				<?php
+				foreach ( (array) $blogs as $key => $details ) {
+					$blog_users = get_users( array( 'blog_id' => $details->userblog_id, 'fields' => array( 'ID', 'user_login' ) ) );
+					if ( is_array( $blog_users ) && !empty( $blog_users ) ) {
+						$user_site = "<a href='" . esc_url( get_home_url( $details->userblog_id ) ) . "'>{$details->blogname}</a>";
+						$user_dropdown = '<label for="reassign_user" class="screen-reader-text">' . __( 'Select a user' ) . '</label>';
+						$user_dropdown .= "<select name='blog[$user_id][$key]' id='reassign_user'>";
+						$user_list = '';
+						foreach ( $blog_users as $user ) {
+							if ( ! in_array( $user->ID, $allusers ) ) {
+								$user_list .= "<option value='{$user->ID}'>{$user->user_login}</option>";
+							}
+						}
+						if ( '' == $user_list ) {
+							$user_list = $admin_out;
+						}
+						$user_dropdown .= $user_list;
+						$user_dropdown .= "</select>\n";
+						?>
+						<ul style="list-style:none;">
+							<li><?php printf( __( 'Site: %s' ), $user_site ); ?></li>
+							<li><label><input type="radio" id="delete_option0" name="delete[<?php echo $details->userblog_id . '][' . $delete_user->ID ?>]" value="delete" checked="checked" />
+							<?php _e( 'Delete all content.' ); ?></label></li>
+							<li><label><input type="radio" id="delete_option1" name="delete[<?php echo $details->userblog_id . '][' . $delete_user->ID ?>]" value="reassign" />
+							<?php _e( 'Attribute all content to:' ); ?></label>
+							<?php echo $user_dropdown; ?></li>
+						</ul>
+						<?php
+					}
+				}
+				echo "</fieldset></td></tr>";
+			} else {
+				?>
+				<td><fieldset><p><legend><?php _e( 'User has no sites or content and will be deleted.' ); ?></legend></p>
+			<?php } ?>
+			</tr>
+		<?php
+		}
+	}
+
+	?>
+	</table>
+	<?php
+	/** This action is documented in wp-admin/users.php */
+	do_action( 'delete_user_form', $current_user, $allusers );
+
+	if ( 1 == count( $users ) ) : ?>
+		<p><?php _e( 'Once you hit &#8220;Confirm Deletion&#8221;, the user will be permanently removed.' ); ?></p>
+	<?php else : ?>
+		<p><?php _e( 'Once you hit &#8220;Confirm Deletion&#8221;, these users will be permanently removed.' ); ?></p>
+	<?php endif;
+
+	submit_button( __('Confirm Deletion'), 'primary' );
+	?>
+	</form>
+	<?php
+	return true;
+}
+
+/**
+ * Print JavaScript in the header on the Network Settings screen.
+ *
+ * @since 4.1.0
+ */
+function network_settings_add_js() {
+?>
+<script type="text/javascript">
+jQuery(document).ready( function($) {
+	var languageSelect = $( '#WPLANG' );
+	$( 'form' ).submit( function() {
+		// Don't show a spinner for English and installed languages,
+		// as there is nothing to download.
+		if ( ! languageSelect.find( 'option:selected' ).data( 'installed' ) ) {
+			$( '#submit', this ).after( '<span class="spinner language-install-spinner is-active" />' );
+		}
+	});
+});
+</script>
+<?php
+}
+
+/**
+ * Outputs the HTML for a network's "Edit Site" tabular interface.
+ *
+ * @since 4.6.0
+ *
+ * @param $args {
+ *     Optional. Array or string of Query parameters. Default empty array.
+ *
+ *     @type int    $blog_id  The site ID. Default is the current site.
+ *     @type array  $links    The tabs to include with (label|url|cap) keys.
+ *     @type string $selected The ID of the selected link.
+ * }
+ */
+function network_edit_site_nav( $args = array() ) {
+
+	/**
+	 * Filters the links that appear on site-editing network pages.
+	 *
+	 * Default links: 'site-info', 'site-users', 'site-themes', and 'site-settings'.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param array $links {
+	 *     An array of link data representing individual network admin pages.
+	 *
+	 *     @type array $link_slug {
+	 *         An array of information about the individual link to a page.
+	 *
+	 *         $type string $label Label to use for the link.
+	 *         $type string $url   URL, relative to `network_admin_url()` to use for the link.
+	 *         $type string $cap   Capability required to see the link.
+	 *     }
+	 * }
+	 */
+	$links = apply_filters( 'network_edit_site_nav_links', array(
+		'site-info'     => array( 'label' => __( 'Info' ),     'url' => 'site-info.php',     'cap' => 'manage_sites' ),
+		'site-users'    => array( 'label' => __( 'Users' ),    'url' => 'site-users.php',    'cap' => 'manage_sites' ),
+		'site-themes'   => array( 'label' => __( 'Themes' ),   'url' => 'site-themes.php',   'cap' => 'manage_sites' ),
+		'site-settings' => array( 'label' => __( 'Settings' ), 'url' => 'site-settings.php', 'cap' => 'manage_sites' )
+	) );
+
+	// Parse arguments
+	$r = wp_parse_args( $args, array(
+		'blog_id'  => isset( $_GET['blog_id'] ) ? (int) $_GET['blog_id'] : 0,
+		'links'    => $links,
+		'selected' => 'site-info',
+	) );
+
+	// Setup the links array
+	$screen_links = array();
+
+	// Loop through tabs
+	foreach ( $r['links'] as $link_id => $link ) {
+
+		// Skip link if user can't access
+		if ( ! current_user_can( $link['cap'], $r['blog_id'] ) ) {
+			continue;
+		}
+
+		// Link classes
+		$classes = array( 'nav-tab' );
+
+		// Selected is set by the parent OR assumed by the $pagenow global
+		if ( $r['selected'] === $link_id || $link['url'] === $GLOBALS['pagenow'] ) {
+			$classes[] = 'nav-tab-active';
+		}
+
+		// Escape each class
+		$esc_classes = implode( ' ', $classes );
+
+		// Get the URL for this link
+		$url = add_query_arg( array( 'id' => $r['blog_id'] ), network_admin_url( $link['url'] ) );
+
+		// Add link to nav links
+		$screen_links[ $link_id ] = '<a href="' . esc_url( $url ) . '" id="' . esc_attr( $link_id ) . '" class="' . $esc_classes . '">' . esc_html( $link['label'] ) . '</a>';
+	}
+
+	// All done!
+	echo '<h2 class="nav-tab-wrapper wp-clearfix">';
+	echo implode( '', $screen_links );
+	echo '</h2>';
+}
+
+/**
+ * Returns the arguments for the help tab on the Edit Site screens.
+ *
+ * @since 4.9.0
+ *
+ * @return array Help tab arguments.
+ */
+function get_site_screen_help_tab_args() {
+	return array(
+		'id'      => 'overview',
+		'title'   => __('Overview'),
+		'content' =>
+			'<p>' . __('The menu is for editing information specific to individual sites, particularly if the admin area of a site is unavailable.') . '</p>' .
+			'<p>' . __('<strong>Info</strong> &mdash; The site URL is rarely edited as this can cause the site to not work properly. The Registered date and Last Updated date are displayed. Network admins can mark a site as archived, spam, deleted and mature, to remove from public listings or disable.') . '</p>' .
+			'<p>' . __('<strong>Users</strong> &mdash; This displays the users associated with this site. You can also change their role, reset their password, or remove them from the site. Removing the user from the site does not remove the user from the network.') . '</p>' .
+			'<p>' . sprintf( __('<strong>Themes</strong> &mdash; This area shows themes that are not already enabled across the network. Enabling a theme in this menu makes it accessible to this site. It does not activate the theme, but allows it to show in the site&#8217;s Appearance menu. To enable a theme for the entire network, see the <a href="%s">Network Themes</a> screen.' ), network_admin_url( 'themes.php' ) ) . '</p>' .
+			'<p>' . __('<strong>Settings</strong> &mdash; This page shows a list of all settings associated with this site. Some are created by WordPress and others are created by plugins you activate. Note that some fields are grayed out and say Serialized Data. You cannot modify these values due to the way the setting is stored in the database.') . '</p>'
+	);
+}
+
+/**
+ * Returns the content for the help sidebar on the Edit Site screens.
+ *
+ * @since 4.9.0
+ *
+ * @return string Help sidebar content.
+ */
+function get_site_screen_help_sidebar_content() {
+	return '<p><strong>' . __('For more information:') . '</strong></p>' .
+		'<p>' . __('<a href="https://codex.wordpress.org/Network_Admin_Sites_Screen">Documentation on Site Management</a>') . '</p>' .
+		'<p>' . __('<a href="https://wordpress.org/support/forum/multisite/">Support Forums</a>') . '</p>';
