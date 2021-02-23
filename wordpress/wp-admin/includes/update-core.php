@@ -1076,4 +1076,303 @@ function update_core($from, $to) {
 			clearstatcache(); // for FTP, Need to clear the stat cache
 		}
 
-		if ( @is_dir($lang_dir
+		if ( @is_dir($lang_dir) ) {
+			$wp_lang_dir = $wp_filesystem->find_folder($lang_dir);
+			if ( $wp_lang_dir ) {
+				$result = copy_dir($from . $distro . 'wp-content/languages/', $wp_lang_dir);
+				if ( is_wp_error( $result ) )
+					$result = new WP_Error( $result->get_error_code() . '_languages', $result->get_error_message(), substr( $result->get_error_data(), strlen( $wp_lang_dir ) ) );
+			}
+		}
+	}
+
+	/** This filter is documented in wp-admin/includes/update-core.php */
+	apply_filters( 'update_feedback', __( 'Disabling Maintenance mode&#8230;' ) );
+	// Remove maintenance file, we're done with potential site-breaking changes
+	$wp_filesystem->delete( $maintenance_file );
+
+	// 3.5 -> 3.5+ - an empty twentytwelve directory was created upon upgrade to 3.5 for some users, preventing installation of Twenty Twelve.
+	if ( '3.5' == $old_wp_version ) {
+		if ( is_dir( WP_CONTENT_DIR . '/themes/twentytwelve' ) && ! file_exists( WP_CONTENT_DIR . '/themes/twentytwelve/style.css' )  ) {
+			$wp_filesystem->delete( $wp_filesystem->wp_themes_dir() . 'twentytwelve/' );
+		}
+	}
+
+	// Copy New bundled plugins & themes
+	// This gives us the ability to install new plugins & themes bundled with future versions of WordPress whilst avoiding the re-install upon upgrade issue.
+	// $development_build controls us overwriting bundled themes and plugins when a non-stable release is being updated
+	if ( !is_wp_error($result) && ( ! defined('CORE_UPGRADE_SKIP_NEW_BUNDLED') || ! CORE_UPGRADE_SKIP_NEW_BUNDLED ) ) {
+		foreach ( (array) $_new_bundled_files as $file => $introduced_version ) {
+			// If a $development_build or if $introduced version is greater than what the site was previously running
+			if ( $development_build || version_compare( $introduced_version, $old_wp_version, '>' ) ) {
+				$directory = ('/' == $file[ strlen($file)-1 ]);
+				list($type, $filename) = explode('/', $file, 2);
+
+				// Check to see if the bundled items exist before attempting to copy them
+				if ( ! $wp_filesystem->exists( $from . $distro . 'wp-content/' . $file ) )
+					continue;
+
+				if ( 'plugins' == $type )
+					$dest = $wp_filesystem->wp_plugins_dir();
+				elseif ( 'themes' == $type )
+					$dest = trailingslashit($wp_filesystem->wp_themes_dir()); // Back-compat, ::wp_themes_dir() did not return trailingslash'd pre-3.2
+				else
+					continue;
+
+				if ( ! $directory ) {
+					if ( ! $development_build && $wp_filesystem->exists( $dest . $filename ) )
+						continue;
+
+					if ( ! $wp_filesystem->copy($from . $distro . 'wp-content/' . $file, $dest . $filename, FS_CHMOD_FILE) )
+						$result = new WP_Error( "copy_failed_for_new_bundled_$type", __( 'Could not copy file.' ), $dest . $filename );
+				} else {
+					if ( ! $development_build && $wp_filesystem->is_dir( $dest . $filename ) )
+						continue;
+
+					$wp_filesystem->mkdir($dest . $filename, FS_CHMOD_DIR);
+					$_result = copy_dir( $from . $distro . 'wp-content/' . $file, $dest . $filename);
+
+					// If a error occurs partway through this final step, keep the error flowing through, but keep process going.
+					if ( is_wp_error( $_result ) ) {
+						if ( ! is_wp_error( $result ) )
+							$result = new WP_Error;
+						$result->add( $_result->get_error_code() . "_$type", $_result->get_error_message(), substr( $_result->get_error_data(), strlen( $dest ) ) );
+					}
+				}
+			}
+		} //end foreach
+	}
+
+	// Handle $result error from the above blocks
+	if ( is_wp_error($result) ) {
+		$wp_filesystem->delete($from, true);
+		return $result;
+	}
+
+	// Remove old files
+	foreach ( $_old_files as $old_file ) {
+		$old_file = $to . $old_file;
+		if ( !$wp_filesystem->exists($old_file) )
+			continue;
+
+		// If the file isn't deleted, try writing an empty string to the file instead.
+		if ( ! $wp_filesystem->delete( $old_file, true ) && $wp_filesystem->is_file( $old_file ) ) {
+			$wp_filesystem->put_contents( $old_file, '' );
+		}
+	}
+
+	// Remove any Genericons example.html's from the filesystem
+	_upgrade_422_remove_genericons();
+
+	// Remove the REST API plugin if its version is Beta 4 or lower
+	_upgrade_440_force_deactivate_incompatible_plugins();
+
+	// Upgrade DB with separate request
+	/** This filter is documented in wp-admin/includes/update-core.php */
+	apply_filters( 'update_feedback', __( 'Upgrading database&#8230;' ) );
+	$db_upgrade_url = admin_url('upgrade.php?step=upgrade_db');
+	wp_remote_post($db_upgrade_url, array('timeout' => 60));
+
+	// Clear the cache to prevent an update_option() from saving a stale db_version to the cache
+	wp_cache_flush();
+	// (Not all cache back ends listen to 'flush')
+	wp_cache_delete( 'alloptions', 'options' );
+
+	// Remove working directory
+	$wp_filesystem->delete($from, true);
+
+	// Force refresh of update information
+	if ( function_exists('delete_site_transient') )
+		delete_site_transient('update_core');
+	else
+		delete_option('update_core');
+
+	/**
+	 * Fires after WordPress core has been successfully updated.
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param string $wp_version The current WordPress version.
+	 */
+	do_action( '_core_updated_successfully', $wp_version );
+
+	// Clear the option that blocks auto updates after failures, now that we've been successful.
+	if ( function_exists( 'delete_site_option' ) )
+		delete_site_option( 'auto_core_update_failed' );
+
+	return $wp_version;
+}
+
+/**
+ * Copies a directory from one location to another via the WordPress Filesystem Abstraction.
+ * Assumes that WP_Filesystem() has already been called and setup.
+ *
+ * This is a temporary function for the 3.1 -> 3.2 upgrade, as well as for those upgrading to
+ * 3.7+
+ *
+ * @ignore
+ * @since 3.2.0
+ * @since 3.7.0 Updated not to use a regular expression for the skip list
+ * @see copy_dir()
+ *
+ * @global WP_Filesystem_Base $wp_filesystem
+ *
+ * @param string $from     source directory
+ * @param string $to       destination directory
+ * @param array $skip_list a list of files/folders to skip copying
+ * @return mixed WP_Error on failure, True on success.
+ */
+function _copy_dir($from, $to, $skip_list = array() ) {
+	global $wp_filesystem;
+
+	$dirlist = $wp_filesystem->dirlist($from);
+
+	$from = trailingslashit($from);
+	$to = trailingslashit($to);
+
+	foreach ( (array) $dirlist as $filename => $fileinfo ) {
+		if ( in_array( $filename, $skip_list ) )
+			continue;
+
+		if ( 'f' == $fileinfo['type'] ) {
+			if ( ! $wp_filesystem->copy($from . $filename, $to . $filename, true, FS_CHMOD_FILE) ) {
+				// If copy failed, chmod file to 0644 and try again.
+				$wp_filesystem->chmod( $to . $filename, FS_CHMOD_FILE );
+				if ( ! $wp_filesystem->copy($from . $filename, $to . $filename, true, FS_CHMOD_FILE) )
+					return new WP_Error( 'copy_failed__copy_dir', __( 'Could not copy file.' ), $to . $filename );
+			}
+		} elseif ( 'd' == $fileinfo['type'] ) {
+			if ( !$wp_filesystem->is_dir($to . $filename) ) {
+				if ( !$wp_filesystem->mkdir($to . $filename, FS_CHMOD_DIR) )
+					return new WP_Error( 'mkdir_failed__copy_dir', __( 'Could not create directory.' ), $to . $filename );
+			}
+
+			/*
+			 * Generate the $sub_skip_list for the subdirectory as a sub-set
+			 * of the existing $skip_list.
+			 */
+			$sub_skip_list = array();
+			foreach ( $skip_list as $skip_item ) {
+				if ( 0 === strpos( $skip_item, $filename . '/' ) )
+					$sub_skip_list[] = preg_replace( '!^' . preg_quote( $filename, '!' ) . '/!i', '', $skip_item );
+			}
+
+			$result = _copy_dir($from . $filename, $to . $filename, $sub_skip_list);
+			if ( is_wp_error($result) )
+				return $result;
+		}
+	}
+	return true;
+}
+
+/**
+ * Redirect to the About WordPress page after a successful upgrade.
+ *
+ * This function is only needed when the existing installation is older than 3.4.0.
+ *
+ * @since 3.3.0
+ *
+ * @global string $wp_version
+ * @global string $pagenow
+ * @global string $action
+ *
+ * @param string $new_version
+ */
+function _redirect_to_about_wordpress( $new_version ) {
+	global $wp_version, $pagenow, $action;
+
+	if ( version_compare( $wp_version, '3.4-RC1', '>=' ) )
+		return;
+
+	// Ensure we only run this on the update-core.php page. The Core_Upgrader may be used in other contexts.
+	if ( 'update-core.php' != $pagenow )
+		return;
+
+ 	if ( 'do-core-upgrade' != $action && 'do-core-reinstall' != $action )
+ 		return;
+
+	// Load the updated default text localization domain for new strings.
+	load_default_textdomain();
+
+	// See do_core_upgrade()
+	show_message( __('WordPress updated successfully') );
+
+	// self_admin_url() won't exist when upgrading from <= 3.0, so relative URLs are intentional.
+	show_message( '<span class="hide-if-no-js">' . sprintf( __( 'Welcome to WordPress %1$s. You will be redirected to the About WordPress screen. If not, click <a href="%2$s">here</a>.' ), $new_version, 'about.php?updated' ) . '</span>' );
+	show_message( '<span class="hide-if-js">' . sprintf( __( 'Welcome to WordPress %1$s. <a href="%2$s">Learn more</a>.' ), $new_version, 'about.php?updated' ) . '</span>' );
+	echo '</div>';
+	?>
+<script type="text/javascript">
+window.location = 'about.php?updated';
+</script>
+	<?php
+
+	// Include admin-footer.php and exit.
+	include(ABSPATH . 'wp-admin/admin-footer.php');
+	exit();
+}
+
+/**
+ * Cleans up Genericons example files.
+ *
+ * @since 4.2.2
+ *
+ * @global array              $wp_theme_directories
+ * @global WP_Filesystem_Base $wp_filesystem
+ */
+function _upgrade_422_remove_genericons() {
+	global $wp_theme_directories, $wp_filesystem;
+
+	// A list of the affected files using the filesystem absolute paths.
+	$affected_files = array();
+
+	// Themes
+	foreach ( $wp_theme_directories as $directory ) {
+		$affected_theme_files = _upgrade_422_find_genericons_files_in_folder( $directory );
+		$affected_files       = array_merge( $affected_files, $affected_theme_files );
+	}
+
+	// Plugins
+	$affected_plugin_files = _upgrade_422_find_genericons_files_in_folder( WP_PLUGIN_DIR );
+	$affected_files        = array_merge( $affected_files, $affected_plugin_files );
+
+	foreach ( $affected_files as $file ) {
+		$gen_dir = $wp_filesystem->find_folder( trailingslashit( dirname( $file ) ) );
+		if ( empty( $gen_dir ) ) {
+			continue;
+		}
+
+		// The path when the file is accessed via WP_Filesystem may differ in the case of FTP
+		$remote_file = $gen_dir . basename( $file );
+
+		if ( ! $wp_filesystem->exists( $remote_file ) ) {
+			continue;
+		}
+
+		if ( ! $wp_filesystem->delete( $remote_file, false, 'f' ) ) {
+			$wp_filesystem->put_contents( $remote_file, '' );
+		}
+	}
+}
+
+/**
+ * Recursively find Genericons example files in a given folder.
+ *
+ * @ignore
+ * @since 4.2.2
+ *
+ * @param string $directory Directory path. Expects trailingslashed.
+ * @return array
+ */
+function _upgrade_422_find_genericons_files_in_folder( $directory ) {
+	$directory = trailingslashit( $directory );
+	$files     = array();
+
+	if ( file_exists( "{$directory}example.html" ) && false !== strpos( file_get_contents( "{$directory}example.html" ), '<title>Genericons</title>' ) ) {
+		$files[] = "{$directory}example.html";
+	}
+
+	$dirs = glob( $directory . '*', GLOB_ONLYDIR );
+	if ( $dirs ) {
+		foreach ( $dirs as $dir ) {
+			$files = array_merge( $files, _upgrade_422_find_ge
