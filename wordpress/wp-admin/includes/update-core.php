@@ -629,4 +629,228 @@ $_old_files = array(
 'wp-includes/js/tinymce/plugins/paste/js',
 'wp-includes/js/tinymce/themes/advanced',
 'wp-includes/js/tinymce/tiny_mce.js',
-'wp-includes/js/tinymce/mark_loade
+'wp-includes/js/tinymce/mark_loaded_src.js',
+'wp-includes/js/tinymce/wp-tinymce-schema.js',
+'wp-includes/js/tinymce/plugins/media/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/media/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/media/media.htm',
+'wp-includes/js/tinymce/plugins/wpview/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wpview/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/directionality/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/directionality/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wordpress/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wordpress/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wpdialogs/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wpdialogs/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wpeditimage/editimage.html',
+'wp-includes/js/tinymce/plugins/wpeditimage/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wpeditimage/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/fullscreen/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/fullscreen/fullscreen.htm',
+'wp-includes/js/tinymce/plugins/fullscreen/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wplink/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wplink/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wpgallery/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wpgallery/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/tabfocus/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/tabfocus/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/wpfullscreen/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/wpfullscreen/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/paste/editor_plugin.js',
+'wp-includes/js/tinymce/plugins/paste/pasteword.htm',
+'wp-includes/js/tinymce/plugins/paste/editor_plugin_src.js',
+'wp-includes/js/tinymce/plugins/paste/pastetext.htm',
+'wp-includes/js/tinymce/langs/wp-langs.php',
+// 4.1
+'wp-includes/js/jquery/ui/jquery.ui.accordion.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.autocomplete.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.button.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.core.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.datepicker.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.dialog.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.draggable.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.droppable.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-blind.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-bounce.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-clip.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-drop.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-explode.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-fade.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-fold.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-highlight.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-pulsate.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-scale.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-shake.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-slide.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect-transfer.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.effect.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.menu.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.mouse.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.position.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.progressbar.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.resizable.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.selectable.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.slider.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.sortable.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.spinner.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.tabs.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.tooltip.min.js',
+'wp-includes/js/jquery/ui/jquery.ui.widget.min.js',
+'wp-includes/js/tinymce/skins/wordpress/images/dashicon-no-alt.png',
+// 4.3
+'wp-admin/js/wp-fullscreen.js',
+'wp-admin/js/wp-fullscreen.min.js',
+'wp-includes/js/tinymce/wp-mce-help.php',
+'wp-includes/js/tinymce/plugins/wpfullscreen',
+// 4.5
+'wp-includes/theme-compat/comments-popup.php',
+// 4.6
+'wp-admin/includes/class-wp-automatic-upgrader.php', // Wrong file name, see #37628.
+// 4.8
+'wp-includes/js/tinymce/plugins/wpembed',
+'wp-includes/js/tinymce/plugins/media/moxieplayer.swf',
+'wp-includes/js/tinymce/skins/lightgray/fonts/readme.md',
+'wp-includes/js/tinymce/skins/lightgray/fonts/tinymce-small.json',
+'wp-includes/js/tinymce/skins/lightgray/fonts/tinymce.json',
+'wp-includes/js/tinymce/skins/lightgray/skin.ie7.min.css',
+// 4.9
+'wp-admin/css/press-this-editor-rtl.css',
+'wp-admin/css/press-this-editor-rtl.min.css',
+'wp-admin/css/press-this-editor.css',
+'wp-admin/css/press-this-editor.min.css',
+'wp-admin/css/press-this-rtl.css',
+'wp-admin/css/press-this-rtl.min.css',
+'wp-admin/css/press-this.css',
+'wp-admin/css/press-this.min.css',
+'wp-admin/includes/class-wp-press-this.php',
+'wp-admin/js/bookmarklet.js',
+'wp-admin/js/bookmarklet.min.js',
+'wp-admin/js/press-this.js',
+'wp-admin/js/press-this.min.js',
+'wp-includes/js/mediaelement/background.png',
+'wp-includes/js/mediaelement/bigplay.png',
+'wp-includes/js/mediaelement/bigplay.svg',
+'wp-includes/js/mediaelement/controls.png',
+'wp-includes/js/mediaelement/controls.svg',
+'wp-includes/js/mediaelement/flashmediaelement.swf',
+'wp-includes/js/mediaelement/froogaloop.min.js',
+'wp-includes/js/mediaelement/jumpforward.png',
+'wp-includes/js/mediaelement/loading.gif',
+'wp-includes/js/mediaelement/silverlightmediaelement.xap',
+'wp-includes/js/mediaelement/skipback.png',
+'wp-includes/js/plupload/plupload.flash.swf',
+'wp-includes/js/plupload/plupload.full.min.js',
+'wp-includes/js/plupload/plupload.silverlight.xap',
+'wp-includes/js/swfupload/plugins',
+'wp-includes/js/swfupload/swfupload.swf',
+	// 4.9.2
+	'wp-includes/js/mediaelement/lang',
+	'wp-includes/js/mediaelement/lang/ca.js',
+	'wp-includes/js/mediaelement/lang/cs.js',
+	'wp-includes/js/mediaelement/lang/de.js',
+	'wp-includes/js/mediaelement/lang/es.js',
+	'wp-includes/js/mediaelement/lang/fa.js',
+	'wp-includes/js/mediaelement/lang/fr.js',
+	'wp-includes/js/mediaelement/lang/hr.js',
+	'wp-includes/js/mediaelement/lang/hu.js',
+	'wp-includes/js/mediaelement/lang/it.js',
+	'wp-includes/js/mediaelement/lang/ja.js',
+	'wp-includes/js/mediaelement/lang/ko.js',
+	'wp-includes/js/mediaelement/lang/nl.js',
+	'wp-includes/js/mediaelement/lang/pl.js',
+	'wp-includes/js/mediaelement/lang/pt.js',
+	'wp-includes/js/mediaelement/lang/ro.js',
+	'wp-includes/js/mediaelement/lang/ru.js',
+	'wp-includes/js/mediaelement/lang/sk.js',
+	'wp-includes/js/mediaelement/lang/sv.js',
+	'wp-includes/js/mediaelement/lang/uk.js',
+	'wp-includes/js/mediaelement/lang/zh-cn.js',
+	'wp-includes/js/mediaelement/lang/zh.js',
+	'wp-includes/js/mediaelement/mediaelement-flash-audio-ogg.swf',
+	'wp-includes/js/mediaelement/mediaelement-flash-audio.swf',
+	'wp-includes/js/mediaelement/mediaelement-flash-video-hls.swf',
+	'wp-includes/js/mediaelement/mediaelement-flash-video-mdash.swf',
+	'wp-includes/js/mediaelement/mediaelement-flash-video.swf',
+	'wp-includes/js/mediaelement/renderers/dailymotion.js',
+	'wp-includes/js/mediaelement/renderers/dailymotion.min.js',
+	'wp-includes/js/mediaelement/renderers/facebook.js',
+	'wp-includes/js/mediaelement/renderers/facebook.min.js',
+	'wp-includes/js/mediaelement/renderers/soundcloud.js',
+	'wp-includes/js/mediaelement/renderers/soundcloud.min.js',
+	'wp-includes/js/mediaelement/renderers/twitch.js',
+	'wp-includes/js/mediaelement/renderers/twitch.min.js',
+);
+
+/**
+ * Stores new files in wp-content to copy
+ *
+ * The contents of this array indicate any new bundled plugins/themes which
+ * should be installed with the WordPress Upgrade. These items will not be
+ * re-installed in future upgrades, this behaviour is controlled by the
+ * introduced version present here being older than the current installed version.
+ *
+ * The content of this array should follow the following format:
+ * Filename (relative to wp-content) => Introduced version
+ * Directories should be noted by suffixing it with a trailing slash (/)
+ *
+ * @since 3.2.0
+ * @since 4.7.0 New themes were not automatically installed for 4.4-4.6 on
+ *              upgrade. New themes are now installed again. To disable new
+ *              themes from being installed on upgrade, explicitly define
+ *              CORE_UPGRADE_SKIP_NEW_BUNDLED as false.
+ * @global array $_new_bundled_files
+ * @var array
+ * @name $_new_bundled_files
+ */
+global $_new_bundled_files;
+
+$_new_bundled_files = array(
+	'plugins/akismet/'        => '2.0',
+	'themes/twentyten/'       => '3.0',
+	'themes/twentyeleven/'    => '3.2',
+	'themes/twentytwelve/'    => '3.5',
+	'themes/twentythirteen/'  => '3.6',
+	'themes/twentyfourteen/'  => '3.8',
+	'themes/twentyfifteen/'   => '4.1',
+	'themes/twentysixteen/'   => '4.4',
+	'themes/twentyseventeen/' => '4.7',
+);
+
+/**
+ * Upgrades the core of WordPress.
+ *
+ * This will create a .maintenance file at the base of the WordPress directory
+ * to ensure that people can not access the web site, when the files are being
+ * copied to their locations.
+ *
+ * The files in the `$_old_files` list will be removed and the new files
+ * copied from the zip file after the database is upgraded.
+ *
+ * The files in the `$_new_bundled_files` list will be added to the installation
+ * if the version is greater than or equal to the old version being upgraded.
+ *
+ * The steps for the upgrader for after the new release is downloaded and
+ * unzipped is:
+ *   1. Test unzipped location for select files to ensure that unzipped worked.
+ *   2. Create the .maintenance file in current WordPress base.
+ *   3. Copy new WordPress directory over old WordPress files.
+ *   4. Upgrade WordPress to new version.
+ *     4.1. Copy all files/folders other than wp-content
+ *     4.2. Copy any language files to WP_LANG_DIR (which may differ from WP_CONTENT_DIR
+ *     4.3. Copy any new bundled themes/plugins to their respective locations
+ *   5. Delete new WordPress directory path.
+ *   6. Delete .maintenance file.
+ *   7. Remove old files.
+ *   8. Delete 'update_core' option.
+ *
+ * There are several areas of failure. For instance if PHP times out before step
+ * 6, then you will not be able to access any portion of your site. Also, since
+ * the upgrade will not continue where it left off, you will not be able to
+ * automatically remove old files and remove the 'update_core' option. This
+ * isn't that bad.
+ *
+ * If the copy of the new WordPress over the old fails, then the worse is that
+ * the new WordPress directory will remain.
+ *
+ * If it is assumed that every file will be copied over, including plugins and
+ * themes, then if you edit the default theme, you
