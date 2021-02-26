@@ -1375,4 +1375,19 @@ function _upgrade_422_find_genericons_files_in_folder( $directory ) {
 	$dirs = glob( $directory . '*', GLOB_ONLYDIR );
 	if ( $dirs ) {
 		foreach ( $dirs as $dir ) {
-			$files = array_merge( $files, _upgrade_422_find_ge
+			$files = array_merge( $files, _upgrade_422_find_genericons_files_in_folder( $dir ) );
+		}
+	}
+
+	return $files;
+}
+
+/**
+ * @ignore
+ * @since 4.4.0
+ */
+function _upgrade_440_force_deactivate_incompatible_plugins() {
+	if ( defined( 'REST_API_VERSION' ) && version_compare( REST_API_VERSION, '2.0-beta4', '<=' ) ) {
+		deactivate_plugins( array( 'rest-api/plugin.php' ), true );
+	}
+}
