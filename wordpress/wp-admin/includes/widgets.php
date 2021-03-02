@@ -189,4 +189,102 @@ function wp_widget_control( $sidebar_args ) {
 	$before_widget_content = isset( $sidebar_args['before_widget_content'] ) ? $sidebar_args['before_widget_content'] : '<div class="widget-content">';
 	$after_widget_content = isset( $sidebar_args['after_widget_content'] ) ? $sidebar_args['after_widget_content'] : '</div>';
 
-	$query_arg = array( 'editwidge
+	$query_arg = array( 'editwidget' => $widget['id'] );
+	if ( $add_new ) {
+		$query_arg['addnew'] = 1;
+		if ( $multi_number ) {
+			$query_arg['num'] = $multi_number;
+			$query_arg['base'] = $id_base;
+		}
+	} else {
+		$query_arg['sidebar'] = $sidebar_id;
+		$query_arg['key'] = $key;
+	}
+
+	/*
+	 * We aren't showing a widget control, we're outputting a template
+	 * for a multi-widget control.
+	 */
+	if ( isset($sidebar_args['_display']) && 'template' == $sidebar_args['_display'] && $widget_number ) {
+		// number == -1 implies a template where id numbers are replaced by a generic '__i__'
+		$control['params'][0]['number'] = -1;
+		// With id_base widget id's are constructed like {$id_base}-{$id_number}.
+		if ( isset($control['id_base']) )
+			$id_format = $control['id_base'] . '-__i__';
+	}
+
+	$wp_registered_widgets[$widget_id]['callback'] = $wp_registered_widgets[$widget_id]['_callback'];
+	unset($wp_registered_widgets[$widget_id]['_callback']);
+
+	$widget_title = esc_html( strip_tags( $sidebar_args['widget_name'] ) );
+	$has_form = 'noform';
+
+	echo $sidebar_args['before_widget']; ?>
+	<div class="widget-top">
+	<div class="widget-title-action">
+		<button type="button" class="widget-action hide-if-no-js" aria-expanded="false">
+			<span class="screen-reader-text"><?php printf( __( 'Edit widget: %s' ), $widget_title ); ?></span>
+			<span class="toggle-indicator" aria-hidden="true"></span>
+		</button>
+		<a class="widget-control-edit hide-if-js" href="<?php echo esc_url( add_query_arg( $query_arg ) ); ?>">
+			<span class="edit"><?php _ex( 'Edit', 'widget' ); ?></span>
+			<span class="add"><?php _ex( 'Add', 'widget' ); ?></span>
+			<span class="screen-reader-text"><?php echo $widget_title; ?></span>
+		</a>
+	</div>
+	<div class="widget-title"><h3><?php echo $widget_title; ?><span class="in-widget-title"></span></h3></div>
+	</div>
+
+	<div class="widget-inside">
+	<?php echo $before_form; ?>
+	<?php echo $before_widget_content; ?>
+	<?php
+	if ( isset( $control['callback'] ) ) {
+		$has_form = call_user_func_array( $control['callback'], $control['params'] );
+	} else {
+		echo "\t\t<p>" . __('There are no options for this widget.') . "</p>\n";
+	}
+	?>
+	<?php echo $after_widget_content; ?>
+	<input type="hidden" name="widget-id" class="widget-id" value="<?php echo esc_attr($id_format); ?>" />
+	<input type="hidden" name="id_base" class="id_base" value="<?php echo esc_attr($id_base); ?>" />
+	<input type="hidden" name="widget-width" class="widget-width" value="<?php if (isset( $control['width'] )) echo esc_attr($control['width']); ?>" />
+	<input type="hidden" name="widget-height" class="widget-height" value="<?php if (isset( $control['height'] )) echo esc_attr($control['height']); ?>" />
+	<input type="hidden" name="widget_number" class="widget_number" value="<?php echo esc_attr($widget_number); ?>" />
+	<input type="hidden" name="multi_number" class="multi_number" value="<?php echo esc_attr($multi_number); ?>" />
+	<input type="hidden" name="add_new" class="add_new" value="<?php echo esc_attr($add_new); ?>" />
+
+	<div class="widget-control-actions">
+		<div class="alignleft">
+			<button type="button" class="button-link button-link-delete widget-control-remove"><?php _e( 'Delete' ); ?></button>
+			<span class="widget-control-close-wrapper">
+				|
+				<button type="button" class="button-link widget-control-close"><?php _e( 'Done' ); ?></button>
+			</span>
+		</div>
+		<div class="alignright<?php if ( 'noform' === $has_form ) echo ' widget-control-noform'; ?>">
+			<?php submit_button( __( 'Save' ), 'primary widget-control-save right', 'savewidget', false, array( 'id' => 'widget-' . esc_attr( $id_format ) . '-savewidget' ) ); ?>
+			<span class="spinner"></span>
+		</div>
+		<br class="clear" />
+	</div>
+	<?php echo $after_form; ?>
+	</div>
+
+	<div class="widget-description">
+<?php echo ( $widget_description = wp_widget_description($widget_id) ) ? "$widget_description\n" : "$widget_title\n"; ?>
+	</div>
+<?php
+	echo $sidebar_args['after_widget'];
+
+	return $sidebar_args;
+}
+
+/**
+ *
+ * @param string $classes
+ * @return string
+ */
+function wp_widgets_access_body_class($classes) {
+	return "$classes widgets_access ";
+}
