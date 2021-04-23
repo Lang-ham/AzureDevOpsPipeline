@@ -359,4 +359,141 @@ jQuery( function( $ ) {
 		 *
 		 * @since 4.8.0
 		 *
-		 * @param {Object} templateParams The various parameters that will 
+		 * @param {Object} templateParams The various parameters that will get passed to wp.template.
+		 * @param {string} initiatedBy    'user' to indicate that this was triggered manually by the user;
+		 *                                'app' to indicate it was triggered automatically by the app itself.
+		 */
+		renderEventsTemplate: function( templateParams, initiatedBy ) {
+			var template,
+				elementVisibility,
+				l10nPlaceholder  = /%(?:\d\$)?s/g, // Match `%s`, `%1$s`, `%2$s`, etc.
+				$toggleButton    = $( '.community-events-toggle-location' ),
+				$locationMessage = $( '#community-events-location-message' ),
+				$results         = $( '.community-events-results' );
+
+			/*
+			 * Hide all toggleable elements by default, to keep the logic simple.
+			 * Otherwise, each block below would have to turn hide everything that
+			 * could have been shown at an earlier point.
+			 *
+			 * The exception to that is that the .community-events container is hidden
+			 * when the page is first loaded, because the content isn't ready yet,
+			 * but once we've reached this point, it should always be shown.
+			 */
+			elementVisibility = {
+				'.community-events'                  : true,
+				'.community-events-loading'          : false,
+				'.community-events-errors'           : false,
+				'.community-events-error-occurred'   : false,
+				'.community-events-could-not-locate' : false,
+				'#community-events-location-message' : false,
+				'.community-events-toggle-location'  : false,
+				'.community-events-results'          : false
+			};
+
+			/*
+			 * Determine which templates should be rendered and which elements
+			 * should be displayed.
+			 */
+			if ( templateParams.location.ip ) {
+				/*
+				 * If the API determined the location by geolocating an IP, it will
+				 * provide events, but not a specific location.
+				 */
+				$locationMessage.text( communityEventsData.l10n.attend_event_near_generic );
+
+				if ( templateParams.events.length ) {
+					template = wp.template( 'community-events-event-list' );
+					$results.html( template( templateParams ) );
+				} else {
+					template = wp.template( 'community-events-no-upcoming-events' );
+					$results.html( template( templateParams ) );
+				}
+
+				elementVisibility['#community-events-location-message'] = true;
+				elementVisibility['.community-events-toggle-location']  = true;
+				elementVisibility['.community-events-results']          = true;
+
+			} else if ( templateParams.location.description ) {
+				template = wp.template( 'community-events-attend-event-near' );
+				$locationMessage.html( template( templateParams ) );
+
+				if ( templateParams.events.length ) {
+					template = wp.template( 'community-events-event-list' );
+					$results.html( template( templateParams ) );
+				} else {
+					template = wp.template( 'community-events-no-upcoming-events' );
+					$results.html( template( templateParams ) );
+				}
+
+				if ( 'user' === initiatedBy ) {
+					wp.a11y.speak( communityEventsData.l10n.city_updated.replace( l10nPlaceholder, templateParams.location.description ), 'assertive' );
+				}
+
+				elementVisibility['#community-events-location-message'] = true;
+				elementVisibility['.community-events-toggle-location']  = true;
+				elementVisibility['.community-events-results']          = true;
+
+			} else if ( templateParams.unknownCity ) {
+				template = wp.template( 'community-events-could-not-locate' );
+				$( '.community-events-could-not-locate' ).html( template( templateParams ) );
+				wp.a11y.speak( communityEventsData.l10n.could_not_locate_city.replace( l10nPlaceholder, templateParams.unknownCity ) );
+
+				elementVisibility['.community-events-errors']           = true;
+				elementVisibility['.community-events-could-not-locate'] = true;
+
+			} else if ( templateParams.error && 'user' === initiatedBy ) {
+				/*
+				 * Errors messages are only shown for requests that were initiated
+				 * by the user, not for ones that were initiated by the app itself.
+				 * Showing error messages for an event that user isn't aware of
+				 * could be confusing or unnecessarily distracting.
+				 */
+				wp.a11y.speak( communityEventsData.l10n.error_occurred_please_try_again );
+
+				elementVisibility['.community-events-errors']         = true;
+				elementVisibility['.community-events-error-occurred'] = true;
+			} else {
+				$locationMessage.text( communityEventsData.l10n.enter_closest_city );
+
+				elementVisibility['#community-events-location-message'] = true;
+				elementVisibility['.community-events-toggle-location']  = true;
+			}
+
+			// Set the visibility of toggleable elements.
+			_.each( elementVisibility, function( isVisible, element ) {
+				$( element ).attr( 'aria-hidden', ! isVisible );
+			});
+
+			$toggleButton.attr( 'aria-expanded', elementVisibility['.community-events-toggle-location'] );
+
+			if ( templateParams.location && ( templateParams.location.ip || templateParams.location.latitude ) ) {
+				// Hide the form when there's a valid location.
+				app.toggleLocationForm( 'hide' );
+
+				if ( 'user' === initiatedBy ) {
+					/*
+					 * When the form is programmatically hidden after a user search,
+					 * bring the focus back to the toggle button so users relying
+					 * on screen readers don't lose their place.
+					 */
+					$toggleButton.focus();
+				}
+			} else {
+				app.toggleLocationForm( 'show' );
+			}
+		}
+	};
+
+	if ( $( '#dashboard_primary' ).is( ':visible' ) ) {
+		app.init();
+	} else {
+		$( document ).on( 'postbox-toggled', function( event, postbox ) {
+			var $postbox = $( postbox );
+
+			if ( 'dashboard_primary' === $postbox.attr( 'id' ) && $postbox.is( ':visible' ) ) {
+				app.init();
+			}
+		});
+	}
+});
