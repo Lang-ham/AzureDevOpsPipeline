@@ -557,4 +557,422 @@
 			imageEdit.init( postid );
 		});
 
-		return
+		return dfd;
+	},
+
+	/**
+	 * @summary Initializes the cropping tool and sets a default cropping selection.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 *
+	 * @returns {void}
+	 */
+	imgLoaded : function(postid) {
+		var img = $('#image-preview-' + postid), parent = $('#imgedit-crop-' + postid);
+
+		// Ensure init has run even when directly loaded.
+		if ( 'undefined' === typeof this.hold.sizer ) {
+			this.init( postid );
+		}
+
+		this.initCrop(postid, img, parent);
+		this.setCropSelection(postid, 0);
+		this.toggleEditor(postid, 0);
+		// Editor is ready, move focus to the first focusable element.
+		$( '.imgedit-wrap .imgedit-help-toggle' ).eq( 0 ).focus();
+	},
+
+	/**
+	 * @summary Initializes the cropping tool.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number}      postid The post id.
+	 * @param {HTMLElement} image  The preview image.
+	 * @param {HTMLElement} parent The preview image container.
+	 *
+	 * @returns {void}
+	 */
+	initCrop : function(postid, image, parent) {
+		var t = this,
+			selW = $('#imgedit-sel-width-' + postid),
+			selH = $('#imgedit-sel-height-' + postid),
+			$img;
+
+		t.iasapi = $(image).imgAreaSelect({
+			parent: parent,
+			instance: true,
+			handles: true,
+			keys: true,
+			minWidth: 3,
+			minHeight: 3,
+
+			/**
+			 * @summary Sets the CSS styles and binds events for locking the aspect ratio.
+			 *
+			 * @param {jQuery} img The preview image.
+			 */
+			onInit: function( img ) {
+				// Ensure that the imgAreaSelect wrapper elements are position:absolute.
+				// (even if we're in a position:fixed modal)
+				$img = $( img );
+				$img.next().css( 'position', 'absolute' )
+					.nextAll( '.imgareaselect-outer' ).css( 'position', 'absolute' );
+				/**
+				 * @summary Binds mouse down event to the cropping container.
+				 *
+				 * @returns {void}
+				 */
+				parent.children().mousedown(function(e){
+					var ratio = false, sel, defRatio;
+
+					if ( e.shiftKey ) {
+						sel = t.iasapi.getSelection();
+						defRatio = t.getSelRatio(postid);
+						ratio = ( sel && sel.width && sel.height ) ? sel.width + ':' + sel.height : defRatio;
+					}
+
+					t.iasapi.setOptions({
+						aspectRatio: ratio
+					});
+				});
+			},
+
+			/**
+			 * @summary Event triggered when starting a selection.
+			 *
+			 * @returns {void}
+			 */
+			onSelectStart: function() {
+				imageEdit.setDisabled($('#imgedit-crop-sel-' + postid), 1);
+			},
+			/**
+			 * @summary Event triggered when the selection is ended.
+			 *
+			 * @param {object} img jQuery object representing the image.
+			 * @param {object} c   The selection.
+			 *
+			 * @returns {object}
+			 */
+			onSelectEnd: function(img, c) {
+				imageEdit.setCropSelection(postid, c);
+			},
+
+			/**
+			 * @summary Event triggered when the selection changes.
+			 *
+			 * @param {object} img jQuery object representing the image.
+			 * @param {object} c   The selection.
+			 *
+			 * @returns {void}
+			 */
+			onSelectChange: function(img, c) {
+				var sizer = imageEdit.hold.sizer;
+				selW.val( imageEdit.round(c.width / sizer) );
+				selH.val( imageEdit.round(c.height / sizer) );
+			}
+		});
+	},
+
+	/**
+	 * @summary Stores the current crop selection.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 * @param {object} c      The selection.
+	 *
+	 * @returns {boolean}
+	 */
+	setCropSelection : function(postid, c) {
+		var sel;
+
+		c = c || 0;
+
+		if ( !c || ( c.width < 3 && c.height < 3 ) ) {
+			this.setDisabled($('.imgedit-crop', '#imgedit-panel-' + postid), 0);
+			this.setDisabled($('#imgedit-crop-sel-' + postid), 0);
+			$('#imgedit-sel-width-' + postid).val('');
+			$('#imgedit-sel-height-' + postid).val('');
+			$('#imgedit-selection-' + postid).val('');
+			return false;
+		}
+
+		sel = { 'x': c.x1, 'y': c.y1, 'w': c.width, 'h': c.height };
+		this.setDisabled($('.imgedit-crop', '#imgedit-panel-' + postid), 1);
+		$('#imgedit-selection-' + postid).val( JSON.stringify(sel) );
+	},
+
+
+	/**
+	 * @summary Closes the image editor.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number}  postid The post id.
+	 * @param {bool}    warn   Warning message.
+	 *
+	 * @returns {void|bool} Returns false if there is a warning.
+	 */
+	close : function(postid, warn) {
+		warn = warn || false;
+
+		if ( warn && this.notsaved(postid) ) {
+			return false;
+		}
+
+		this.iasapi = {};
+		this.hold = {};
+
+		// If we've loaded the editor in the context of a Media Modal, then switch to the previous view,
+		// whatever that might have been.
+		if ( this._view ){
+			this._view.back();
+		}
+
+		// In case we are not accessing the image editor in the context of a View, close the editor the old-skool way
+		else {
+			$('#image-editor-' + postid).fadeOut('fast', function() {
+				$( '#media-head-' + postid ).fadeIn( 'fast', function() {
+					// Move focus back to the Edit Image button. Runs also when saving.
+					$( '#imgedit-open-btn-' + postid ).focus();
+				});
+				$(this).empty();
+			});
+		}
+
+
+	},
+
+	/**
+	 * @summary Checks if the image edit history is saved.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 *
+	 * @returns {boolean} Returns true if the history is not saved.
+	 */
+	notsaved : function(postid) {
+		var h = $('#imgedit-history-' + postid).val(),
+			history = ( h !== '' ) ? JSON.parse(h) : [],
+			pop = this.intval( $('#imgedit-undone-' + postid).val() );
+
+		if ( pop < history.length ) {
+			if ( confirm( $('#imgedit-leaving-' + postid).html() ) ) {
+				return false;
+			}
+			return true;
+		}
+		return false;
+	},
+
+	/**
+	 * @summary Adds an image edit action to the history.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {object} op     The original position.
+	 * @param {number} postid The post id.
+	 * @param {string} nonce  The nonce.
+	 *
+	 * @returns {void}
+	 */
+	addStep : function(op, postid, nonce) {
+		var t = this, elem = $('#imgedit-history-' + postid),
+			history = ( elem.val() !== '' ) ? JSON.parse( elem.val() ) : [],
+			undone = $( '#imgedit-undone-' + postid ),
+			pop = t.intval( undone.val() );
+
+		while ( pop > 0 ) {
+			history.pop();
+			pop--;
+		}
+		undone.val(0); // reset
+
+		history.push(op);
+		elem.val( JSON.stringify(history) );
+
+		t.refreshEditor(postid, nonce, function() {
+			t.setDisabled($('#image-undo-' + postid), true);
+			t.setDisabled($('#image-redo-' + postid), false);
+		});
+	},
+
+	/**
+	 * @summary Rotates the image.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {string} angle  The angle the image is rotated with.
+	 * @param {number} postid The post id.
+	 * @param {string} nonce  The nonce.
+	 * @param {object} t      The target element.
+	 *
+	 * @returns {boolean}
+	 */
+	rotate : function(angle, postid, nonce, t) {
+		if ( $(t).hasClass('disabled') ) {
+			return false;
+		}
+
+		this.addStep({ 'r': { 'r': angle, 'fw': this.hold.h, 'fh': this.hold.w }}, postid, nonce);
+	},
+
+	/**
+	 * @summary Flips the image.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} axis   The axle the image is flipped on.
+	 * @param {number} postid The post id.
+	 * @param {string} nonce  The nonce.
+	 * @param {object} t      The target element.
+	 *
+	 * @returns {boolean}
+	 */
+	flip : function (axis, postid, nonce, t) {
+		if ( $(t).hasClass('disabled') ) {
+			return false;
+		}
+
+		this.addStep({ 'f': { 'f': axis, 'fw': this.hold.w, 'fh': this.hold.h }}, postid, nonce);
+	},
+
+	/**
+	 * @summary Crops the image.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 * @param {string} nonce  The nonce.
+	 * @param {object} t      The target object.
+	 *
+	 * @returns {void|boolean} Returns false if the crop button is disabled.
+	 */
+	crop : function (postid, nonce, t) {
+		var sel = $('#imgedit-selection-' + postid).val(),
+			w = this.intval( $('#imgedit-sel-width-' + postid).val() ),
+			h = this.intval( $('#imgedit-sel-height-' + postid).val() );
+
+		if ( $(t).hasClass('disabled') || sel === '' ) {
+			return false;
+		}
+
+		sel = JSON.parse(sel);
+		if ( sel.w > 0 && sel.h > 0 && w > 0 && h > 0 ) {
+			sel.fw = w;
+			sel.fh = h;
+			this.addStep({ 'c': sel }, postid, nonce);
+		}
+	},
+
+	/**
+	 * @summary Undoes an image edit action.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid   The post id.
+	 * @param {string} nonce    The nonce.
+	 *
+	 * @returns {void|false} Returns false if the undo button is disabled.
+	 */
+	undo : function (postid, nonce) {
+		var t = this, button = $('#image-undo-' + postid), elem = $('#imgedit-undone-' + postid),
+			pop = t.intval( elem.val() ) + 1;
+
+		if ( button.hasClass('disabled') ) {
+			return;
+		}
+
+		elem.val(pop);
+		t.refreshEditor(postid, nonce, function() {
+			var elem = $('#imgedit-history-' + postid),
+				history = ( elem.val() !== '' ) ? JSON.parse( elem.val() ) : [];
+
+			t.setDisabled($('#image-redo-' + postid), true);
+			t.setDisabled(button, pop < history.length);
+			// When undo gets disabled, move focus to the redo button to avoid a focus loss.
+			if ( history.length === pop ) {
+				$( '#image-redo-' + postid ).focus();
+			}
+		});
+	},
+
+	/**
+	 * Reverts a undo action.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 * @param {string} nonce  The nonce.
+	 *
+	 * @returns {void}
+	 */
+	redo : function(postid, nonce) {
+		var t = this, button = $('#image-redo-' + postid), elem = $('#imgedit-undone-' + postid),
+			pop = t.intval( elem.val() ) - 1;
+
+		if ( button.hasClass('disabled') ) {
+			return;
+		}
+
+		elem.val(pop);
+		t.refreshEditor(postid, nonce, function() {
+			t.setDisabled($('#image-undo-' + postid), true);
+			t.setDisabled(button, pop > 0);
+			// When redo gets disabled, move focus to the undo button to avoid a focus loss.
+			if ( 0 === pop ) {
+				$( '#image-undo-' + postid ).focus();
+			}
+		});
+	},
+
+	/**
+	 * @summary Sets the selection for the height and width in pixels.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 * @param {jQuery} el     The element containing the values.
+	 *
+	 * @returns {void|boolean} Returns false when the x or y value is lower than 1,
+	 *                         void when the value is not numeric or when the operation
+	 *                         is successful.
+	 */
+	setNumSelection : function( postid, el ) {
+		var sel, elX = $('#imgedit-sel-width-' + postid), elY = $('#imgedit-sel-height-' + postid),
+			x = this.intval( elX.val() ), y = this.intval( elY.val() ),
+			img = $('#image-preview-' + postid), imgh = img.height(), imgw = img.width(),
+			sizer = this.hold.sizer, x1, y1, x2, y2, ias = this.iasapi;
+
+		if ( false === this.validateNumeric( el ) ) {
+			return;
+		}
+
+		if ( x < 1 ) {
+			elX.val('');
+			return false;
+		}
+
+		if ( y < 1 ) {
+			elY.val('');
+			return false;
+		}
+
+		if ( x && y && ( sel = ias.getSelection() ) ) {
+			x2 = sel.x1 +
