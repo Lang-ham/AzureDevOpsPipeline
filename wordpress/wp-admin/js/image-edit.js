@@ -975,4 +975,118 @@
 		}
 
 		if ( x && y && ( sel = ias.getSelection() ) ) {
-			x2 = sel.x1 +
+			x2 = sel.x1 + Math.round( x * sizer );
+			y2 = sel.y1 + Math.round( y * sizer );
+			x1 = sel.x1;
+			y1 = sel.y1;
+
+			if ( x2 > imgw ) {
+				x1 = 0;
+				x2 = imgw;
+				elX.val( Math.round( x2 / sizer ) );
+			}
+
+			if ( y2 > imgh ) {
+				y1 = 0;
+				y2 = imgh;
+				elY.val( Math.round( y2 / sizer ) );
+			}
+
+			ias.setSelection( x1, y1, x2, y2 );
+			ias.update();
+			this.setCropSelection(postid, ias.getSelection());
+		}
+	},
+
+	/**
+	 * Rounds a number to a whole.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} num The number.
+	 *
+	 * @returns {number} The number rounded to a whole number.
+	 */
+	round : function(num) {
+		var s;
+		num = Math.round(num);
+
+		if ( this.hold.sizer > 0.6 ) {
+			return num;
+		}
+
+		s = num.toString().slice(-1);
+
+		if ( '1' === s ) {
+			return num - 1;
+		} else if ( '9' === s ) {
+			return num + 1;
+		}
+
+		return num;
+	},
+
+	/**
+	 * Sets a locked aspect ratio for the selection.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid     The post id.
+	 * @param {number} n          The ratio to set.
+	 * @param {jQuery} el         The element containing the values.
+	 *
+	 * @returns {void}
+	 */
+	setRatioSelection : function(postid, n, el) {
+		var sel, r, x = this.intval( $('#imgedit-crop-width-' + postid).val() ),
+			y = this.intval( $('#imgedit-crop-height-' + postid).val() ),
+			h = $('#image-preview-' + postid).height();
+
+		if ( false === this.validateNumeric( el ) ) {
+			return;
+		}
+
+		if ( x && y ) {
+			this.iasapi.setOptions({
+				aspectRatio: x + ':' + y
+			});
+
+			if ( sel = this.iasapi.getSelection(true) ) {
+				r = Math.ceil( sel.y1 + ( ( sel.x2 - sel.x1 ) / ( x / y ) ) );
+
+				if ( r > h ) {
+					r = h;
+					if ( n ) {
+						$('#imgedit-crop-height-' + postid).val('');
+					} else {
+						$('#imgedit-crop-width-' + postid).val('');
+					}
+				}
+
+				this.iasapi.setSelection( sel.x1, sel.y1, sel.x2, r );
+				this.iasapi.update();
+			}
+		}
+	},
+
+	/**
+	 * Validates if a value in a jQuery.HTMLElement is numeric.
+	 *
+	 * @memberof imageEdit
+	 * @since    4.6
+	 *
+	 * @param {jQuery} el The html element.
+	 *
+	 * @returns {void|boolean} Returns false if the value is not numeric,
+	 *                         void when it is.
+	 */
+	validateNumeric: function( el ) {
+		if ( ! this.intval( $( el ).val() ) ) {
+			$( el ).val( '' );
+			return false;
+		}
+	}
+};
+})(jQuery);
