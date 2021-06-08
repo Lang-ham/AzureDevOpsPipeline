@@ -168,4 +168,393 @@
 	},
 
 	/**
-	 * @summary Recalculates the height or width a
+	 * @summary Recalculates the height or width and keeps the original aspect ratio.
+	 *
+	 * If the original image size is exceeded a red exclamation mark is shown.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number}         postid The current post id.
+	 * @param {number}         x      Is 0 when it applies the y-axis
+	 *                                and 1 when applicable for the x-axis.
+	 * @param {jQuery}         el     Element.
+	 *
+	 * @returns {void}
+	 */
+	scaleChanged : function( postid, x, el ) {
+		var w = $('#imgedit-scale-width-' + postid), h = $('#imgedit-scale-height-' + postid),
+		warn = $('#imgedit-scale-warn-' + postid), w1 = '', h1 = '';
+
+		if ( false === this.validateNumeric( el ) ) {
+			return;
+		}
+
+		if ( x ) {
+			h1 = ( w.val() !== '' ) ? Math.round( w.val() / this.hold.xy_ratio ) : '';
+			h.val( h1 );
+		} else {
+			w1 = ( h.val() !== '' ) ? Math.round( h.val() * this.hold.xy_ratio ) : '';
+			w.val( w1 );
+		}
+
+		if ( ( h1 && h1 > this.hold.oh ) || ( w1 && w1 > this.hold.ow ) ) {
+			warn.css('visibility', 'visible');
+		} else {
+			warn.css('visibility', 'hidden');
+		}
+	},
+
+	/**
+	 * @summary Gets the selected aspect ratio.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid The post id.
+	 *
+	 * @returns {string} The aspect ratio.
+	 */
+	getSelRatio : function(postid) {
+		var x = this.hold.w, y = this.hold.h,
+			X = this.intval( $('#imgedit-crop-width-' + postid).val() ),
+			Y = this.intval( $('#imgedit-crop-height-' + postid).val() );
+
+		if ( X && Y ) {
+			return X + ':' + Y;
+		}
+
+		if ( x && y ) {
+			return x + ':' + y;
+		}
+
+		return '1:1';
+	},
+
+	/**
+	 * @summary Removes the last action from the image edit history
+	 * The history consist of (edit) actions performed on the image.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid  The post id.
+	 * @param {number} setSize 0 or 1, when 1 the image resets to its original size.
+	 *
+	 * @returns {string} JSON string containing the history or an empty string if no history exists.
+	 */
+	filterHistory : function(postid, setSize) {
+		// Apply undo state to history.
+		var history = $('#imgedit-history-' + postid).val(), pop, n, o, i, op = [];
+
+		if ( history !== '' ) {
+			// Read the JSON string with the image edit history.
+			history = JSON.parse(history);
+			pop = this.intval( $('#imgedit-undone-' + postid).val() );
+			if ( pop > 0 ) {
+				while ( pop > 0 ) {
+					history.pop();
+					pop--;
+				}
+			}
+
+			// Reset size to it's original state.
+			if ( setSize ) {
+				if ( !history.length ) {
+					this.hold.w = this.hold.ow;
+					this.hold.h = this.hold.oh;
+					return '';
+				}
+
+				// Restore original 'o'.
+				o = history[history.length - 1];
+
+				// c = 'crop', r = 'rotate', f = 'flip'
+				o = o.c || o.r || o.f || false;
+
+				if ( o ) {
+					// fw = Full image width
+					this.hold.w = o.fw;
+					// fh = Full image height
+					this.hold.h = o.fh;
+				}
+			}
+
+			// Filter the last step/action from the history.
+			for ( n in history ) {
+				i = history[n];
+				if ( i.hasOwnProperty('c') ) {
+					op[n] = { 'c': { 'x': i.c.x, 'y': i.c.y, 'w': i.c.w, 'h': i.c.h } };
+				} else if ( i.hasOwnProperty('r') ) {
+					op[n] = { 'r': i.r.r };
+				} else if ( i.hasOwnProperty('f') ) {
+					op[n] = { 'f': i.f.f };
+				}
+			}
+			return JSON.stringify(op);
+		}
+		return '';
+	},
+	/**
+	 * @summary Binds the necessary events to the image.
+	 *
+	 * When the image source is reloaded the image will be reloaded.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number}   postid   The post id.
+	 * @param {string}   nonce    The nonce to verify the request.
+	 * @param {function} callback Function to execute when the image is loaded.
+	 *
+	 * @returns {void}
+	 */
+	refreshEditor : function(postid, nonce, callback) {
+		var t = this, data, img;
+
+		t.toggleEditor(postid, 1);
+		data = {
+			'action': 'imgedit-preview',
+			'_ajax_nonce': nonce,
+			'postid': postid,
+			'history': t.filterHistory(postid, 1),
+			'rand': t.intval(Math.random() * 1000000)
+		};
+
+		img = $( '<img id="image-preview-' + postid + '" alt="" />' )
+			.on( 'load', { history: data.history }, function( event ) {
+				var max1, max2,
+					parent = $( '#imgedit-crop-' + postid ),
+					t = imageEdit,
+					historyObj;
+
+				// Checks if there already is some image-edit history.
+				if ( '' !== event.data.history ) {
+					historyObj = JSON.parse( event.data.history );
+					// If last executed action in history is a crop action.
+					if ( historyObj[historyObj.length - 1].hasOwnProperty( 'c' ) ) {
+						/*
+						 * A crop action has completed and the crop button gets disabled
+						 * ensure the undo button is enabled.
+						 */
+						t.setDisabled( $( '#image-undo-' + postid) , true );
+						// Move focus to the undo button to avoid a focus loss.
+						$( '#image-undo-' + postid ).focus();
+					}
+				}
+
+				parent.empty().append(img);
+
+				// w, h are the new full size dims
+				max1 = Math.max( t.hold.w, t.hold.h );
+				max2 = Math.max( $(img).width(), $(img).height() );
+				t.hold.sizer = max1 > max2 ? max2 / max1 : 1;
+
+				t.initCrop(postid, img, parent);
+				t.setCropSelection(postid, 0);
+
+				if ( (typeof callback !== 'undefined') && callback !== null ) {
+					callback();
+				}
+
+				if ( $('#imgedit-history-' + postid).val() && $('#imgedit-undone-' + postid).val() === '0' ) {
+					$('input.imgedit-submit-btn', '#imgedit-panel-' + postid).removeAttr('disabled');
+				} else {
+					$('input.imgedit-submit-btn', '#imgedit-panel-' + postid).prop('disabled', true);
+				}
+
+				t.toggleEditor(postid, 0);
+			})
+			.on('error', function() {
+				$('#imgedit-crop-' + postid).empty().append('<div class="error"><p>' + imageEditL10n.error + '</p></div>');
+				t.toggleEditor(postid, 0);
+			})
+			.attr('src', ajaxurl + '?' + $.param(data));
+	},
+	/**
+	 * @summary Performs an image edit action.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param  {number}  postid The post id.
+	 * @param  {string}  nonce  The nonce to verify the request.
+	 * @param  {string}  action The action to perform on the image.
+	 *                          The possible actions are: "scale" and "restore".
+	 *
+	 * @returns {boolean|void} Executes a post request that refreshes the page
+	 *                         when the action is performed.
+	 *                         Returns false if a invalid action is given,
+	 *                         or when the action cannot be performed.
+	 */
+	action : function(postid, nonce, action) {
+		var t = this, data, w, h, fw, fh;
+
+		if ( t.notsaved(postid) ) {
+			return false;
+		}
+
+		data = {
+			'action': 'image-editor',
+			'_ajax_nonce': nonce,
+			'postid': postid
+		};
+
+		if ( 'scale' === action ) {
+			w = $('#imgedit-scale-width-' + postid),
+			h = $('#imgedit-scale-height-' + postid),
+			fw = t.intval(w.val()),
+			fh = t.intval(h.val());
+
+			if ( fw < 1 ) {
+				w.focus();
+				return false;
+			} else if ( fh < 1 ) {
+				h.focus();
+				return false;
+			}
+
+			if ( fw === t.hold.ow || fh === t.hold.oh ) {
+				return false;
+			}
+
+			data['do'] = 'scale';
+			data.fwidth = fw;
+			data.fheight = fh;
+		} else if ( 'restore' === action ) {
+			data['do'] = 'restore';
+		} else {
+			return false;
+		}
+
+		t.toggleEditor(postid, 1);
+		$.post(ajaxurl, data, function(r) {
+			$('#image-editor-' + postid).empty().append(r);
+			t.toggleEditor(postid, 0);
+			// refresh the attachment model so that changes propagate
+			if ( t._view ) {
+				t._view.refresh();
+			}
+		});
+	},
+
+	/**
+	 * @summary Stores the changes that are made to the image.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number}  postid   The post id to get the image from the database.
+	 * @param {string}  nonce    The nonce to verify the request.
+	 *
+	 * @returns {boolean|void}  If the actions are successfully saved a response message is shown.
+	 *                          Returns false if there is no image editing history,
+	 *                          thus there are not edit-actions performed on the image.
+	 */
+	save : function(postid, nonce) {
+		var data,
+			target = this.getTarget(postid),
+			history = this.filterHistory(postid, 0),
+			self = this;
+
+		if ( '' === history ) {
+			return false;
+		}
+
+		this.toggleEditor(postid, 1);
+		data = {
+			'action': 'image-editor',
+			'_ajax_nonce': nonce,
+			'postid': postid,
+			'history': history,
+			'target': target,
+			'context': $('#image-edit-context').length ? $('#image-edit-context').val() : null,
+			'do': 'save'
+		};
+		// Post the image edit data to the backend.
+		$.post(ajaxurl, data, function(r) {
+			// Read the response.
+			var ret = JSON.parse(r);
+
+			// If a response is returned, close the editor and show an error.
+			if ( ret.error ) {
+				$('#imgedit-response-' + postid).html('<div class="error"><p>' + ret.error + '</p></div>');
+				imageEdit.close(postid);
+				return;
+			}
+
+			if ( ret.fw && ret.fh ) {
+				$('#media-dims-' + postid).html( ret.fw + ' &times; ' + ret.fh );
+			}
+
+			if ( ret.thumbnail ) {
+				$('.thumbnail', '#thumbnail-head-' + postid).attr('src', ''+ret.thumbnail);
+			}
+
+			if ( ret.msg ) {
+				$('#imgedit-response-' + postid).html('<div class="updated"><p>' + ret.msg + '</p></div>');
+			}
+
+			if ( self._view ) {
+				self._view.save();
+			} else {
+				imageEdit.close(postid);
+			}
+		});
+	},
+
+	/**
+	 * @summary Creates the image edit window.
+	 *
+	 * @memberof imageEdit
+	 * @since    2.9.0
+	 *
+	 * @param {number} postid   The post id for the image.
+	 * @param {string} nonce    The nonce to verify the request.
+	 * @param {object} view     The image editor view to be used for the editing.
+	 *
+	 * @returns {void|promise} Either returns void if the button was already activated
+	 *                         or returns an instance of the image editor, wrapped in a promise.
+	 */
+	open : function( postid, nonce, view ) {
+		this._view = view;
+
+		var dfd, data, elem = $('#image-editor-' + postid), head = $('#media-head-' + postid),
+			btn = $('#imgedit-open-btn-' + postid), spin = btn.siblings('.spinner');
+
+		/*
+		 * Instead of disabling the button, which causes a focus loss and makes screen
+		 * readers announce "unavailable", return if the button was already clicked.
+		 */
+		if ( btn.hasClass( 'button-activated' ) ) {
+			return;
+		}
+
+		spin.addClass( 'is-active' );
+
+		data = {
+			'action': 'image-editor',
+			'_ajax_nonce': nonce,
+			'postid': postid,
+			'do': 'open'
+		};
+
+		dfd = $.ajax({
+			url:  ajaxurl,
+			type: 'post',
+			data: data,
+			beforeSend: function() {
+				btn.addClass( 'button-activated' );
+			}
+		}).done(function( html ) {
+			elem.html( html );
+			head.fadeOut('fast', function(){
+				elem.fadeIn('fast');
+				btn.removeClass( 'button-activated' );
+				spin.removeClass( 'is-active' );
+			});
+			// Initialise the Image Editor now that everything is ready.
+			imageEdit.init( postid );
+		});
+
+		return
