@@ -102,4 +102,103 @@ var findPosts;
 		 */
 		send: function() {
 			var post = {
-					p
+					ps: $( '#find-posts-input' ).val(),
+					action: 'find_posts',
+					_ajax_nonce: $('#_ajax_nonce').val()
+				},
+				spinner = $( '.find-box-search .spinner' );
+
+			spinner.addClass( 'is-active' );
+
+			/**
+			 * Send a POST request to admin_ajax.php, hide the spinner and replace the list of posts with the response data.
+			 * If an error occurs, display it.
+			 */
+			$.ajax( ajaxurl, {
+				type: 'POST',
+				data: post,
+				dataType: 'json'
+			}).always( function() {
+				spinner.removeClass( 'is-active' );
+			}).done( function( x ) {
+				if ( ! x.success ) {
+					$( '#find-posts-response' ).text( attachMediaBoxL10n.error );
+				}
+
+				$( '#find-posts-response' ).html( x.data );
+			}).fail( function() {
+				$( '#find-posts-response' ).text( attachMediaBoxL10n.error );
+			});
+		}
+	};
+
+	/**
+	 * @summary Initializes the file once the DOM is fully loaded and attaches events to the various form elements.
+	 *
+	 * @returns {void}
+	 */
+	$( document ).ready( function() {
+		var settings, $mediaGridWrap = $( '#wp-media-grid' );
+
+		// Opens a manage media frame into the grid.
+		if ( $mediaGridWrap.length && window.wp && window.wp.media ) {
+			settings = _wpMediaGridSettings;
+
+			window.wp.media({
+				frame: 'manage',
+				container: $mediaGridWrap,
+				library: settings.queryVars
+			}).open();
+		}
+
+		// Prevents form submission if no post has been selected.
+		$( '#find-posts-submit' ).click( function( event ) {
+			if ( ! $( '#find-posts-response input[type="radio"]:checked' ).length )
+				event.preventDefault();
+		});
+
+		// Submits the search query when hitting the enter key in the search input.
+		$( '#find-posts .find-box-search :input' ).keypress( function( event ) {
+			if ( 13 == event.which ) {
+				findPosts.send();
+				return false;
+			}
+		});
+
+		// Binds the click event to the search button.
+		$( '#find-posts-search' ).click( findPosts.send );
+
+		// Binds the close dialog click event.
+		$( '#find-posts-close' ).click( findPosts.close );
+
+		// Binds the bulk action events to the submit buttons.
+		$( '#doaction, #doaction2' ).click( function( event ) {
+
+			/*
+			 * Retrieves all select elements for bulk actions that have a name starting with `action`
+			 * and handle its action based on its value.
+			 */
+			$( 'select[name^="action"]' ).each( function() {
+				var optionValue = $( this ).val();
+
+				if ( 'attach' === optionValue ) {
+					event.preventDefault();
+					findPosts.open();
+				} else if ( 'delete' === optionValue ) {
+					if ( ! showNotice.warn() ) {
+						event.preventDefault();
+					}
+				}
+			});
+		});
+
+		/**
+		 * @summary Enables clicking on the entire table row.
+		 *
+		 * @returns {void}
+		 */
+		$( '.find-box-inside' ).on( 'click', 'tr', function() {
+			$( this ).find( '.found-radio input' ).prop( 'checked', true );
+		});
+	});
+})( jQuery );
