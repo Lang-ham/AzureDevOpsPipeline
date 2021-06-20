@@ -509,4 +509,313 @@ var wpNavMenu;
 		/**
 		 * refreshAdvancedAccessibility
 		 *
-		 * 
+		 * Hides all advanced accessibility buttons and marks them for refreshing.
+		 */
+		refreshAdvancedAccessibility : function() {
+
+			// Hide all the move buttons by default.
+			$( '.menu-item-settings .field-move .menus-move' ).hide();
+
+			// Mark all menu items as unprocessed
+			$( 'a.item-edit' ).data( 'needs_accessibility_refresh', true );
+
+			// All open items have to be refreshed or they will show no links
+			$( '.menu-item-edit-active a.item-edit' ).each( function() {
+				api.refreshAdvancedAccessibilityOfItem( this );
+			} );
+		},
+
+		refreshKeyboardAccessibility : function() {
+			$( 'a.item-edit' ).off( 'focus' ).on( 'focus', function(){
+				$(this).off( 'keydown' ).on( 'keydown', function(e){
+
+					var arrows,
+						$this = $( this ),
+						thisItem = $this.parents( 'li.menu-item' ),
+						thisItemData = thisItem.getItemData();
+
+					// Bail if it's not an arrow key
+					if ( 37 != e.which && 38 != e.which && 39 != e.which && 40 != e.which )
+						return;
+
+					// Avoid multiple keydown events
+					$this.off('keydown');
+
+					// Bail if there is only one menu item
+					if ( 1 === $('#menu-to-edit li').length )
+						return;
+
+					// If RTL, swap left/right arrows
+					arrows = { '38': 'up', '40': 'down', '37': 'left', '39': 'right' };
+					if ( $('body').hasClass('rtl') )
+						arrows = { '38' : 'up', '40' : 'down', '39' : 'left', '37' : 'right' };
+
+					switch ( arrows[e.which] ) {
+					case 'up':
+						api.moveMenuItem( $this, 'up' );
+						break;
+					case 'down':
+						api.moveMenuItem( $this, 'down' );
+						break;
+					case 'left':
+						api.moveMenuItem( $this, 'left' );
+						break;
+					case 'right':
+						api.moveMenuItem( $this, 'right' );
+						break;
+					}
+					// Put focus back on same menu item
+					$( '#edit-' + thisItemData['menu-item-db-id'] ).focus();
+					return false;
+				});
+			});
+		},
+
+		initPreviewing : function() {
+			// Update the item handle title when the navigation label is changed.
+			$( '#menu-to-edit' ).on( 'change input', '.edit-menu-item-title', function(e) {
+				var input = $( e.currentTarget ), title, titleEl;
+				title = input.val();
+				titleEl = input.closest( '.menu-item' ).find( '.menu-item-title' );
+				// Don't update to empty title.
+				if ( title ) {
+					titleEl.text( title ).removeClass( 'no-title' );
+				} else {
+					titleEl.text( navMenuL10n.untitled ).addClass( 'no-title' );
+				}
+			} );
+		},
+
+		initToggles : function() {
+			// init postboxes
+			postboxes.add_postbox_toggles('nav-menus');
+
+			// adjust columns functions for menus UI
+			columns.useCheckboxesForHidden();
+			columns.checked = function(field) {
+				$('.field-' + field).removeClass('hidden-field');
+			};
+			columns.unchecked = function(field) {
+				$('.field-' + field).addClass('hidden-field');
+			};
+			// hide fields
+			api.menuList.hideAdvancedMenuItemFields();
+
+			$('.hide-postbox-tog').click(function () {
+				var hidden = $( '.accordion-container li.accordion-section' ).filter(':hidden').map(function() { return this.id; }).get().join(',');
+				$.post(ajaxurl, {
+					action: 'closed-postboxes',
+					hidden: hidden,
+					closedpostboxesnonce: jQuery('#closedpostboxesnonce').val(),
+					page: 'nav-menus'
+				});
+			});
+		},
+
+		initSortables : function() {
+			var currentDepth = 0, originalDepth, minDepth, maxDepth,
+				prev, next, prevBottom, nextThreshold, helperHeight, transport,
+				menuEdge = api.menuList.offset().left,
+				body = $('body'), maxChildDepth,
+				menuMaxDepth = initialMenuMaxDepth();
+
+			if( 0 !== $( '#menu-to-edit li' ).length )
+				$( '.drag-instructions' ).show();
+
+			// Use the right edge if RTL.
+			menuEdge += api.isRTL ? api.menuList.width() : 0;
+
+			api.menuList.sortable({
+				handle: '.menu-item-handle',
+				placeholder: 'sortable-placeholder',
+				items: api.options.sortableItems,
+				start: function(e, ui) {
+					var height, width, parent, children, tempHolder;
+
+					// handle placement for rtl orientation
+					if ( api.isRTL )
+						ui.item[0].style.right = 'auto';
+
+					transport = ui.item.children('.menu-item-transport');
+
+					// Set depths. currentDepth must be set before children are located.
+					originalDepth = ui.item.menuItemDepth();
+					updateCurrentDepth(ui, originalDepth);
+
+					// Attach child elements to parent
+					// Skip the placeholder
+					parent = ( ui.item.next()[0] == ui.placeholder[0] ) ? ui.item.next() : ui.item;
+					children = parent.childMenuItems();
+					transport.append( children );
+
+					// Update the height of the placeholder to match the moving item.
+					height = transport.outerHeight();
+					// If there are children, account for distance between top of children and parent
+					height += ( height > 0 ) ? (ui.placeholder.css('margin-top').slice(0, -2) * 1) : 0;
+					height += ui.helper.outerHeight();
+					helperHeight = height;
+					height -= 2; // Subtract 2 for borders
+					ui.placeholder.height(height);
+
+					// Update the width of the placeholder to match the moving item.
+					maxChildDepth = originalDepth;
+					children.each(function(){
+						var depth = $(this).menuItemDepth();
+						maxChildDepth = (depth > maxChildDepth) ? depth : maxChildDepth;
+					});
+					width = ui.helper.find('.menu-item-handle').outerWidth(); // Get original width
+					width += api.depthToPx(maxChildDepth - originalDepth); // Account for children
+					width -= 2; // Subtract 2 for borders
+					ui.placeholder.width(width);
+
+					// Update the list of menu items.
+					tempHolder = ui.placeholder.next( '.menu-item' );
+					tempHolder.css( 'margin-top', helperHeight + 'px' ); // Set the margin to absorb the placeholder
+					ui.placeholder.detach(); // detach or jQuery UI will think the placeholder is a menu item
+					$(this).sortable( 'refresh' ); // The children aren't sortable. We should let jQ UI know.
+					ui.item.after( ui.placeholder ); // reattach the placeholder.
+					tempHolder.css('margin-top', 0); // reset the margin
+
+					// Now that the element is complete, we can update...
+					updateSharedVars(ui);
+				},
+				stop: function(e, ui) {
+					var children, subMenuTitle,
+						depthChange = currentDepth - originalDepth;
+
+					// Return child elements to the list
+					children = transport.children().insertAfter(ui.item);
+
+					// Add "sub menu" description
+					subMenuTitle = ui.item.find( '.item-title .is-submenu' );
+					if ( 0 < currentDepth )
+						subMenuTitle.show();
+					else
+						subMenuTitle.hide();
+
+					// Update depth classes
+					if ( 0 !== depthChange ) {
+						ui.item.updateDepthClass( currentDepth );
+						children.shiftDepthClass( depthChange );
+						updateMenuMaxDepth( depthChange );
+					}
+					// Register a change
+					api.registerChange();
+					// Update the item data.
+					ui.item.updateParentMenuItemDBId();
+
+					// address sortable's incorrectly-calculated top in opera
+					ui.item[0].style.top = 0;
+
+					// handle drop placement for rtl orientation
+					if ( api.isRTL ) {
+						ui.item[0].style.left = 'auto';
+						ui.item[0].style.right = 0;
+					}
+
+					api.refreshKeyboardAccessibility();
+					api.refreshAdvancedAccessibility();
+				},
+				change: function(e, ui) {
+					// Make sure the placeholder is inside the menu.
+					// Otherwise fix it, or we're in trouble.
+					if( ! ui.placeholder.parent().hasClass('menu') )
+						(prev.length) ? prev.after( ui.placeholder ) : api.menuList.prepend( ui.placeholder );
+
+					updateSharedVars(ui);
+				},
+				sort: function(e, ui) {
+					var offset = ui.helper.offset(),
+						edge = api.isRTL ? offset.left + ui.helper.width() : offset.left,
+						depth = api.negateIfRTL * api.pxToDepth( edge - menuEdge );
+
+					// Check and correct if depth is not within range.
+					// Also, if the dragged element is dragged upwards over
+					// an item, shift the placeholder to a child position.
+					if ( depth > maxDepth || offset.top < ( prevBottom - api.options.targetTolerance ) ) {
+						depth = maxDepth;
+					} else if ( depth < minDepth ) {
+						depth = minDepth;
+					}
+
+					if( depth != currentDepth )
+						updateCurrentDepth(ui, depth);
+
+					// If we overlap the next element, manually shift downwards
+					if( nextThreshold && offset.top + helperHeight > nextThreshold ) {
+						next.after( ui.placeholder );
+						updateSharedVars( ui );
+						$( this ).sortable( 'refreshPositions' );
+					}
+				}
+			});
+
+			function updateSharedVars(ui) {
+				var depth;
+
+				prev = ui.placeholder.prev( '.menu-item' );
+				next = ui.placeholder.next( '.menu-item' );
+
+				// Make sure we don't select the moving item.
+				if( prev[0] == ui.item[0] ) prev = prev.prev( '.menu-item' );
+				if( next[0] == ui.item[0] ) next = next.next( '.menu-item' );
+
+				prevBottom = (prev.length) ? prev.offset().top + prev.height() : 0;
+				nextThreshold = (next.length) ? next.offset().top + next.height() / 3 : 0;
+				minDepth = (next.length) ? next.menuItemDepth() : 0;
+
+				if( prev.length )
+					maxDepth = ( (depth = prev.menuItemDepth() + 1) > api.options.globalMaxDepth ) ? api.options.globalMaxDepth : depth;
+				else
+					maxDepth = 0;
+			}
+
+			function updateCurrentDepth(ui, depth) {
+				ui.placeholder.updateDepthClass( depth, currentDepth );
+				currentDepth = depth;
+			}
+
+			function initialMenuMaxDepth() {
+				if( ! body[0].className ) return 0;
+				var match = body[0].className.match(/menu-max-depth-(\d+)/);
+				return match && match[1] ? parseInt( match[1], 10 ) : 0;
+			}
+
+			function updateMenuMaxDepth( depthChange ) {
+				var depth, newDepth = menuMaxDepth;
+				if ( depthChange === 0 ) {
+					return;
+				} else if ( depthChange > 0 ) {
+					depth = maxChildDepth + depthChange;
+					if( depth > menuMaxDepth )
+						newDepth = depth;
+				} else if ( depthChange < 0 && maxChildDepth == menuMaxDepth ) {
+					while( ! $('.menu-item-depth-' + newDepth, api.menuList).length && newDepth > 0 )
+						newDepth--;
+				}
+				// Update the depth class.
+				body.removeClass( 'menu-max-depth-' + menuMaxDepth ).addClass( 'menu-max-depth-' + newDepth );
+				menuMaxDepth = newDepth;
+			}
+		},
+
+		initManageLocations : function () {
+			$('#menu-locations-wrap form').submit(function(){
+				window.onbeforeunload = null;
+			});
+			$('.menu-location-menus select').on('change', function () {
+				var editLink = $(this).closest('tr').find('.locations-edit-menu-link');
+				if ($(this).find('option:selected').data('orig'))
+					editLink.show();
+				else
+					editLink.hide();
+			});
+		},
+
+		attachMenuEditListeners : function() {
+			var that = this;
+			$('#update-nav-menu').bind('click', function(e) {
+				if ( e.target && e.target.className ) {
+					if ( -1 != e.target.className.indexOf('item-edit') ) {
+						return that.eventOnClickEditLink(e.target);
+					} else if ( -1 != e.target.className.indexOf('menu-sa
