@@ -818,4 +818,336 @@ var wpNavMenu;
 				if ( e.target && e.target.className ) {
 					if ( -1 != e.target.className.indexOf('item-edit') ) {
 						return that.eventOnClickEditLink(e.target);
-					} else if ( -1 != e.target.className.indexOf('menu-sa
+					} else if ( -1 != e.target.className.indexOf('menu-save') ) {
+						return that.eventOnClickMenuSave(e.target);
+					} else if ( -1 != e.target.className.indexOf('menu-delete') ) {
+						return that.eventOnClickMenuDelete(e.target);
+					} else if ( -1 != e.target.className.indexOf('item-delete') ) {
+						return that.eventOnClickMenuItemDelete(e.target);
+					} else if ( -1 != e.target.className.indexOf('item-cancel') ) {
+						return that.eventOnClickCancelLink(e.target);
+					}
+				}
+			});
+			$('#add-custom-links input[type="text"]').keypress(function(e){
+				$('#customlinkdiv').removeClass('form-invalid');
+
+				if ( e.keyCode === 13 ) {
+					e.preventDefault();
+					$( '#submit-customlinkdiv' ).click();
+				}
+			});
+		},
+
+		attachMenuSaveSubmitListeners : function() {
+			/*
+			 * When a navigation menu is saved, store a JSON representation of all form data
+			 * in a single input to avoid PHP `max_input_vars` limitations. See #14134.
+			 */
+			$( '#update-nav-menu' ).submit( function() {
+				var navMenuData = $( '#update-nav-menu' ).serializeArray();
+				$( '[name="nav-menu-data"]' ).val( JSON.stringify( navMenuData ) );
+			});
+		},
+
+		attachThemeLocationsListeners : function() {
+			var loc = $('#nav-menu-theme-locations'), params = {};
+			params.action = 'menu-locations-save';
+			params['menu-settings-column-nonce'] = $('#menu-settings-column-nonce').val();
+			loc.find('input[type="submit"]').click(function() {
+				loc.find('select').each(function() {
+					params[this.name] = $(this).val();
+				});
+				loc.find( '.spinner' ).addClass( 'is-active' );
+				$.post( ajaxurl, params, function() {
+					loc.find( '.spinner' ).removeClass( 'is-active' );
+				});
+				return false;
+			});
+		},
+
+		attachQuickSearchListeners : function() {
+			var searchTimer,
+				inputEvent;
+
+			// Prevent form submission.
+			$( '#nav-menu-meta' ).on( 'submit', function( event ) {
+				event.preventDefault();
+			});
+
+			/*
+			 * Use feature detection to determine whether inputs should use
+			 * the `keyup` or `input` event. Input is preferred but lacks support
+			 * in legacy browsers. See changeset 34078, see also ticket #26600#comment:59
+			 */
+			if ( 'oninput' in document.createElement( 'input' ) ) {
+				inputEvent = 'input';
+			} else {
+				inputEvent = 'keyup';
+			}
+
+			$( '#nav-menu-meta' ).on( inputEvent, '.quick-search', function() {
+				var $this = $( this );
+
+				$this.attr( 'autocomplete', 'off' );
+
+				if ( searchTimer ) {
+					clearTimeout( searchTimer );
+				}
+
+				searchTimer = setTimeout( function() {
+					api.updateQuickSearchResults( $this );
+ 				}, 500 );
+			}).on( 'blur', '.quick-search', function() {
+				api.lastSearch = '';
+			});
+		},
+
+		updateQuickSearchResults : function(input) {
+			var panel, params,
+				minSearchLength = 2,
+				q = input.val();
+
+			/*
+			 * Minimum characters for a search. Also avoid a new AJAX search when
+			 * the pressed key (e.g. arrows) doesn't change the searched term.
+			 */
+			if ( q.length < minSearchLength || api.lastSearch == q ) {
+				return;
+			}
+
+			api.lastSearch = q;
+
+			panel = input.parents('.tabs-panel');
+			params = {
+				'action': 'menu-quick-search',
+				'response-format': 'markup',
+				'menu': $('#menu').val(),
+				'menu-settings-column-nonce': $('#menu-settings-column-nonce').val(),
+				'q': q,
+				'type': input.attr('name')
+			};
+
+			$( '.spinner', panel ).addClass( 'is-active' );
+
+			$.post( ajaxurl, params, function(menuMarkup) {
+				api.processQuickSearchQueryResponse(menuMarkup, params, panel);
+			});
+		},
+
+		addCustomLink : function( processMethod ) {
+			var url = $('#custom-menu-item-url').val(),
+				label = $('#custom-menu-item-name').val();
+
+			processMethod = processMethod || api.addMenuItemToBottom;
+
+			if ( '' === url || 'http://' == url ) {
+				$('#customlinkdiv').addClass('form-invalid');
+				return false;
+			}
+
+			// Show the ajax spinner
+			$( '.customlinkdiv .spinner' ).addClass( 'is-active' );
+			this.addLinkToMenu( url, label, processMethod, function() {
+				// Remove the ajax spinner
+				$( '.customlinkdiv .spinner' ).removeClass( 'is-active' );
+				// Set custom link form back to defaults
+				$('#custom-menu-item-name').val('').blur();
+				$('#custom-menu-item-url').val('http://');
+			});
+		},
+
+		addLinkToMenu : function(url, label, processMethod, callback) {
+			processMethod = processMethod || api.addMenuItemToBottom;
+			callback = callback || function(){};
+
+			api.addItemToMenu({
+				'-1': {
+					'menu-item-type': 'custom',
+					'menu-item-url': url,
+					'menu-item-title': label
+				}
+			}, processMethod, callback);
+		},
+
+		addItemToMenu : function(menuItem, processMethod, callback) {
+			var menu = $('#menu').val(),
+				nonce = $('#menu-settings-column-nonce').val(),
+				params;
+
+			processMethod = processMethod || function(){};
+			callback = callback || function(){};
+
+			params = {
+				'action': 'add-menu-item',
+				'menu': menu,
+				'menu-settings-column-nonce': nonce,
+				'menu-item': menuItem
+			};
+
+			$.post( ajaxurl, params, function(menuMarkup) {
+				var ins = $('#menu-instructions');
+
+				menuMarkup = $.trim( menuMarkup ); // Trim leading whitespaces
+				processMethod(menuMarkup, params);
+
+				// Make it stand out a bit more visually, by adding a fadeIn
+				$( 'li.pending' ).hide().fadeIn('slow');
+				$( '.drag-instructions' ).show();
+				if( ! ins.hasClass( 'menu-instructions-inactive' ) && ins.siblings().length )
+					ins.addClass( 'menu-instructions-inactive' );
+
+				callback();
+			});
+		},
+
+		/**
+		 * Process the add menu item request response into menu list item. Appends to menu.
+		 *
+		 * @param {string} menuMarkup The text server response of menu item markup.
+		 *
+		 * @fires document#menu-item-added Passes menuMarkup as a jQuery object.
+		 */
+		addMenuItemToBottom : function( menuMarkup ) {
+			var $menuMarkup = $( menuMarkup );
+			$menuMarkup.hideAdvancedMenuItemFields().appendTo( api.targetList );
+			api.refreshKeyboardAccessibility();
+			api.refreshAdvancedAccessibility();
+			$( document ).trigger( 'menu-item-added', [ $menuMarkup ] );
+		},
+
+		/**
+		 * Process the add menu item request response into menu list item. Prepends to menu.
+		 *
+		 * @param {string} menuMarkup The text server response of menu item markup.
+		 *
+		 * @fires document#menu-item-added Passes menuMarkup as a jQuery object.
+		 */
+		addMenuItemToTop : function( menuMarkup ) {
+			var $menuMarkup = $( menuMarkup );
+			$menuMarkup.hideAdvancedMenuItemFields().prependTo( api.targetList );
+			api.refreshKeyboardAccessibility();
+			api.refreshAdvancedAccessibility();
+			$( document ).trigger( 'menu-item-added', [ $menuMarkup ] );
+		},
+
+		attachUnsavedChangesListener : function() {
+			$('#menu-management input, #menu-management select, #menu-management, #menu-management textarea, .menu-location-menus select').change(function(){
+				api.registerChange();
+			});
+
+			if ( 0 !== $('#menu-to-edit').length || 0 !== $('.menu-location-menus select').length ) {
+				window.onbeforeunload = function(){
+					if ( api.menusChanged )
+						return navMenuL10n.saveAlert;
+				};
+			} else {
+				// Make the post boxes read-only, as they can't be used yet
+				$( '#menu-settings-column' ).find( 'input,select' ).end().find( 'a' ).attr( 'href', '#' ).unbind( 'click' );
+			}
+		},
+
+		registerChange : function() {
+			api.menusChanged = true;
+		},
+
+		attachTabsPanelListeners : function() {
+			$('#menu-settings-column').bind('click', function(e) {
+				var selectAreaMatch, panelId, wrapper, items,
+					target = $(e.target);
+
+				if ( target.hasClass('nav-tab-link') ) {
+
+					panelId = target.data( 'type' );
+
+					wrapper = target.parents('.accordion-section-content').first();
+
+					// upon changing tabs, we want to uncheck all checkboxes
+					$('input', wrapper).removeAttr('checked');
+
+					$('.tabs-panel-active', wrapper).removeClass('tabs-panel-active').addClass('tabs-panel-inactive');
+					$('#' + panelId, wrapper).removeClass('tabs-panel-inactive').addClass('tabs-panel-active');
+
+					$('.tabs', wrapper).removeClass('tabs');
+					target.parent().addClass('tabs');
+
+					// select the search bar
+					$('.quick-search', wrapper).focus();
+
+					// Hide controls in the search tab if no items found.
+					if ( ! wrapper.find( '.tabs-panel-active .menu-item-title' ).length ) {
+						wrapper.addClass( 'has-no-menu-item' );
+					} else {
+						wrapper.removeClass( 'has-no-menu-item' );
+					}
+
+					e.preventDefault();
+				} else if ( target.hasClass('select-all') ) {
+					selectAreaMatch = /#(.*)$/.exec(e.target.href);
+					if ( selectAreaMatch && selectAreaMatch[1] ) {
+						items = $('#' + selectAreaMatch[1] + ' .tabs-panel-active .menu-item-title input');
+						if( items.length === items.filter(':checked').length )
+							items.removeAttr('checked');
+						else
+							items.prop('checked', true);
+						return false;
+					}
+				} else if ( target.hasClass('submit-add-to-menu') ) {
+					api.registerChange();
+
+					if ( e.target.id && 'submit-customlinkdiv' == e.target.id )
+						api.addCustomLink( api.addMenuItemToBottom );
+					else if ( e.target.id && -1 != e.target.id.indexOf('submit-') )
+						$('#' + e.target.id.replace(/submit-/, '')).addSelectedToMenu( api.addMenuItemToBottom );
+					return false;
+				}
+			});
+
+			/*
+			 * Delegate the `click` event and attach it just to the pagination
+			 * links thus excluding the current page `<span>`. See ticket #35577.
+			 */
+			$( '#nav-menu-meta' ).on( 'click', 'a.page-numbers', function() {
+				var $container = $( this ).closest( '.inside' );
+
+				$.post( ajaxurl, this.href.replace( /.*\?/, '' ).replace( /action=([^&]*)/, '' ) + '&action=menu-get-metabox',
+					function( resp ) {
+						var metaBoxData = $.parseJSON( resp ),
+							toReplace;
+
+						if ( -1 === resp.indexOf( 'replace-id' ) ) {
+							return;
+						}
+
+						// Get the post type menu meta box to update.
+						toReplace = document.getElementById( metaBoxData['replace-id'] );
+
+						if ( ! metaBoxData.markup || ! toReplace ) {
+							return;
+						}
+
+						// Update the post type menu meta box with new content from the response.
+						$container.html( metaBoxData.markup );
+					}
+				);
+
+				return false;
+			});
+		},
+
+		eventOnClickEditLink : function(clickedEl) {
+			var settings, item,
+			matchedSection = /#(.*)$/.exec(clickedEl.href);
+			if ( matchedSection && matchedSection[1] ) {
+				settings = $('#'+matchedSection[1]);
+				item = settings.parent();
+				if( 0 !== item.length ) {
+					if( item.hasClass('menu-item-edit-inactive') ) {
+						if( ! settings.data('menu-item-data') ) {
+							settings.data( 'menu-item-data', settings.getItemData() );
+						}
+						settings.slideDown('fast');
+						item.removeClass('menu-item-edit-inactive')
+							.addClass('menu-item-edit-active');
+					} else {
+						settings.slideUp('fas
