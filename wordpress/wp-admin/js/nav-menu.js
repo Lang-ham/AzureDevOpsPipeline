@@ -1150,4 +1150,145 @@ var wpNavMenu;
 						item.removeClass('menu-item-edit-inactive')
 							.addClass('menu-item-edit-active');
 					} else {
-						settings.slideUp('fas
+						settings.slideUp('fast');
+						item.removeClass('menu-item-edit-active')
+							.addClass('menu-item-edit-inactive');
+					}
+					return false;
+				}
+			}
+		},
+
+		eventOnClickCancelLink : function(clickedEl) {
+			var settings = $( clickedEl ).closest( '.menu-item-settings' ),
+				thisMenuItem = $( clickedEl ).closest( '.menu-item' );
+			thisMenuItem.removeClass('menu-item-edit-active').addClass('menu-item-edit-inactive');
+			settings.setItemData( settings.data('menu-item-data') ).hide();
+			return false;
+		},
+
+		eventOnClickMenuSave : function() {
+			var locs = '',
+			menuName = $('#menu-name'),
+			menuNameVal = menuName.val();
+			// Cancel and warn if invalid menu name
+			if( !menuNameVal || menuNameVal == menuName.attr('title') || !menuNameVal.replace(/\s+/, '') ) {
+				menuName.parent().addClass('form-invalid');
+				return false;
+			}
+			// Copy menu theme locations
+			$('#nav-menu-theme-locations select').each(function() {
+				locs += '<input type="hidden" name="' + this.name + '" value="' + $(this).val() + '" />';
+			});
+			$('#update-nav-menu').append( locs );
+			// Update menu item position data
+			api.menuList.find('.menu-item-data-position').val( function(index) { return index + 1; } );
+			window.onbeforeunload = null;
+
+			return true;
+		},
+
+		eventOnClickMenuDelete : function() {
+			// Delete warning AYS
+			if ( window.confirm( navMenuL10n.warnDeleteMenu ) ) {
+				window.onbeforeunload = null;
+				return true;
+			}
+			return false;
+		},
+
+		eventOnClickMenuItemDelete : function(clickedEl) {
+			var itemID = parseInt(clickedEl.id.replace('delete-', ''), 10);
+			api.removeMenuItem( $('#menu-item-' + itemID) );
+			api.registerChange();
+			return false;
+		},
+
+		/**
+		 * Process the quick search response into a search result
+		 *
+		 * @param string resp The server response to the query.
+		 * @param object req The request arguments.
+		 * @param jQuery panel The tabs panel we're searching in.
+		 */
+		processQuickSearchQueryResponse : function(resp, req, panel) {
+			var matched, newID,
+			takenIDs = {},
+			form = document.getElementById('nav-menu-meta'),
+			pattern = /menu-item[(\[^]\]*/,
+			$items = $('<div>').html(resp).find('li'),
+			wrapper = panel.closest( '.accordion-section-content' ),
+			$item;
+
+			if( ! $items.length ) {
+				$('.categorychecklist', panel).html( '<li><p>' + navMenuL10n.noResultsFound + '</p></li>' );
+				$( '.spinner', panel ).removeClass( 'is-active' );
+				wrapper.addClass( 'has-no-menu-item' );
+				return;
+			}
+
+			$items.each(function(){
+				$item = $(this);
+
+				// make a unique DB ID number
+				matched = pattern.exec($item.html());
+
+				if ( matched && matched[1] ) {
+					newID = matched[1];
+					while( form.elements['menu-item[' + newID + '][menu-item-type]'] || takenIDs[ newID ] ) {
+						newID--;
+					}
+
+					takenIDs[newID] = true;
+					if ( newID != matched[1] ) {
+						$item.html( $item.html().replace(new RegExp(
+							'menu-item\\[' + matched[1] + '\\]', 'g'),
+							'menu-item[' + newID + ']'
+						) );
+					}
+				}
+			});
+
+			$('.categorychecklist', panel).html( $items );
+			$( '.spinner', panel ).removeClass( 'is-active' );
+			wrapper.removeClass( 'has-no-menu-item' );
+		},
+
+		/**
+		 * Remove a menu item.
+		 * @param  {object} el The element to be removed as a jQuery object.
+		 *
+		 * @fires document#menu-removing-item Passes the element to be removed.
+		 */
+		removeMenuItem : function(el) {
+			var children = el.childMenuItems();
+
+			$( document ).trigger( 'menu-removing-item', [ el ] );
+			el.addClass('deleting').animate({
+					opacity : 0,
+					height: 0
+				}, 350, function() {
+					var ins = $('#menu-instructions');
+					el.remove();
+					children.shiftDepthClass( -1 ).updateParentMenuItemDBId();
+					if ( 0 === $( '#menu-to-edit li' ).length ) {
+						$( '.drag-instructions' ).hide();
+						ins.removeClass( 'menu-instructions-inactive' );
+					}
+					api.refreshAdvancedAccessibility();
+				});
+		},
+
+		depthToPx : function(depth) {
+			return depth * api.options.menuItemDepthPerLevel;
+		},
+
+		pxToDepth : function(px) {
+			return Math.floor(px / api.options.menuItemDepthPerLevel);
+		}
+
+	};
+
+	$(document).ready(function(){ wpNavMenu.init(); });
+
+})(jQuery);
