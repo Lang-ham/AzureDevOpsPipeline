@@ -647,4 +647,370 @@ window.wp = window.wp || {};
 				if ( scrolled >= controls.top ) {
 					if ( ! frame.$el.hasClass('pinned') ) {
 						controls.setWidth();
-						container.css('hei
+						container.css('height', container.height() + 'px' );
+						controls.window.on('resize.wp.revisions.pinning click.wp.revisions.pinning', {controls: controls}, function(e) {
+							e.data.controls.setWidth();
+						});
+					}
+					frame.$el.addClass('pinned');
+				} else if ( frame.$el.hasClass('pinned') ) {
+					controls.window.off('.wp.revisions.pinning');
+					controls.$el.css('width', 'auto');
+					frame.$el.removeClass('pinned');
+					container.css('height', 'auto');
+					controls.top = controls.$el.offset().top;
+				} else {
+					controls.top = controls.$el.offset().top;
+				}
+			});
+		},
+
+		setWidth: function() {
+			this.$el.css('width', this.$el.parent().width() + 'px');
+		}
+	});
+
+	// The tickmarks view
+	revisions.view.Tickmarks = wp.Backbone.View.extend({
+		className: 'revisions-tickmarks',
+		direction: isRtl ? 'right' : 'left',
+
+		initialize: function() {
+			this.listenTo( this.model, 'change:revision', this.reportTickPosition );
+		},
+
+		reportTickPosition: function( model, revision ) {
+			var offset, thisOffset, parentOffset, tick, index = this.model.revisions.indexOf( revision );
+			thisOffset = this.$el.allOffsets();
+			parentOffset = this.$el.parent().allOffsets();
+			if ( index === this.model.revisions.length - 1 ) {
+				// Last one
+				offset = {
+					rightPlusWidth: thisOffset.left - parentOffset.left + 1,
+					leftPlusWidth: thisOffset.right - parentOffset.right + 1
+				};
+			} else {
+				// Normal tick
+				tick = this.$('div:nth-of-type(' + (index + 1) + ')');
+				offset = tick.allPositions();
+				_.extend( offset, {
+					left: offset.left + thisOffset.left - parentOffset.left,
+					right: offset.right + thisOffset.right - parentOffset.right
+				});
+				_.extend( offset, {
+					leftPlusWidth: offset.left + tick.outerWidth(),
+					rightPlusWidth: offset.right + tick.outerWidth()
+				});
+			}
+			this.model.set({ offset: offset });
+		},
+
+		ready: function() {
+			var tickCount, tickWidth;
+			tickCount = this.model.revisions.length - 1;
+			tickWidth = 1 / tickCount;
+			this.$el.css('width', ( this.model.revisions.length * 50 ) + 'px');
+
+			_(tickCount).times( function( index ){
+				this.$el.append( '<div style="' + this.direction + ': ' + ( 100 * tickWidth * index ) + '%"></div>' );
+			}, this );
+		}
+	});
+
+	// The metabox view
+	revisions.view.Metabox = wp.Backbone.View.extend({
+		className: 'revisions-meta',
+
+		initialize: function() {
+			// Add the 'from' view
+			this.views.add( new revisions.view.MetaFrom({
+				model: this.model,
+				className: 'diff-meta diff-meta-from'
+			}) );
+
+			// Add the 'to' view
+			this.views.add( new revisions.view.MetaTo({
+				model: this.model
+			}) );
+		}
+	});
+
+	// The revision meta view (to be extended)
+	revisions.view.Meta = wp.Backbone.View.extend({
+		template: wp.template('revisions-meta'),
+
+		events: {
+			'click .restore-revision': 'restoreRevision'
+		},
+
+		initialize: function() {
+			this.listenTo( this.model, 'update:revisions', this.render );
+		},
+
+		prepare: function() {
+			return _.extend( this.model.toJSON()[this.type] || {}, {
+				type: this.type
+			});
+		},
+
+		restoreRevision: function() {
+			document.location = this.model.get('to').attributes.restoreUrl;
+		}
+	});
+
+	// The revision meta 'from' view
+	revisions.view.MetaFrom = revisions.view.Meta.extend({
+		className: 'diff-meta diff-meta-from',
+		type: 'from'
+	});
+
+	// The revision meta 'to' view
+	revisions.view.MetaTo = revisions.view.Meta.extend({
+		className: 'diff-meta diff-meta-to',
+		type: 'to'
+	});
+
+	// The checkbox view.
+	revisions.view.Checkbox = wp.Backbone.View.extend({
+		className: 'revisions-checkbox',
+		template: wp.template('revisions-checkbox'),
+
+		events: {
+			'click .compare-two-revisions': 'compareTwoToggle'
+		},
+
+		initialize: function() {
+			this.listenTo( this.model, 'change:compareTwoMode', this.updateCompareTwoMode );
+		},
+
+		ready: function() {
+			if ( this.model.revisions.length < 3 ) {
+				$('.revision-toggle-compare-mode').hide();
+			}
+		},
+
+		updateCompareTwoMode: function() {
+			this.$('.compare-two-revisions').prop( 'checked', this.model.get('compareTwoMode') );
+		},
+
+		// Toggle the compare two mode feature when the compare two checkbox is checked.
+		compareTwoToggle: function() {
+			// Activate compare two mode?
+			this.model.set({ compareTwoMode: $('.compare-two-revisions').prop('checked') });
+		}
+	});
+
+	// The tooltip view.
+	// Encapsulates the tooltip.
+	revisions.view.Tooltip = wp.Backbone.View.extend({
+		className: 'revisions-tooltip',
+		template: wp.template('revisions-meta'),
+
+		initialize: function() {
+			this.listenTo( this.model, 'change:offset', this.render );
+			this.listenTo( this.model, 'change:hovering', this.toggleVisibility );
+			this.listenTo( this.model, 'change:scrubbing', this.toggleVisibility );
+		},
+
+		prepare: function() {
+			if ( _.isNull( this.model.get('revision') ) ) {
+				return;
+			} else {
+				return _.extend( { type: 'tooltip' }, {
+					attributes: this.model.get('revision').toJSON()
+				});
+			}
+		},
+
+		render: function() {
+			var otherDirection,
+				direction,
+				directionVal,
+				flipped,
+				css      = {},
+				position = this.model.revisions.indexOf( this.model.get('revision') ) + 1;
+
+			flipped = ( position / this.model.revisions.length ) > 0.5;
+			if ( isRtl ) {
+				direction = flipped ? 'left' : 'right';
+				directionVal = flipped ? 'leftPlusWidth' : direction;
+			} else {
+				direction = flipped ? 'right' : 'left';
+				directionVal = flipped ? 'rightPlusWidth' : direction;
+			}
+			otherDirection = 'right' === direction ? 'left': 'right';
+			wp.Backbone.View.prototype.render.apply( this, arguments );
+			css[direction] = this.model.get('offset')[directionVal] + 'px';
+			css[otherDirection] = '';
+			this.$el.toggleClass( 'flipped', flipped ).css( css );
+		},
+
+		visible: function() {
+			return this.model.get( 'scrubbing' ) || this.model.get( 'hovering' );
+		},
+
+		toggleVisibility: function() {
+			if ( this.visible() ) {
+				this.$el.stop().show().fadeTo( 100 - this.el.style.opacity * 100, 1 );
+			} else {
+				this.$el.stop().fadeTo( this.el.style.opacity * 300, 0, function(){ $(this).hide(); } );
+			}
+			return;
+		}
+	});
+
+	// The buttons view.
+	// Encapsulates all of the configuration for the previous/next buttons.
+	revisions.view.Buttons = wp.Backbone.View.extend({
+		className: 'revisions-buttons',
+		template: wp.template('revisions-buttons'),
+
+		events: {
+			'click .revisions-next .button': 'nextRevision',
+			'click .revisions-previous .button': 'previousRevision'
+		},
+
+		initialize: function() {
+			this.listenTo( this.model, 'update:revisions', this.disabledButtonCheck );
+		},
+
+		ready: function() {
+			this.disabledButtonCheck();
+		},
+
+		// Go to a specific model index
+		gotoModel: function( toIndex ) {
+			var attributes = {
+				to: this.model.revisions.at( toIndex )
+			};
+			// If we're at the first revision, unset 'from'.
+			if ( toIndex ) {
+				attributes.from = this.model.revisions.at( toIndex - 1 );
+			} else {
+				this.model.unset('from', { silent: true });
+			}
+
+			this.model.set( attributes );
+		},
+
+		// Go to the 'next' revision
+		nextRevision: function() {
+			var toIndex = this.model.revisions.indexOf( this.model.get('to') ) + 1;
+			this.gotoModel( toIndex );
+		},
+
+		// Go to the 'previous' revision
+		previousRevision: function() {
+			var toIndex = this.model.revisions.indexOf( this.model.get('to') ) - 1;
+			this.gotoModel( toIndex );
+		},
+
+		// Check to see if the Previous or Next buttons need to be disabled or enabled.
+		disabledButtonCheck: function() {
+			var maxVal   = this.model.revisions.length - 1,
+				minVal   = 0,
+				next     = $('.revisions-next .button'),
+				previous = $('.revisions-previous .button'),
+				val      = this.model.revisions.indexOf( this.model.get('to') );
+
+			// Disable "Next" button if you're on the last node.
+			next.prop( 'disabled', ( maxVal === val ) );
+
+			// Disable "Previous" button if you're on the first node.
+			previous.prop( 'disabled', ( minVal === val ) );
+		}
+	});
+
+
+	// The slider view.
+	revisions.view.Slider = wp.Backbone.View.extend({
+		className: 'wp-slider',
+		direction: isRtl ? 'right' : 'left',
+
+		events: {
+			'mousemove' : 'mouseMove'
+		},
+
+		initialize: function() {
+			_.bindAll( this, 'start', 'slide', 'stop', 'mouseMove', 'mouseEnter', 'mouseLeave' );
+			this.listenTo( this.model, 'update:slider', this.applySliderSettings );
+		},
+
+		ready: function() {
+			this.$el.css('width', ( this.model.revisions.length * 50 ) + 'px');
+			this.$el.slider( _.extend( this.model.toJSON(), {
+				start: this.start,
+				slide: this.slide,
+				stop:  this.stop
+			}) );
+
+			this.$el.hoverIntent({
+				over: this.mouseEnter,
+				out: this.mouseLeave,
+				timeout: 800
+			});
+
+			this.applySliderSettings();
+		},
+
+		mouseMove: function( e ) {
+			var zoneCount         = this.model.revisions.length - 1, // One fewer zone than models
+				sliderFrom        = this.$el.allOffsets()[this.direction], // "From" edge of slider
+				sliderWidth       = this.$el.width(), // Width of slider
+				tickWidth         = sliderWidth / zoneCount, // Calculated width of zone
+				actualX           = ( isRtl ? $(window).width() - e.pageX : e.pageX ) - sliderFrom, // Flipped for RTL - sliderFrom;
+				currentModelIndex = Math.floor( ( actualX  + ( tickWidth / 2 )  ) / tickWidth ); // Calculate the model index
+
+			// Ensure sane value for currentModelIndex.
+			if ( currentModelIndex < 0 ) {
+				currentModelIndex = 0;
+			} else if ( currentModelIndex >= this.model.revisions.length ) {
+				currentModelIndex = this.model.revisions.length - 1;
+			}
+
+			// Update the tooltip mode
+			this.model.set({ hoveredRevision: this.model.revisions.at( currentModelIndex ) });
+		},
+
+		mouseLeave: function() {
+			this.model.set({ hovering: false });
+		},
+
+		mouseEnter: function() {
+			this.model.set({ hovering: true });
+		},
+
+		applySliderSettings: function() {
+			this.$el.slider( _.pick( this.model.toJSON(), 'value', 'values', 'range' ) );
+			var handles = this.$('a.ui-slider-handle');
+
+			if ( this.model.get('compareTwoMode') ) {
+				// in RTL mode the 'left handle' is the second in the slider, 'right' is first
+				handles.first()
+					.toggleClass( 'to-handle', !! isRtl )
+					.toggleClass( 'from-handle', ! isRtl );
+				handles.last()
+					.toggleClass( 'from-handle', !! isRtl )
+					.toggleClass( 'to-handle', ! isRtl );
+			} else {
+				handles.removeClass('from-handle to-handle');
+			}
+		},
+
+		start: function( event, ui ) {
+			this.model.set({ scrubbing: true });
+
+			// Track the mouse position to enable smooth dragging,
+			// overrides default jQuery UI step behavior.
+			$( window ).on( 'mousemove.wp.revisions', { view: this }, function( e ) {
+				var handles,
+					view              = e.data.view,
+					leftDragBoundary  = view.$el.offset().left,
+					sliderOffset      = leftDragBoundary,
+					sliderRightEdge   = leftDragBoundary + view.$el.width(),
+					rightDragBoundary = sliderRightEdge,
+					leftDragReset     = '0',
+					rightDragReset    = '100%',
+					handle            = $( ui.handle );
+
+				// In two handle m
