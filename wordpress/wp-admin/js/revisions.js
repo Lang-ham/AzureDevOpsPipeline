@@ -1013,4 +1013,157 @@ window.wp = window.wp || {};
 					rightDragReset    = '100%',
 					handle            = $( ui.handle );
 
-				// In two handle m
+				// In two handle mode, ensure handles can't be dragged past each other.
+				// Adjust left/right boundaries and reset points.
+				if ( view.model.get('compareTwoMode') ) {
+					handles = handle.parent().find('.ui-slider-handle');
+					if ( handle.is( handles.first() ) ) { // We're the left handle
+						rightDragBoundary = handles.last().offset().left;
+						rightDragReset    = rightDragBoundary - sliderOffset;
+					} else { // We're the right handle
+						leftDragBoundary = handles.first().offset().left + handles.first().width();
+						leftDragReset    = leftDragBoundary - sliderOffset;
+					}
+				}
+
+				// Follow mouse movements, as long as handle remains inside slider.
+				if ( e.pageX < leftDragBoundary ) {
+					handle.css( 'left', leftDragReset ); // Mouse to left of slider.
+				} else if ( e.pageX > rightDragBoundary ) {
+					handle.css( 'left', rightDragReset ); // Mouse to right of slider.
+				} else {
+					handle.css( 'left', e.pageX - sliderOffset ); // Mouse in slider.
+				}
+			} );
+		},
+
+		getPosition: function( position ) {
+			return isRtl ? this.model.revisions.length - position - 1: position;
+		},
+
+		// Responds to slide events
+		slide: function( event, ui ) {
+			var attributes, movedRevision;
+			// Compare two revisions mode
+			if ( this.model.get('compareTwoMode') ) {
+				// Prevent sliders from occupying same spot
+				if ( ui.values[1] === ui.values[0] ) {
+					return false;
+				}
+				if ( isRtl ) {
+					ui.values.reverse();
+				}
+				attributes = {
+					from: this.model.revisions.at( this.getPosition( ui.values[0] ) ),
+					to: this.model.revisions.at( this.getPosition( ui.values[1] ) )
+				};
+			} else {
+				attributes = {
+					to: this.model.revisions.at( this.getPosition( ui.value ) )
+				};
+				// If we're at the first revision, unset 'from'.
+				if ( this.getPosition( ui.value ) > 0 ) {
+					attributes.from = this.model.revisions.at( this.getPosition( ui.value ) - 1 );
+				} else {
+					attributes.from = undefined;
+				}
+			}
+			movedRevision = this.model.revisions.at( this.getPosition( ui.value ) );
+
+			// If we are scrubbing, a scrub to a revision is considered a hover
+			if ( this.model.get('scrubbing') ) {
+				attributes.hoveredRevision = movedRevision;
+			}
+
+			this.model.set( attributes );
+		},
+
+		stop: function() {
+			$( window ).off('mousemove.wp.revisions');
+			this.model.updateSliderSettings(); // To snap us back to a tick mark
+			this.model.set({ scrubbing: false });
+		}
+	});
+
+	// The diff view.
+	// This is the view for the current active diff.
+	revisions.view.Diff = wp.Backbone.View.extend({
+		className: 'revisions-diff',
+		template:  wp.template('revisions-diff'),
+
+		// Generate the options to be passed to the template.
+		prepare: function() {
+			return _.extend({ fields: this.model.fields.toJSON() }, this.options );
+		}
+	});
+
+	// The revisions router.
+	// Maintains the URL routes so browser URL matches state.
+	revisions.Router = Backbone.Router.extend({
+		initialize: function( options ) {
+			this.model = options.model;
+
+			// Maintain state and history when navigating
+			this.listenTo( this.model, 'update:diff', _.debounce( this.updateUrl, 250 ) );
+			this.listenTo( this.model, 'change:compareTwoMode', this.updateUrl );
+		},
+
+		baseUrl: function( url ) {
+			return this.model.get('baseUrl') + url;
+		},
+
+		updateUrl: function() {
+			var from = this.model.has('from') ? this.model.get('from').id : 0,
+				to   = this.model.get('to').id;
+			if ( this.model.get('compareTwoMode' ) ) {
+				this.navigate( this.baseUrl( '?from=' + from + '&to=' + to ), { replace: true } );
+			} else {
+				this.navigate( this.baseUrl( '?revision=' + to ), { replace: true } );
+			}
+		},
+
+		handleRoute: function( a, b ) {
+			var compareTwo = _.isUndefined( b );
+
+			if ( ! compareTwo ) {
+				b = this.model.revisions.get( a );
+				a = this.model.revisions.prev( b );
+				b = b ? b.id : 0;
+				a = a ? a.id : 0;
+			}
+		}
+	});
+
+	/**
+	 * Initialize the revisions UI for revision.php.
+	 */
+	revisions.init = function() {
+		var state;
+
+		// Bail if the current page is not revision.php.
+		if ( ! window.adminpage || 'revision-php' !== window.adminpage ) {
+			return;
+		}
+
+		state = new revisions.model.FrameState({
+			initialDiffState: {
+				// wp_localize_script doesn't stringifies ints, so cast them.
+				to: parseInt( revisions.settings.to, 10 ),
+				from: parseInt( revisions.settings.from, 10 ),
+				// wp_localize_script does not allow for top-level booleans so do a comparator here.
+				compareTwoMode: ( revisions.settings.compareTwoMode === '1' )
+			},
+			diffData: revisions.settings.diffData,
+			baseUrl: revisions.settings.baseUrl,
+			postId: parseInt( revisions.settings.postId, 10 )
+		}, {
+			revisions: new revisions.model.Revisions( revisions.settings.revisionData )
+		});
+
+		revisions.view.frame = new revisions.view.Frame({
+			model: state
+		}).render();
+	};
+
+	$( revisions.init );
+}(jQuery));
