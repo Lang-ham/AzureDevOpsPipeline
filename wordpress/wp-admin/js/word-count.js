@@ -89,4 +89,132 @@
 				/*
 				 * The following range consists of:
 				 * General Punctuation
-	
+				 * Superscripts and Subscripts
+				 * Currency Symbols
+				 * Combining Diacritical Marks for Symbols
+				 * Letterlike Symbols
+				 * Number Forms
+				 * Arrows
+				 * Mathematical Operators
+				 * Miscellaneous Technical
+				 * Control Pictures
+				 * Optical Character Recognition
+				 * Enclosed Alphanumerics
+				 * Box Drawing
+				 * Block Elements
+				 * Geometric Shapes
+				 * Miscellaneous Symbols
+				 * Dingbats
+				 * Miscellaneous Mathematical Symbols-A
+				 * Supplemental Arrows-A
+				 * Braille Patterns
+				 * Supplemental Arrows-B
+				 * Miscellaneous Mathematical Symbols-B
+				 * Supplemental Mathematical Operators
+				 * Miscellaneous Symbols and Arrows
+				 */
+				'\u2000-\u2BFF',
+
+				// Supplemental Punctuation
+				'\u2E00-\u2E7F',
+			']'
+		].join( '' ), 'g' ),
+
+		// Remove UTF-16 surrogate points, see https://en.wikipedia.org/wiki/UTF-16#U.2BD800_to_U.2BDFFF
+		astralRegExp: /[\uD800-\uDBFF][\uDC00-\uDFFF]/g,
+		wordsRegExp: /\S\s+/g,
+		characters_excluding_spacesRegExp: /\S/g,
+
+		/*
+		 * Match anything that is not a formatting character, excluding:
+		 * \f = form feed
+		 * \n = new line
+		 * \r = carriage return
+		 * \t = tab
+		 * \v = vertical tab
+		 * \u00AD = soft hyphen
+		 * \u2028 = line separator
+		 * \u2029 = paragraph separator
+		 */
+		characters_including_spacesRegExp: /[^\f\n\r\t\v\u00AD\u2028\u2029]/g,
+		l10n: window.wordCountL10n || {}
+	};
+
+	/**
+	 * Counts the number of words (or other specified type) in the specified text.
+	 *
+	 * @summary  Count the number of elements in a text.
+	 *
+	 * @since    2.6.0
+	 * @memberof wp.utils.wordcounter
+	 *
+	 * @param {String}  text Text to count elements in.
+	 * @param {String}  type Optional. Specify type to use.
+	 *
+	 * @return {Number} The number of items counted.
+	 */
+	WordCounter.prototype.count = function( text, type ) {
+		var count = 0;
+
+		// Use default type if none was provided.
+		type = type || this.settings.l10n.type;
+
+		// Sanitize type to one of three possibilities: 'words', 'characters_excluding_spaces' or 'characters_including_spaces'.
+		if ( type !== 'characters_excluding_spaces' && type !== 'characters_including_spaces' ) {
+			type = 'words';
+		}
+
+		// If we have any text at all.
+		if ( text ) {
+			text = text + '\n';
+
+			// Replace all HTML with a new-line.
+			text = text.replace( this.settings.HTMLRegExp, '\n' );
+
+			// Remove all HTML comments.
+			text = text.replace( this.settings.HTMLcommentRegExp, '' );
+
+			// If a shortcode regular expression has been provided use it to remove shortcodes.
+			if ( this.settings.shortcodesRegExp ) {
+				text = text.replace( this.settings.shortcodesRegExp, '\n' );
+			}
+
+			// Normalize non-breaking space to a normal space.
+			text = text.replace( this.settings.spaceRegExp, ' ' );
+
+			if ( type === 'words' ) {
+
+				// Remove HTML Entities.
+				text = text.replace( this.settings.HTMLEntityRegExp, '' );
+
+				// Convert connectors to spaces to count attached text as words.
+				text = text.replace( this.settings.connectorRegExp, ' ' );
+
+				// Remove unwanted characters.
+				text = text.replace( this.settings.removeRegExp, '' );
+			} else {
+
+				// Convert HTML Entities to "a".
+				text = text.replace( this.settings.HTMLEntityRegExp, 'a' );
+
+				// Remove surrogate points.
+				text = text.replace( this.settings.astralRegExp, 'a' );
+			}
+
+			// Match with the selected type regular expression to count the items.
+			text = text.match( this.settings[ type + 'RegExp' ] );
+
+			// If we have any matches, set the count to the number of items found.
+			if ( text ) {
+				count = text.length;
+			}
+		}
+
+		return count;
+	};
+
+	// Add the WordCounter to the WP Utils.
+	window.wp = window.wp || {};
+	window.wp.utils = window.wp.utils || {};
+	window.wp.utils.WordCounter = WordCounter;
+} )();
