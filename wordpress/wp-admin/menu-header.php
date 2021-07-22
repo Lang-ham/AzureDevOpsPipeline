@@ -225,4 +225,51 @@ function _wp_menu_output( $menu, $submenu, $submenu_as_parent = true ) {
 
 				$title = wptexturize($sub_item[0]);
 
-				if ( ! empty( $menu_hook ) || ( ( 'index.php' != $sub_item[2] ) && file_exists( WP_PLUGIN_DIR . "/$sub_file" ) && ! file
+				if ( ! empty( $menu_hook ) || ( ( 'index.php' != $sub_item[2] ) && file_exists( WP_PLUGIN_DIR . "/$sub_file" ) && ! file_exists( ABSPATH . "/wp-admin/$sub_file" ) ) ) {
+					// If admin.php is the current page or if the parent exists as a file in the plugins or admin dir
+					if ( ( ! $admin_is_parent && file_exists( WP_PLUGIN_DIR . "/$menu_file" ) && ! is_dir( WP_PLUGIN_DIR . "/{$item[2]}" ) ) || file_exists( $menu_file ) )
+						$sub_item_url = add_query_arg( array( 'page' => $sub_item[2] ), $item[2] );
+					else
+						$sub_item_url = add_query_arg( array( 'page' => $sub_item[2] ), 'admin.php' );
+
+					$sub_item_url = esc_url( $sub_item_url );
+					echo "<li$class><a href='$sub_item_url'$class$aria_attributes>$title</a></li>";
+				} else {
+					echo "<li$class><a href='{$sub_item[2]}'$class$aria_attributes>$title</a></li>";
+				}
+			}
+			echo "</ul>";
+		}
+		echo "</li>";
+	}
+
+	echo '<li id="collapse-menu" class="hide-if-no-js">' .
+		'<button type="button" id="collapse-button" aria-label="' . esc_attr__( 'Collapse Main menu' ) . '" aria-expanded="true">' .
+		'<span class="collapse-button-icon" aria-hidden="true"></span>' .
+		'<span class="collapse-button-label">' . __( 'Collapse menu' ) . '</span>' .
+		'</button></li>';
+}
+
+?>
+
+<div id="adminmenumain" role="navigation" aria-label="<?php esc_attr_e( 'Main menu' ); ?>">
+<a href="#wpbody-content" class="screen-reader-shortcut"><?php _e( 'Skip to main content' ); ?></a>
+<a href="#wp-toolbar" class="screen-reader-shortcut"><?php _e( 'Skip to toolbar' ); ?></a>
+<div id="adminmenuback"></div>
+<div id="adminmenuwrap">
+<ul id="adminmenu">
+
+<?php
+
+_wp_menu_output( $menu, $submenu );
+/**
+ * Fires after the admin menu has been output.
+ *
+ * @since 2.5.0
+ */
+do_action( 'adminmenu' );
+
+?>
+</ul>
+</div>
+</div>
