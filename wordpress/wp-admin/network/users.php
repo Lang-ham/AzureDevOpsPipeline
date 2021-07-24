@@ -188,4 +188,57 @@ get_current_screen()->set_screen_reader_content( array(
 
 require_once( ABSPATH . 'wp-admin/admin-header.php' );
 
-if ( iss
+if ( isset( $_REQUEST['updated'] ) && $_REQUEST['updated'] == 'true' && ! empty( $_REQUEST['action'] ) ) {
+	?>
+	<div id="message" class="updated notice is-dismissible"><p>
+		<?php
+		switch ( $_REQUEST['action'] ) {
+			case 'delete':
+				_e( 'User deleted.' );
+			break;
+			case 'all_spam':
+				_e( 'Users marked as spam.' );
+			break;
+			case 'all_notspam':
+				_e( 'Users removed from spam.' );
+			break;
+			case 'all_delete':
+				_e( 'Users deleted.' );
+			break;
+			case 'add':
+				_e( 'User added.' );
+			break;
+		}
+		?>
+	</p></div>
+	<?php
+}
+	?>
+<div class="wrap">
+	<h1 class="wp-heading-inline"><?php esc_html_e( 'Users' ); ?></h1>
+
+	<?php
+	if ( current_user_can( 'create_users') ) : ?>
+		<a href="<?php echo network_admin_url('user-new.php'); ?>" class="page-title-action"><?php echo esc_html_x( 'Add New', 'user' ); ?></a><?php
+	endif;
+
+	if ( strlen( $usersearch ) ) {
+		/* translators: %s: search keywords */
+		printf( '<span class="subtitle">' . __( 'Search results for &#8220;%s&#8221;' ) . '</span>', esc_html( $usersearch ) );
+	}
+	?>
+
+	<hr class="wp-header-end">
+
+	<?php $wp_list_table->views(); ?>
+
+	<form method="get" class="search-form">
+		<?php $wp_list_table->search_box( __( 'Search Users' ), 'all-user' ); ?>
+	</form>
+
+	<form id="form-user-list" action="users.php?action=allusers" method="post">
+		<?php $wp_list_table->display(); ?>
+	</form>
+</div>
+
+<?php require_once( ABSPATH . 'wp-admin/admin-footer.php' ); ?>
