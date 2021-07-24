@@ -253,4 +253,120 @@ $structures = array(
 
 				if ( ! empty( $available_tags ) ) :
 					?>
-			
+					<p><?php _e( 'Available tags:' ); ?></p>
+					<ul role="list">
+						<?php
+						foreach ( $available_tags as $tag => $explanation ) {
+							?>
+							<li>
+								<button type="button"
+								        class="button button-secondary"
+								        aria-label="<?php echo esc_attr( sprintf( $explanation, $tag ) ); ?>"
+								        data-added="<?php echo esc_attr( sprintf( $structure_tag_added, $tag ) ); ?>"
+								        data-used="<?php echo esc_attr( sprintf( $structure_tag_already_used, $tag ) ); ?>">
+									<?php echo '%' . $tag . '%'; ?>
+								</button>
+							</li>
+							<?php
+						}
+						?>
+					</ul>
+				<?php endif; ?>
+			</div>
+		</td>
+	</tr>
+</table>
+
+<h2 class="title"><?php _e('Optional'); ?></h2>
+<p><?php
+/* translators: %s: placeholder that must come at the start of the URL */
+printf( __( 'If you like, you may enter custom structures for your category and tag URLs here. For example, using <code>topics</code> as your category base would make your category links like <code>%s/topics/uncategorized/</code>. If you leave these blank the defaults will be used.' ), get_option( 'home' ) . $blog_prefix . $prefix ); ?></p>
+
+<table class="form-table">
+	<tr>
+		<th><label for="category_base"><?php /* translators: prefix for category permalinks */ _e('Category base'); ?></label></th>
+		<td><?php echo $blog_prefix; ?> <input name="category_base" id="category_base" type="text" value="<?php echo esc_attr( $category_base ); ?>" class="regular-text code" /></td>
+	</tr>
+	<tr>
+		<th><label for="tag_base"><?php _e('Tag base'); ?></label></th>
+		<td><?php echo $blog_prefix; ?> <input name="tag_base" id="tag_base" type="text" value="<?php echo esc_attr($tag_base); ?>" class="regular-text code" /></td>
+	</tr>
+	<?php do_settings_fields('permalink', 'optional'); ?>
+</table>
+
+<?php do_settings_sections('permalink'); ?>
+
+<?php submit_button(); ?>
+  </form>
+<?php if ( !is_multisite() ) { ?>
+<?php if ( $iis7_permalinks ) :
+	if ( isset($_POST['submit']) && $permalink_structure && ! $using_index_permalinks && ! $writable ) :
+		if ( file_exists($home_path . 'web.config') ) : ?>
+<p><?php
+	printf(
+		/* translators: 1: web.config, 2: Codex URL, 3: CTRL + a, 4: element code */
+		__( 'If your %1$s file was <a href="%2$s">writable</a>, we could do this automatically, but it isn&#8217;t so this is the url rewrite rule you should have in your %1$s file. Click in the field and press %3$s to select all. Then insert this rule inside of the %4$s element in %1$s file.' ),
+		'<code>web.config</code>',
+		__( 'https://codex.wordpress.org/Changing_File_Permissions' ),
+		'<kbd>CTRL + a</kbd>',
+		'<code>/&lt;configuration&gt;/&lt;system.webServer&gt;/&lt;rewrite&gt;/&lt;rules&gt;</code>'
+	);
+?></p>
+<form action="options-permalink.php" method="post">
+<?php wp_nonce_field('update-permalink') ?>
+	<p><textarea rows="9" class="large-text readonly" name="rules" id="rules" readonly="readonly"><?php echo esc_textarea( $wp_rewrite->iis7_url_rewrite_rules() ); ?></textarea></p>
+</form>
+<p><?php
+	printf(
+		/* translators: %s: web.config */
+		__( 'If you temporarily make your %s file writable for us to generate rewrite rules automatically, do not forget to revert the permissions after rule has been saved.' ),
+		'<code>web.config</code>'
+	);
+?></p>
+		<?php else : ?>
+<p><?php
+	printf(
+		/* translators: 1: Codex URL, 2: web.config, 3: CTRL + a */
+		__( 'If the root directory of your site was <a href="%1$s">writable</a>, we could do this automatically, but it isn&#8217;t so this is the url rewrite rule you should have in your %2$s file. Create a new file, called %2$s in the root directory of your site. Click in the field and press %3$s to select all. Then insert this code into the %2$s file.' ),
+		__( 'https://codex.wordpress.org/Changing_File_Permissions' ),
+		'<code>web.config</code>',
+		'<kbd>CTRL + a</kbd>'
+	);
+?></p>
+<form action="options-permalink.php" method="post">
+<?php wp_nonce_field('update-permalink') ?>
+	<p><textarea rows="18" class="large-text readonly" name="rules" id="rules" readonly="readonly"><?php echo esc_textarea( $wp_rewrite->iis7_url_rewrite_rules(true) ); ?></textarea></p>
+</form>
+<p><?php
+	printf(
+		/* translators: %s: web.config */
+		__( 'If you temporarily make your site&#8217;s root directory writable for us to generate the %s file automatically, do not forget to revert the permissions after the file has been created.' ),
+		'<code>web.config</code>'
+	);
+?></p>
+		<?php endif; ?>
+	<?php endif; ?>
+<?php elseif ( $is_nginx ) : ?>
+	<p><?php _e( '<a href="https://codex.wordpress.org/Nginx">Documentation on Nginx configuration</a>.' ); ?></p>
+<?php else:
+	if ( $permalink_structure && ! $using_index_permalinks && ! $writable && $update_required ) : ?>
+<p><?php
+	printf(
+		/* translators: 1: .htaccess, 2: Codex URL, 3: CTRL + a */
+		__( 'If your %1$s file was <a href="%2$s">writable</a>, we could do this automatically, but it isn&#8217;t so these are the mod_rewrite rules you should have in your %1$s file. Click in the field and press %3$s to select all.' ),
+		'<code>.htaccess</code>',
+		__( 'https://codex.wordpress.org/Changing_File_Permissions' ),
+		'<kbd>CTRL + a</kbd>'
+	);
+?></p>
+<form action="options-permalink.php" method="post">
+<?php wp_nonce_field('update-permalink') ?>
+	<p><textarea rows="6" class="large-text readonly" name="rules" id="rules" readonly="readonly"><?php echo esc_textarea( $wp_rewrite->mod_rewrite_rules() ); ?></textarea></p>
+</form>
+	<?php endif; ?>
+<?php endif; ?>
+<?php } // multisite ?>
+
+</div>
+
+<?php require( ABSPATH . 'wp-admin/admin-footer.php' ); ?>
