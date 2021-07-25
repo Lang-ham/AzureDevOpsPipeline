@@ -88,3 +88,64 @@ else :
 <?php endif; ?>
 </fieldset></td>
 </tr>
+<?php endif; ?>
+<tr>
+<th scope="row"><label for="posts_per_page"><?php _e( 'Blog pages show at most' ); ?></label></th>
+<td>
+<input name="posts_per_page" type="number" step="1" min="1" id="posts_per_page" value="<?php form_option( 'posts_per_page' ); ?>" class="small-text" /> <?php _e( 'posts' ); ?>
+</td>
+</tr>
+<tr>
+<th scope="row"><label for="posts_per_rss"><?php _e( 'Syndication feeds show the most recent' ); ?></label></th>
+<td><input name="posts_per_rss" type="number" step="1" min="1" id="posts_per_rss" value="<?php form_option( 'posts_per_rss' ); ?>" class="small-text" /> <?php _e( 'items' ); ?></td>
+</tr>
+<tr>
+<th scope="row"><?php _e( 'For each article in a feed, show' ); ?> </th>
+<td><fieldset><legend class="screen-reader-text"><span><?php _e( 'For each article in a feed, show' ); ?> </span></legend>
+<p><label><input name="rss_use_excerpt" type="radio" value="0" <?php checked( 0, get_option( 'rss_use_excerpt' ) ); ?>	/> <?php _e( 'Full text' ); ?></label><br />
+<label><input name="rss_use_excerpt" type="radio" value="1" <?php checked( 1, get_option( 'rss_use_excerpt' ) ); ?> /> <?php _e( 'Summary' ); ?></label></p>
+</fieldset></td>
+</tr>
+
+<tr class="option-site-visibility">
+<th scope="row"><?php has_action( 'blog_privacy_selector' ) ? _e( 'Site Visibility' ) : _e( 'Search Engine Visibility' ); ?> </th>
+<td><fieldset><legend class="screen-reader-text"><span><?php has_action( 'blog_privacy_selector' ) ? _e( 'Site Visibility' ) : _e( 'Search Engine Visibility' ); ?> </span></legend>
+<?php if ( has_action( 'blog_privacy_selector' ) ) : ?>
+	<input id="blog-public" type="radio" name="blog_public" value="1" <?php checked('1', get_option('blog_public')); ?> />
+	<label for="blog-public"><?php _e( 'Allow search engines to index this site' );?></label><br/>
+	<input id="blog-norobots" type="radio" name="blog_public" value="0" <?php checked('0', get_option('blog_public')); ?> />
+	<label for="blog-norobots"><?php _e( 'Discourage search engines from indexing this site' ); ?></label>
+	<p class="description"><?php _e( 'Note: Neither of these options blocks access to your site &mdash; it is up to search engines to honor your request.' ); ?></p>
+	<?php
+	/**
+	 * Enable the legacy 'Site Visibility' privacy options.
+	 *
+	 * By default the privacy options form displays a single checkbox to 'discourage' search
+	 * engines from indexing the site. Hooking to this action serves a dual purpose:
+	 * 1. Disable the single checkbox in favor of a multiple-choice list of radio buttons.
+	 * 2. Open the door to adding additional radio button choices to the list.
+	 *
+	 * Hooking to this action also converts the 'Search Engine Visibility' heading to the more
+	 * open-ended 'Site Visibility' heading.
+	 *
+	 * @since 2.1.0
+	 */
+	do_action( 'blog_privacy_selector' );
+	?>
+<?php else : ?>
+	<label for="blog_public"><input name="blog_public" type="checkbox" id="blog_public" value="0" <?php checked( '0', get_option( 'blog_public' ) ); ?> />
+	<?php _e( 'Discourage search engines from indexing this site' ); ?></label>
+	<p class="description"><?php _e( 'It is up to search engines to honor this request.' ); ?></p>
+<?php endif; ?>
+</fieldset></td>
+</tr>
+
+<?php do_settings_fields( 'reading', 'default' ); ?>
+</table>
+
+<?php do_settings_sections( 'reading' ); ?>
+
+<?php submit_button(); ?>
+</form>
+</div>
+<?php include( ABSPATH . 'wp-admin/admin-footer.php' ); ?>
