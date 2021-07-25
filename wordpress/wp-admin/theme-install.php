@@ -139,4 +139,222 @@ include(ABSPATH . 'wp-admin/admin-header.php');
 	 * @param array $tabs The tabs shown on the Add Themes screen. Default is 'upload'.
 	 */
 	$tabs = apply_filters( 'install_themes_tabs', array( 'upload' => __( 'Upload Theme' ) ) );
-	if ( ! empty( $tabs[
+	if ( ! empty( $tabs['upload'] ) && current_user_can( 'upload_themes' ) ) {
+		echo ' <button type="button" class="upload-view-toggle page-title-action hide-if-no-js" aria-expanded="false">' . __( 'Upload Theme' ) . '</button>';
+	}
+	?>
+
+	<hr class="wp-header-end">
+
+	<div class="error hide-if-js">
+		<p><?php _e( 'The Theme Installer screen requires JavaScript.' ); ?></p>
+	</div>
+
+	<div class="upload-theme">
+	<?php install_themes_upload(); ?>
+	</div>
+
+	<h2 class="screen-reader-text hide-if-no-js"><?php _e( 'Filter themes list' ); ?></h2>
+
+	<div class="wp-filter hide-if-no-js">
+		<div class="filter-count">
+			<span class="count theme-count"></span>
+		</div>
+
+		<ul class="filter-links">
+			<li><a href="#" data-sort="featured"><?php _ex( 'Featured', 'themes' ); ?></a></li>
+			<li><a href="#" data-sort="popular"><?php _ex( 'Popular', 'themes' ); ?></a></li>
+			<li><a href="#" data-sort="new"><?php _ex( 'Latest', 'themes' ); ?></a></li>
+			<li><a href="#" data-sort="favorites"><?php _ex( 'Favorites', 'themes' ); ?></a></li>
+		</ul>
+
+		<button type="button" class="button drawer-toggle" aria-expanded="false"><?php _e( 'Feature Filter' ); ?></button>
+
+		<form class="search-form"></form>
+
+		<div class="favorites-form">
+			<?php
+			$action = 'save_wporg_username_' . get_current_user_id();
+			if ( isset( $_GET['_wpnonce'] ) && wp_verify_nonce( wp_unslash( $_GET['_wpnonce'] ), $action ) ) {
+				$user = isset( $_GET['user'] ) ? wp_unslash( $_GET['user'] ) : get_user_option( 'wporg_favorites' );
+				update_user_meta( get_current_user_id(), 'wporg_favorites', $user );
+			} else {
+				$user = get_user_option( 'wporg_favorites' );
+			}
+			?>
+			<p class="install-help"><?php _e( 'If you have marked themes as favorites on WordPress.org, you can browse them here.' ); ?></p>
+
+			<p>
+				<label for="wporg-username-input"><?php _e( 'Your WordPress.org username:' ); ?></label>
+				<input type="hidden" id="wporg-username-nonce" name="_wpnonce" value="<?php echo esc_attr( wp_create_nonce( $action ) ); ?>" />
+				<input type="search" id="wporg-username-input" value="<?php echo esc_attr( $user ); ?>" />
+				<input type="button" class="button favorites-form-submit" value="<?php esc_attr_e( 'Get Favorites' ); ?>" />
+			</p>
+		</div>
+
+		<div class="filter-drawer">
+			<div class="buttons">
+				<button type="button" class="apply-filters button"><?php _e( 'Apply Filters' ); ?><span></span></button>
+				<button type="button" class="clear-filters button" aria-label="<?php esc_attr_e( 'Clear current filters' ); ?>"><?php _e( 'Clear' ); ?></button>
+			</div>
+		<?php
+		$feature_list = get_theme_feature_list( false ); // Use the core list, rather than the .org API, due to inconsistencies and to ensure tags are translated.
+		foreach ( $feature_list as $feature_name => $features ) {
+			echo '<fieldset class="filter-group">';
+			$feature_name = esc_html( $feature_name );
+			echo '<legend>' . $feature_name . '</legend>';
+			echo '<div class="filter-group-feature">';
+			foreach ( $features as $feature => $feature_name ) {
+				$feature = esc_attr( $feature );
+				echo '<input type="checkbox" id="filter-id-' . $feature . '" value="' . $feature . '" /> ';
+				echo '<label for="filter-id-' . $feature . '">' . $feature_name . '</label>';
+			}
+			echo '</div>';
+			echo '</fieldset>';
+		}
+		?>
+			<div class="buttons">
+				<button type="button" class="apply-filters button"><?php _e( 'Apply Filters' ); ?><span></span></button>
+				<button type="button" class="clear-filters button" aria-label="<?php esc_attr_e( 'Clear current filters' ); ?>"><?php _e( 'Clear' ); ?></button>
+			</div>
+			<div class="filtered-by">
+				<span><?php _e( 'Filtering by:' ); ?></span>
+				<div class="tags"></div>
+				<button type="button" class="button-link edit-filters"><?php _e( 'Edit Filters' ); ?></button>
+			</div>
+		</div>
+	</div>
+	<h2 class="screen-reader-text hide-if-no-js"><?php _e( 'Themes list' ); ?></h2>
+	<div class="theme-browser content-filterable"></div>
+	<div class="theme-install-overlay wp-full-overlay expanded"></div>
+
+	<p class="no-themes"><?php _e( 'No themes found. Try a different search.' ); ?></p>
+	<span class="spinner"></span>
+
+<?php
+if ( $tab ) {
+	/**
+	 * Fires at the top of each of the tabs on the Install Themes page.
+	 *
+	 * The dynamic portion of the hook name, `$tab`, refers to the current
+	 * theme installation tab. Possible values are 'dashboard', 'search', 'upload',
+	 * 'featured', 'new', or 'updated'.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param int $paged Number of the current page of results being viewed.
+	 */
+	do_action( "install_themes_{$tab}", $paged );
+}
+?>
+</div>
+
+<script id="tmpl-theme" type="text/template">
+	<# if ( data.screenshot_url ) { #>
+		<div class="theme-screenshot">
+			<img src="{{ data.screenshot_url }}" alt="" />
+		</div>
+	<# } else { #>
+		<div class="theme-screenshot blank"></div>
+	<# } #>
+	<span class="more-details"><?php _ex( 'Details &amp; Preview', 'theme' ); ?></span>
+	<div class="theme-author">
+		<?php
+		/* translators: %s: Theme author name */
+		printf( __( 'By %s' ), '{{ data.author }}' );
+		?>
+	</div>
+
+	<div class="theme-id-container">
+		<h3 class="theme-name">{{ data.name }}</h3>
+
+		<div class="theme-actions">
+			<# if ( data.installed ) { #>
+				<?php
+				/* translators: %s: Theme name */
+				$aria_label = sprintf( _x( 'Activate %s', 'theme' ), '{{ data.name }}' );
+				?>
+				<# if ( data.activate_url ) { #>
+					<a class="button button-primary activate" href="{{ data.activate_url }}" aria-label="<?php echo esc_attr( $aria_label ); ?>"><?php _e( 'Activate' ); ?></a>
+				<# } #>
+				<# if ( data.customize_url ) { #>
+					<a class="button load-customize" href="{{ data.customize_url }}"><?php _e( 'Live Preview' ); ?></a>
+				<# } else { #>
+					<button class="button preview install-theme-preview"><?php _e( 'Preview' ); ?></button>
+				<# } #>
+			<# } else { #>
+				<?php
+				/* translators: %s: Theme name */
+				$aria_label = sprintf( __( 'Install %s' ), '{{ data.name }}' );
+				?>
+				<a class="button button-primary theme-install" data-name="{{ data.name }}" data-slug="{{ data.id }}" href="{{ data.install_url }}" aria-label="<?php echo esc_attr( $aria_label ); ?>"><?php _e( 'Install' ); ?></a>
+				<button class="button preview install-theme-preview"><?php _e( 'Preview' ); ?></button>
+			<# } #>
+		</div>
+	</div>
+
+	<# if ( data.installed ) { #>
+		<div class="notice notice-success notice-alt"><p><?php _ex( 'Installed', 'theme' ); ?></p></div>
+	<# } #>
+</script>
+
+<script id="tmpl-theme-preview" type="text/template">
+	<div class="wp-full-overlay-sidebar">
+		<div class="wp-full-overlay-header">
+			<button class="close-full-overlay"><span class="screen-reader-text"><?php _e( 'Close' ); ?></span></button>
+			<button class="previous-theme"><span class="screen-reader-text"><?php _ex( 'Previous', 'Button label for a theme' ); ?></span></button>
+			<button class="next-theme"><span class="screen-reader-text"><?php _ex( 'Next', 'Button label for a theme' ); ?></span></button>
+			<# if ( data.installed ) { #>
+				<a class="button button-primary activate" href="{{ data.activate_url }}"><?php _e( 'Activate' ); ?></a>
+			<# } else { #>
+				<a href="{{ data.install_url }}" class="button button-primary theme-install" data-name="{{ data.name }}" data-slug="{{ data.id }}"><?php _e( 'Install' ); ?></a>
+			<# } #>
+		</div>
+		<div class="wp-full-overlay-sidebar-content">
+			<div class="install-theme-info">
+				<h3 class="theme-name">{{ data.name }}</h3>
+					<span class="theme-by">
+						<?php
+						/* translators: %s: Theme author name */
+						printf( __( 'By %s' ), '{{ data.author }}' );
+						?>
+					</span>
+
+					<img class="theme-screenshot" src="{{ data.screenshot_url }}" alt="" />
+
+					<div class="theme-details">
+						<# if ( data.rating ) { #>
+							<div class="theme-rating">
+								{{{ data.stars }}}
+								<span class="num-ratings">({{ data.num_ratings }})</span>
+							</div>
+						<# } else { #>
+							<span class="no-rating"><?php _e( 'This theme has not been rated yet.' ); ?></span>
+						<# } #>
+						<div class="theme-version">
+							<?php
+							/* translators: %s: Theme version */
+							printf( __( 'Version: %s' ), '{{ data.version }}' );
+							?>
+						</div>
+						<div class="theme-description">{{{ data.description }}}</div>
+					</div>
+				</div>
+			</div>
+			<div class="wp-full-overlay-footer">
+				<button type="button" class="collapse-sidebar button" aria-expanded="true" aria-label="<?php esc_attr_e( 'Collapse Sidebar' ); ?>">
+					<span class="collapse-sidebar-arrow"></span>
+					<span class="collapse-sidebar-label"><?php _e( 'Collapse' ); ?></span>
+				</button>
+			</div>
+		</div>
+		<div class="wp-full-overlay-main">
+		<iframe src="{{ data.preview_url }}" title="<?php esc_attr_e( 'Preview' ); ?>"></iframe>
+	</div>
+</script>
+
+<?php
+wp_print_request_filesystem_credentials_modal();
+wp_print_admin_notice_templates();
+
+include(ABSPATH . 'wp-admin/admin-footer.php');
