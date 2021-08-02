@@ -495,4 +495,285 @@ function do_core_upgrade( $reinstall = false ) {
 	add_filter( 'update_feedback', 'show_message' );
 
 	$upgrader = new Core_Upgrader();
-	$result = $upgrader->upgra
+	$result = $upgrader->upgrade( $update, array(
+		'allow_relaxed_file_ownership' => $allow_relaxed_file_ownership
+	) );
+
+	if ( is_wp_error($result) ) {
+		show_message($result);
+		if ( 'up_to_date' != $result->get_error_code() && 'locked' != $result->get_error_code() )
+			show_message( __('Installation Failed') );
+		echo '</div>';
+		return;
+	}
+
+	show_message( __('WordPress updated successfully') );
+	show_message( '<span class="hide-if-no-js">' . sprintf( __( 'Welcome to WordPress %1$s. You will be redirected to the About WordPress screen. If not, click <a href="%2$s">here</a>.' ), $result, esc_url( self_admin_url( 'about.php?updated' ) ) ) . '</span>' );
+	show_message( '<span class="hide-if-js">' . sprintf( __( 'Welcome to WordPress %1$s. <a href="%2$s">Learn more</a>.' ), $result, esc_url( self_admin_url( 'about.php?updated' ) ) ) . '</span>' );
+	?>
+	</div>
+	<script type="text/javascript">
+	window.location = '<?php echo self_admin_url( 'about.php?updated' ); ?>';
+	</script>
+	<?php
+}
+
+/**
+ * @since 2.7.0
+ */
+function do_dismiss_core_update() {
+	$version = isset( $_POST['version'] )? $_POST['version'] : false;
+	$locale = isset( $_POST['locale'] )? $_POST['locale'] : 'en_US';
+	$update = find_core_update( $version, $locale );
+	if ( !$update )
+		return;
+	dismiss_core_update( $update );
+	wp_redirect( wp_nonce_url('update-core.php?action=upgrade-core', 'upgrade-core') );
+	exit;
+}
+
+/**
+ * @since 2.7.0
+ */
+function do_undismiss_core_update() {
+	$version = isset( $_POST['version'] )? $_POST['version'] : false;
+	$locale = isset( $_POST['locale'] )? $_POST['locale'] : 'en_US';
+	$update = find_core_update( $version, $locale );
+	if ( !$update )
+		return;
+	undismiss_core_update( $version, $locale );
+	wp_redirect( wp_nonce_url('update-core.php?action=upgrade-core', 'upgrade-core') );
+	exit;
+}
+
+$action = isset($_GET['action']) ? $_GET['action'] : 'upgrade-core';
+
+$upgrade_error = false;
+if ( ( 'do-theme-upgrade' == $action || ( 'do-plugin-upgrade' == $action && ! isset( $_GET['plugins'] ) ) )
+	&& ! isset( $_POST['checked'] ) ) {
+	$upgrade_error = $action == 'do-theme-upgrade' ? 'themes' : 'plugins';
+	$action = 'upgrade-core';
+}
+
+$title = __('WordPress Updates');
+$parent_file = 'index.php';
+
+$updates_overview  = '<p>' . __( 'On this screen, you can update to the latest version of WordPress, as well as update your themes, plugins, and translations from the WordPress.org repositories.' ) . '</p>';
+$updates_overview .= '<p>' . __( 'If an update is available, you&#8127;ll see a notification appear in the Toolbar and navigation menu.' ) . ' ' . __( 'Keeping your site updated is important for security. It also makes the internet a safer place for you and your readers.' ) . '</p>';
+
+get_current_screen()->add_help_tab( array(
+	'id'      => 'overview',
+	'title'   => __( 'Overview' ),
+	'content' => $updates_overview
+) );
+
+$updates_howto  = '<p>' . __( '<strong>WordPress</strong> &mdash; Updating your WordPress installation is a simple one-click procedure: just <strong>click on the &#8220;Update Now&#8221; button</strong> when you are notified that a new version is available.' ) . ' ' . __( 'In most cases, WordPress will automatically apply maintenance and security updates in the background for you.' ) . '</p>';
+$updates_howto .= '<p>' . __( '<strong>Themes and Plugins</strong> &mdash; To update individual themes or plugins from this screen, use the checkboxes to make your selection, then <strong>click on the appropriate &#8220;Update&#8221; button</strong>. To update all of your themes or plugins at once, you can check the box at the top of the section to select all before clicking the update button.' ) . '</p>';
+
+if ( 'en_US' != get_locale() ) {
+	$updates_howto .= '<p>' . __( '<strong>Translations</strong> &mdash; The files translating WordPress into your language are updated for you whenever any other updates occur. But if these files are out of date, you can <strong>click the &#8220;Update Translations&#8221;</strong> button.' ) . '</p>';
+}
+
+get_current_screen()->add_help_tab( array(
+	'id'      => 'how-to-update',
+	'title'   => __( 'How to Update' ),
+	'content' => $updates_howto
+) );
+
+get_current_screen()->set_help_sidebar(
+	'<p><strong>' . __('For more information:') . '</strong></p>' .
+	'<p>' . __( '<a href="https://codex.wordpress.org/Dashboard_Updates_Screen">Documentation on Updating WordPress</a>' ) . '</p>' .
+	'<p>' . __( '<a href="https://wordpress.org/support/">Support Forums</a>' ) . '</p>'
+);
+
+if ( 'upgrade-core' == $action ) {
+	// Force a update check when requested
+	$force_check = ! empty( $_GET['force-check'] );
+	wp_version_check( array(), $force_check );
+
+	require_once(ABSPATH . 'wp-admin/admin-header.php');
+	?>
+	<div class="wrap">
+	<h1><?php _e( 'WordPress Updates' ); ?></h1>
+	<?php
+	if ( $upgrade_error ) {
+		echo '<div class="error"><p>';
+		if ( $upgrade_error == 'themes' )
+			_e('Please select one or more themes to update.');
+		else
+			_e('Please select one or more plugins to update.');
+		echo '</p></div>';
+	}
+
+	$last_update_check = false;
+	$current = get_site_transient( 'update_core' );
+
+	if ( $current && isset ( $current->last_checked ) )	{
+		$last_update_check = $current->last_checked + get_option( 'gmt_offset' ) * HOUR_IN_SECONDS;
+	}
+
+	echo '<p>';
+	/* translators: %1 date, %2 time. */
+	printf( __( 'Last checked on %1$s at %2$s.' ), date_i18n( __( 'F j, Y' ), $last_update_check ), date_i18n( __( 'g:i a' ), $last_update_check ) );
+	echo ' &nbsp; <a class="button" href="' . esc_url( self_admin_url('update-core.php?force-check=1') ) . '">' . __( 'Check Again' ) . '</a>';
+	echo '</p>';
+
+	if ( current_user_can( 'update_core' ) ) {
+		core_upgrade_preamble();
+	}
+	if ( current_user_can( 'update_plugins' ) ) {
+		list_plugin_updates();
+	}
+	if ( current_user_can( 'update_themes' ) ) {
+		list_theme_updates();
+	}
+	if ( current_user_can( 'update_languages' ) ) {
+		list_translation_updates();
+	}
+
+	/**
+	 * Fires after the core, plugin, and theme update tables.
+	 *
+	 * @since 2.9.0
+	 */
+	do_action( 'core_upgrade_preamble' );
+	echo '</div>';
+
+	wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+		'totals'  => wp_get_update_data(),
+	) );
+
+	include(ABSPATH . 'wp-admin/admin-footer.php');
+
+} elseif ( 'do-core-upgrade' == $action || 'do-core-reinstall' == $action ) {
+
+	if ( ! current_user_can( 'update_core' ) )
+		wp_die( __( 'Sorry, you are not allowed to update this site.' ) );
+
+	check_admin_referer('upgrade-core');
+
+	// Do the (un)dismiss actions before headers, so that they can redirect.
+	if ( isset( $_POST['dismiss'] ) )
+		do_dismiss_core_update();
+	elseif ( isset( $_POST['undismiss'] ) )
+		do_undismiss_core_update();
+
+	require_once(ABSPATH . 'wp-admin/admin-header.php');
+	if ( 'do-core-reinstall' == $action )
+		$reinstall = true;
+	else
+		$reinstall = false;
+
+	if ( isset( $_POST['upgrade'] ) )
+		do_core_upgrade($reinstall);
+
+	wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+		'totals'  => wp_get_update_data(),
+	) );
+
+	include(ABSPATH . 'wp-admin/admin-footer.php');
+
+} elseif ( 'do-plugin-upgrade' == $action ) {
+
+	if ( ! current_user_can( 'update_plugins' ) )
+		wp_die( __( 'Sorry, you are not allowed to update this site.' ) );
+
+	check_admin_referer('upgrade-core');
+
+	if ( isset( $_GET['plugins'] ) ) {
+		$plugins = explode( ',', $_GET['plugins'] );
+	} elseif ( isset( $_POST['checked'] ) ) {
+		$plugins = (array) $_POST['checked'];
+	} else {
+		wp_redirect( admin_url('update-core.php') );
+		exit;
+	}
+
+	$url = 'update.php?action=update-selected&plugins=' . urlencode(implode(',', $plugins));
+	$url = wp_nonce_url($url, 'bulk-update-plugins');
+
+	$title = __('Update Plugins');
+
+	require_once(ABSPATH . 'wp-admin/admin-header.php');
+	echo '<div class="wrap">';
+	echo '<h1>' . __( 'Update Plugins' ) . '</h1>';
+	echo '<iframe src="', $url, '" style="width: 100%; height: 100%; min-height: 750px;" frameborder="0" title="' . esc_attr__( 'Update progress' ) . '"></iframe>';
+	echo '</div>';
+
+	wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+		'totals'  => wp_get_update_data(),
+	) );
+
+	include(ABSPATH . 'wp-admin/admin-footer.php');
+
+} elseif ( 'do-theme-upgrade' == $action ) {
+
+	if ( ! current_user_can( 'update_themes' ) )
+		wp_die( __( 'Sorry, you are not allowed to update this site.' ) );
+
+	check_admin_referer('upgrade-core');
+
+	if ( isset( $_GET['themes'] ) ) {
+		$themes = explode( ',', $_GET['themes'] );
+	} elseif ( isset( $_POST['checked'] ) ) {
+		$themes = (array) $_POST['checked'];
+	} else {
+		wp_redirect( admin_url('update-core.php') );
+		exit;
+	}
+
+	$url = 'update.php?action=update-selected-themes&themes=' . urlencode(implode(',', $themes));
+	$url = wp_nonce_url($url, 'bulk-update-themes');
+
+	$title = __('Update Themes');
+
+	require_once(ABSPATH . 'wp-admin/admin-header.php');
+	?>
+	<div class="wrap">
+		<h1><?php _e( 'Update Themes' ); ?></h1>
+		<iframe src="<?php echo $url ?>" style="width: 100%; height: 100%; min-height: 750px;" frameborder="0" title="<?php esc_attr_e( 'Update progress' ); ?>"></iframe>
+	</div>
+	<?php
+
+	wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+		'totals'  => wp_get_update_data(),
+	) );
+
+	include(ABSPATH . 'wp-admin/admin-footer.php');
+
+} elseif ( 'do-translation-upgrade' == $action ) {
+
+	if ( ! current_user_can( 'update_languages' ) )
+		wp_die( __( 'Sorry, you are not allowed to update this site.' ) );
+
+	check_admin_referer( 'upgrade-translations' );
+
+	require_once( ABSPATH . 'wp-admin/admin-header.php' );
+	include_once( ABSPATH . 'wp-admin/includes/class-wp-upgrader.php' );
+
+	$url = 'update-core.php?action=do-translation-upgrade';
+	$nonce = 'upgrade-translations';
+	$title = __( 'Update Translations' );
+	$context = WP_LANG_DIR;
+
+	$upgrader = new Language_Pack_Upgrader( new Language_Pack_Upgrader_Skin( compact( 'url', 'nonce', 'title', 'context' ) ) );
+	$result = $upgrader->bulk_upgrade();
+
+	wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+		'totals'  => wp_get_update_data(),
+	) );
+
+	require_once( ABSPATH . 'wp-admin/admin-footer.php' );
+
+} else {
+	/**
+	 * Fires for each custom update action on the WordPress Updates screen.
+	 *
+	 * The dynamic portion of the hook name, `$action`, refers to the
+	 * passed update action. The hook fires in lieu of all available
+	 * default update actions.
+	 *
+	 * @since 3.2.0
+	 */
+	do_action( "update-core-custom_{$action}" );
+}
