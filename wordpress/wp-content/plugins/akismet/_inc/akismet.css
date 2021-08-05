@@ -1,0 +1,253 @@
+.wp-admin.jetpack_page_akismet-key-config, .wp-admin.settings_page_akismet-key-config {
+	background-color:#f3f6f8;
+}
+
+#submitted-on {
+    position: relative;
+}
+#the-comment-list .author .akismet-user-comment-count {
+    display: inline;
+}
+#the-comment-list .author a span {
+    text-decoration: none;
+    color: #999;
+}
+#the-comment-list .author a span.akismet-span-link {
+	text-decoration: inherit;
+	color: inherit;
+}
+#the-comment-list .akismet_remove_url {
+    margin-left: 3px;
+    color: #999;
+    padding: 2px 3px 2px 0;
+}
+#the-comment-list .akismet_remove_url:hover {
+    color: #A7301F;
+    font-weight: bold;
+    padding: 2px 2px 2px 0;
+}
+#dashboard_recent_comments .akismet-status {
+    display: none;
+}
+.akismet-status {
+    float: right;
+}
+.akismet-status a {
+    color: #AAA;
+    font-style: italic;
+}
+table.comments td.comment p a {
+    text-decoration: underline;
+}
+table.comments td.comment p a:after {
+    content: attr(href);
+    color: #aaa;
+    display: inline-block; /* Show the URL without the link's underline extending under it. */
+    padding: 0 1ex; /* Because it's inline block, we can't just use spaces in the content: attribute to separate it from the link text. */
+}
+.mshot-arrow {
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-right: 10px solid #5C5C5C;
+    position: absolute;
+    left: -6px;
+    top: 91px;
+}
+.mshot-container {
+    background: #5C5C5C;
+    position: absolute;
+    top: -94px;
+    padding: 7px;
+    width: 450px;
+    height: 338px;
+    z-index: 20000;
+    -moz-border-radius: 6px;
+    border-radius: 6px;
+    -webkit-border-radius: 6px;
+}
+.akismet-mshot {
+    position: absolute;
+    z-index: 100;
+}
+.akismet-mshot .mshot-image {
+    margin: 0;
+    height: 338px;
+    width: 450px;
+}
+.checkforspam {
+    display: inline-block !important;
+}
+.checkforspam-progress {
+	padding-left: 1ex;
+	display: none;
+}
+.checkforspam.button-disabled .checkforspam-progress {
+	display: inline;
+}
+
+.checkforspam-spinner {
+    display: inline-block;
+    margin-top: 7px;
+}
+
+.akismet-right {
+	float: right;
+}
+
+.akismet-card .akismet-right {
+	margin: 1em 0;
+}
+
+.akismet-alert-text {
+	color: #dd3d36;
+	font-weight: bold;
+	font-size: 120%;
+	margin-top: .5rem;
+}
+.akismet-alert {
+	border: 1px solid #e5e5e5;
+	padding: 0.4em 1em 1.4em 1em;
+    border-radius: 3px;
+    -webkit-border-radius: 3px;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.akismet-alert h3.akismet-key-status {
+	color: #fff;
+	margin: 1em 0 0.5em 0;
+}
+
+.akismet-alert.akismet-critical {
+	background-color: #993300;
+}
+
+.akismet-alert.akismet-active {
+	background-color: #649316;
+}
+
+.akismet-alert p.akismet-key-status {
+	font-size: 24px;
+}
+
+.akismet-alert p.akismet-description {
+	color:#fff;
+	font-size: 14px;
+    margin: 0 0;
+	font-style: normal;
+}
+
+.akismet-alert p.akismet-description a,
+.akismet-alert p.akismet-description a,
+.akismet-alert p.akismet-description a,
+.akismet-alert p.akismet-description a {
+	color: #fff;
+}
+
+.akismet-new-snapshot {
+	margin-top: 1em;
+	padding: 1em;
+	text-align: center;
+	background: #fff;
+}
+
+.akismet-new-snapshot h3 {
+    background: #f5f5f5;
+	color: #888;
+	font-size: 11px;
+    margin: 0;
+    padding: 3px;
+}
+
+.new-snapspot ul {
+	font-size: 12px;
+	width: 100%;
+}
+
+.akismet-new-snapshot ul li {
+    color: #999;
+	float: left;
+    font-size: 11px;
+	padding: 0 20px;
+    text-transform: uppercase;
+	width: 33%;
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+	-ms-box-sizing: border-box;
+}
+
+.akismet-new-snapshot ul li:first-child,
+.akismet-new-snapshot ul li:nth-child(2) {
+	border-right:1px dotted #ccc;
+}
+
+.akismet-new-snapshot ul li span {
+    color: #52accc;
+	display: block;
+	font-size: 32px;
+	font-weight: lighter;
+	line-height: 1.5em;
+}
+
+.akismet-settings th:first-child {
+	vertical-align: top;
+	padding-top: 15px;
+}
+
+.akismet-settings th.akismet-api-key {
+	vertical-align: middle;
+	padding-top: 0;
+}
+
+.akismet-settings input[type=text] {
+	width: 75%;
+}
+
+.akismet-settings span.akismet-note{
+	float: left;
+	padding-left: 23px;
+	font-size: 75%;
+	margin-top: -10px;
+}
+
+/**
+ * For the activation notice on the plugins page.
+ */
+.akismet_activate {
+	min-width: 825px;
+	border: 1px solid #4F800D;
+	padding: 5px;
+	margin: 15px 0;
+	background: #83AF24;
+	background-image: -webkit-gradient(linear, 0% 0, 80% 100%, from(#83AF24), to(#4F800D));
+	background-image: -moz-linear-gradient(80% 100% 120deg, #4F800D, #83AF24);
+	-moz-border-radius: 3px;
+	border-radius: 3px;
+	-webkit-border-radius: 3px;
+	position: relative;
+	overflow: hidden;
+}
+
+.akismet_activate .aa_a {
+	position: absolute;
+	top: -5px;
+	right: 10px;
+	font-size: 140px;
+	color: #769F33;
+	font-family: Georgia, "Times New Roman", Times, serif;
+	z-index: 1;
+}
+
+.akismet_activate .aa_button {
+	font-weight: bold;
+	border: 1px solid #029DD6;
+	border-top: 1px solid #06B9FD;
+	font-size: 15px;
+	text-align: center;
+	padding: 9px 0 8px 0;
+	color: #FFF;
+	background: #029DD6;
+	background-image: -webki

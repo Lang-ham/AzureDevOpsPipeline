@@ -455,4 +455,66 @@ $new_user_ignore_pass = $creating && isset( $_POST['noconfirmation'] ) ? wp_unsl
 					<span class="text"><?php _e( 'Hide' ); ?></span>
 				</button>
 				<button type="button" class="button wp-cancel-pw hide-if-no-js" data-toggle="0" aria-label="<?php esc_attr_e( 'Cancel password change' ); ?>">
-					<span class="text"><?php _e( 
+					<span class="text"><?php _e( 'Cancel' ); ?></span>
+				</button>
+				<div style="display:none" id="pass-strength-result" aria-live="polite"></div>
+			</div>
+		</td>
+	</tr>
+	<tr class="form-field form-required user-pass2-wrap hide-if-js">
+		<th scope="row"><label for="pass2"><?php _e( 'Repeat Password' ); ?> <span class="description"><?php _e( '(required)' ); ?></span></label></th>
+		<td>
+		<input name="pass2" type="password" id="pass2" autocomplete="off" />
+		</td>
+	</tr>
+	<tr class="pw-weak">
+		<th><?php _e( 'Confirm Password' ); ?></th>
+		<td>
+			<label>
+				<input type="checkbox" name="pw_weak" class="pw-checkbox" />
+				<?php _e( 'Confirm use of weak password' ); ?>
+			</label>
+		</td>
+	</tr>
+	<tr>
+		<th scope="row"><?php _e( 'Send User Notification' ) ?></th>
+		<td>
+			<input type="checkbox" name="send_user_notification" id="send_user_notification" value="1" <?php checked( $new_user_send_notification ); ?> />
+			<label for="send_user_notification"><?php _e( 'Send the new user an email about their account.' ); ?></label>
+		</td>
+	</tr>
+<?php } // !is_multisite ?>
+	<tr class="form-field">
+		<th scope="row"><label for="role"><?php _e('Role'); ?></label></th>
+		<td><select name="role" id="role">
+			<?php
+			if ( !$new_user_role )
+				$new_user_role = !empty($current_role) ? $current_role : get_option('default_role');
+			wp_dropdown_roles($new_user_role);
+			?>
+			</select>
+		</td>
+	</tr>
+	<?php if ( is_multisite() && current_user_can( 'manage_network_users' ) ) { ?>
+	<tr>
+		<th scope="row"><?php _e( 'Skip Confirmation Email' ); ?></th>
+		<td>
+			<input type="checkbox" name="noconfirmation" id="noconfirmation" value="1" <?php checked( $new_user_ignore_pass ); ?> />
+			<label for="noconfirmation"><?php _e( 'Add the user without sending an email that requires their confirmation.' ); ?></label>
+		</td>
+	</tr>
+	<?php } ?>
+</table>
+
+<?php
+/** This action is documented in wp-admin/user-new.php */
+do_action( 'user_new_form', 'add-new-user' );
+?>
+
+<?php submit_button( __( 'Add New User' ), 'primary', 'createuser', true, array( 'id' => 'createusersub' ) ); ?>
+
+</form>
+<?php } // current_user_can('create_users') ?>
+</div>
+<?php
+include( ABSPATH . 'wp-admin/admin-footer.php' );
