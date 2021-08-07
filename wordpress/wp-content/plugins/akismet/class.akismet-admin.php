@@ -943,4 +943,189 @@ class Akismet_Admin {
 					elseif ( $total_in_hours > 1 )
 						$time_saved = $cleaning_up . ' ' . sprintf( _n( 'Akismet has saved you %d hour!', 'Akismet has saved you %d hours!', $total_in_hours, 'akismet' ), $total_in_hours );
 					elseif ( $total_in_minutes >= 30 )
-						$time_saved = $cleaning_up . ' ' . sprintf( _n( 
+						$time_saved = $cleaning_up . ' ' . sprintf( _n( 'Akismet has saved you %d minute!', 'Akismet has saved you %d minutes!', $total_in_minutes, 'akismet' ), $total_in_minutes );
+				}
+				
+				$notices[] =  array( 'type' => 'active-notice', 'time_saved' => $time_saved );
+			}
+			
+			if ( !empty( $akismet_user->limit_reached ) && in_array( $akismet_user->limit_reached, array( 'yellow', 'red' ) ) ) {
+				$notices[] = array( 'type' => 'limit-reached', 'level' => $akismet_user->limit_reached );
+			}
+		}
+		
+		if ( !isset( self::$notices['status'] ) && in_array( $akismet_user->status, array( 'cancelled', 'suspended', 'missing', 'no-sub' ) ) ) {
+			$notices[] = array( 'type' => $akismet_user->status );
+		}
+
+		/*
+		// To see all variants when testing.
+		$notices[] = array( 'type' => 'active-notice', 'time_saved' => 'Cleaning up spam takes time. Akismet has saved you 1 minute!' );
+		$notices[] = array( 'type' => 'plugin' );
+		$notices[] = array( 'type' => 'spam-check', 'link_text' => 'Link text.' );
+		$notices[] = array( 'type' => 'notice', 'notice_header' => 'This is the notice header.', 'notice_text' => 'This is the notice text.' );
+		$notices[] = array( 'type' => 'missing-functions' );
+		$notices[] = array( 'type' => 'servers-be-down' );
+		$notices[] = array( 'type' => 'active-dunning' );
+		$notices[] = array( 'type' => 'cancelled' );
+		$notices[] = array( 'type' => 'suspended' );
+		$notices[] = array( 'type' => 'missing' );
+		$notices[] = array( 'type' => 'no-sub' );
+		$notices[] = array( 'type' => 'new-key-valid' );
+		$notices[] = array( 'type' => 'new-key-invalid' );
+		$notices[] = array( 'type' => 'existing-key-invalid' );
+		$notices[] = array( 'type' => 'new-key-failed' );
+		$notices[] = array( 'type' => 'limit-reached', 'level' => 'yellow' );
+		$notices[] = array( 'type' => 'limit-reached', 'level' => 'red' );
+		*/
+		
+		Akismet::log( compact( 'stat_totals', 'akismet_user' ) );
+		Akismet::view( 'config', compact( 'api_key', 'akismet_user', 'stat_totals', 'notices' ) );
+	}
+
+	public static function display_notice() {
+		global $hook_suffix;
+
+		if ( in_array( $hook_suffix, array( 'jetpack_page_akismet-key-config', 'settings_page_akismet-key-config' ) ) ) {
+			// This page manages the notices and puts them inline where they make sense.
+			return;
+		}
+
+		if ( in_array( $hook_suffix, array( 'edit-comments.php' ) ) && (int) get_option( 'akismet_alert_code' ) > 0 ) {
+			Akismet::verify_key( Akismet::get_api_key() ); //verify that the key is still in alert state
+			
+			if ( get_option( 'akismet_alert_code' ) > 0 )
+				self::display_alert();
+		}
+		elseif ( $hook_suffix == 'plugins.php' && !Akismet::get_api_key() ) {
+			self::display_api_key_warning();
+		}
+		elseif ( $hook_suffix == 'edit-comments.php' && wp_next_scheduled( 'akismet_schedule_cron_recheck' ) ) {
+			self::display_spam_check_warning();
+		}
+		else if ( isset( $_GET['akismet_recheck_complete'] ) ) {
+			$recheck_count = (int) $_GET['recheck_count'];
+			$spam_count = (int) $_GET['spam_count'];
+			
+			if ( $recheck_count === 0 ) {
+				$message = __( 'There were no comments to check. Akismet will only check comments in the Pending queue.', 'akismet' );
+			}
+			else {
+				$message = sprintf( _n( 'Akismet checked %s comment.', 'Akismet checked %s comments.', $recheck_count, 'akismet' ), number_format( $recheck_count ) );
+				$message .= ' ';
+			
+				if ( $spam_count === 0 ) {
+					$message .= __( 'No comments were caught as spam.' );
+				}
+				else {
+					$message .= sprintf( _n( '%s comment was caught as spam.', '%s comments were caught as spam.', $spam_count, 'akismet' ), number_format( $spam_count ) );
+				}
+			}
+			
+			echo '<div class="notice notice-success"><p>' . esc_html( $message ) . '</p></div>';
+		}
+	}
+
+	public static function display_status() {
+		if ( ! self::get_server_connectivity() ) {
+			Akismet::view( 'notice', array( 'type' => 'servers-be-down' ) );
+		}
+		else if ( ! empty( self::$notices ) ) {
+			foreach ( self::$notices as $index => $type ) {
+				if ( is_object( $type ) ) {
+					$notice_header = $notice_text = '';
+					
+					if ( property_exists( $type, 'notice_header' ) ) {
+						$notice_header = wp_kses( $type->notice_header, self::$allowed );
+					}
+				
+					if ( property_exists( $type, 'notice_text' ) ) {
+						$notice_text = wp_kses( $type->notice_text, self::$allowed );
+					}
+					
+					if ( property_exists( $type, 'status' ) ) {
+						$type = wp_kses( $type->status, self::$allowed );
+						Akismet::view( 'notice', compact( 'type', 'notice_header', 'notice_text' ) );
+						
+						unset( self::$notices[ $index ] );
+					}
+				}
+				else {
+					Akismet::view( 'notice', compact( 'type' ) );
+					
+					unset( self::$notices[ $index ] );
+				}
+			}
+		}
+	}
+
+	private static function get_jetpack_user() {
+		if ( !class_exists('Jetpack') )
+			return false;
+
+		Jetpack::load_xml_rpc_client();
+		$xml = new Jetpack_IXR_ClientMulticall( array( 'user_id' => get_current_user_id() ) );
+
+		$xml->addCall( 'wpcom.getUserID' );
+		$xml->addCall( 'akismet.getAPIKey' );
+		$xml->query();
+
+		Akismet::log( compact( 'xml' ) );
+
+		if ( !$xml->isError() ) {
+			$responses = $xml->getResponse();
+			if ( count( $responses ) > 1 ) {
+				// Due to a quirk in how Jetpack does multi-calls, the response order
+				// can't be trusted to match the call order. It's a good thing our
+				// return values can be mostly differentiated from each other.
+				$first_response_value = array_shift( $responses[0] );
+				$second_response_value = array_shift( $responses[1] );
+				
+				// If WPCOM ever reaches 100 billion users, this will fail. :-)
+				if ( preg_match( '/^[a-f0-9]{12}$/i', $first_response_value ) ) {
+					$api_key = $first_response_value;
+					$user_id = (int) $second_response_value;
+				}
+				else {
+					$api_key = $second_response_value;
+					$user_id = (int) $first_response_value;
+				}
+				
+				return compact( 'api_key', 'user_id' );
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Some commentmeta isn't useful in an export file. Suppress it (when supported).
+	 *
+	 * @param bool $exclude
+	 * @param string $key The meta key
+	 * @param object $meta The meta object
+	 * @return bool Whether to exclude this meta entry from the export.
+	 */
+	public static function exclude_commentmeta_from_export( $exclude, $key, $meta ) {
+		if ( in_array( $key, array( 'akismet_as_submitted', 'akismet_rechecking', 'akismet_delayed_moderation_email' ) ) ) {
+			return true;
+		}
+		
+		return $exclude;
+	}
+	
+	/**
+	 * When Akismet is active, remove the "Activate Akismet" step from the plugin description.
+	 */
+	public static function modify_plugin_description( $all_plugins ) {
+		if ( isset( $all_plugins['akismet/akismet.php'] ) ) {
+			if ( Akismet::get_api_key() ) {
+				$all_plugins['akismet/akismet.php']['Description'] = __( 'Used by millions, Akismet is quite possibly the best way in the world to <strong>protect your blog from spam</strong>. Your site is fully configured and being protected, even while you sleep.', 'akismet' );
+			}
+			else {
+				$all_plugins['akismet/akismet.php']['Description'] = __( 'Used by millions, Akismet is quite possibly the best way in the world to <strong>protect your blog from spam</strong>. It keeps your site protected even while you sleep. To get started, just go to <a href="admin.php?page=akismet-key-config">your Akismet Settings page</a> to set up your API key.', 'akismet' );
+			}
+		}
+		
+		return $all_plugins;
+	}
+}
