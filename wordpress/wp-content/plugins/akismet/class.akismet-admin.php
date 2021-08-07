@@ -657,4 +657,290 @@ class Akismet_Admin {
 	}
 
 	// Check connectivity between the WordPress blog and Akismet's servers.
-	// Returns an associative array of server IP addresses, where th
+	// Returns an associative array of server IP addresses, where the key is the IP address, and value is true (available) or false (unable to connect).
+	public static function check_server_ip_connectivity() {
+		
+		$servers = $ips = array();
+
+		// Some web hosts may disable this function
+		if ( function_exists('gethostbynamel') ) {	
+			
+			$ips = gethostbynamel( 'rest.akismet.com' );
+			if ( $ips && is_array($ips) && count($ips) ) {
+				$api_key = Akismet::get_api_key();
+				
+				foreach ( $ips as $ip ) {
+					$response = Akismet::verify_key( $api_key, $ip );
+					// even if the key is invalid, at least we know we have connectivity
+					if ( $response == 'valid' || $response == 'invalid' )
+						$servers[$ip] = 'connected';
+					else
+						$servers[$ip] = $response ? $response : 'unable to connect';
+				}
+			}
+		}
+		
+		return $servers;
+	}
+	
+	// Simpler connectivity check
+	public static function check_server_connectivity($cache_timeout = 86400) {
+		
+		$debug = array();
+		$debug[ 'PHP_VERSION' ]         = PHP_VERSION;
+		$debug[ 'WORDPRESS_VERSION' ]   = $GLOBALS['wp_version'];
+		$debug[ 'AKISMET_VERSION' ]     = AKISMET_VERSION;
+		$debug[ 'AKISMET__PLUGIN_DIR' ] = AKISMET__PLUGIN_DIR;
+		$debug[ 'SITE_URL' ]            = site_url();
+		$debug[ 'HOME_URL' ]            = home_url();
+		
+		$servers = get_option('akismet_available_servers');
+		if ( (time() - get_option('akismet_connectivity_time') < $cache_timeout) && $servers !== false ) {
+			$servers = self::check_server_ip_connectivity();
+			update_option('akismet_available_servers', $servers);
+			update_option('akismet_connectivity_time', time());
+		}
+
+		if ( wp_http_supports( array( 'ssl' ) ) ) {
+			$response = wp_remote_get( 'https://rest.akismet.com/1.1/test' );
+		}
+		else {
+			$response = wp_remote_get( 'http://rest.akismet.com/1.1/test' );
+		}
+
+		$debug[ 'gethostbynamel' ]  = function_exists('gethostbynamel') ? 'exists' : 'not here';
+		$debug[ 'Servers' ]         = $servers;
+		$debug[ 'Test Connection' ] = $response;
+		
+		Akismet::log( $debug );
+		
+		if ( $response && 'connected' == wp_remote_retrieve_body( $response ) )
+			return true;
+		
+		return false;
+	}
+
+	// Check the server connectivity and store the available servers in an option. 
+	public static function get_server_connectivity($cache_timeout = 86400) {
+		return self::check_server_connectivity( $cache_timeout );
+	}
+
+	/**
+	 * Find out whether any comments in the Pending queue have not yet been checked by Akismet.
+	 *
+	 * @return bool
+	 */
+	public static function are_any_comments_waiting_to_be_checked() {
+		return !! get_comments( array(
+			// Exclude comments that are not pending. This would happen if someone manually approved or spammed a comment
+			// that was waiting to be checked. The akismet_error meta entry will eventually be removed by the cron recheck job.
+			'status' => 'hold',
+			
+			// This is the commentmeta that is saved when a comment couldn't be checked.
+			'meta_key' => 'akismet_error',
+			
+			// We only need to know whether at least one comment is waiting for a check.
+			'number' => 1,
+		) );
+	}
+
+	public static function get_page_url( $page = 'config' ) {
+
+		$args = array( 'page' => 'akismet-key-config' );
+
+		if ( $page == 'stats' )
+			$args = array( 'page' => 'akismet-key-config', 'view' => 'stats' );
+		elseif ( $page == 'delete_key' )
+			$args = array( 'page' => 'akismet-key-config', 'view' => 'start', 'action' => 'delete-key', '_wpnonce' => wp_create_nonce( self::NONCE ) );
+
+		$url = add_query_arg( $args, class_exists( 'Jetpack' ) ? admin_url( 'admin.php' ) : admin_url( 'options-general.php' ) );
+
+		return $url;
+	}
+	
+	public static function get_akismet_user( $api_key ) {
+		$akismet_user = false;
+
+		$subscription_verification = Akismet::http_post( Akismet::build_query( array( 'key' => $api_key, 'blog' => get_option( 'home' ) ) ), 'get-subscription' );
+
+		if ( ! empty( $subscription_verification[1] ) ) {
+			if ( 'invalid' !== $subscription_verification[1] ) {
+				$akismet_user = json_decode( $subscription_verification[1] );
+			}
+		}
+
+		return $akismet_user;
+	}
+	
+	public static function get_stats( $api_key ) {
+		$stat_totals = array();
+
+		foreach( array( '6-months', 'all' ) as $interval ) {
+			$response = Akismet::http_post( Akismet::build_query( array( 'blog' => get_option( 'home' ), 'key' => $api_key, 'from' => $interval ) ), 'get-stats' );
+
+			if ( ! empty( $response[1] ) ) {
+				$stat_totals[$interval] = json_decode( $response[1] );
+			}
+		}
+
+		return $stat_totals;
+	}
+	
+	public static function verify_wpcom_key( $api_key, $user_id, $extra = array() ) {
+		$akismet_account = Akismet::http_post( Akismet::build_query( array_merge( array(
+			'user_id'          => $user_id,
+			'api_key'          => $api_key,
+			'get_account_type' => 'true'
+		), $extra ) ), 'verify-wpcom-key' );
+
+		if ( ! empty( $akismet_account[1] ) )
+			$akismet_account = json_decode( $akismet_account[1] );
+
+		Akismet::log( compact( 'akismet_account' ) );
+		
+		return $akismet_account;
+	}
+	
+	public static function connect_jetpack_user() {
+	
+		if ( $jetpack_user = self::get_jetpack_user() ) {
+			if ( isset( $jetpack_user['user_id'] ) && isset(  $jetpack_user['api_key'] ) ) {
+				$akismet_user = self::verify_wpcom_key( $jetpack_user['api_key'], $jetpack_user['user_id'], array( 'action' => 'connect_jetpack_user' ) );
+							
+				if ( is_object( $akismet_user ) ) {
+					self::save_key( $akismet_user->api_key );
+					return in_array( $akismet_user->status, array( 'active', 'active-dunning', 'no-sub' ) );
+				}
+			}
+		}
+		
+		return false;
+	}
+
+	public static function display_alert() {
+		Akismet::view( 'notice', array(
+			'type' => 'alert',
+			'code' => (int) get_option( 'akismet_alert_code' ),
+			'msg'  => get_option( 'akismet_alert_msg' )
+		) );
+	}
+
+	public static function display_spam_check_warning() {
+		Akismet::fix_scheduled_recheck();
+
+		if ( wp_next_scheduled('akismet_schedule_cron_recheck') > time() && self::are_any_comments_waiting_to_be_checked() ) {
+			$link_text = apply_filters( 'akismet_spam_check_warning_link_text', sprintf( __( 'Please check your <a href="%s">Akismet configuration</a> and contact your web host if problems persist.', 'akismet'), esc_url( self::get_page_url() ) ) );
+			Akismet::view( 'notice', array( 'type' => 'spam-check', 'link_text' => $link_text ) );
+		}
+	}
+
+	public static function display_api_key_warning() {
+		Akismet::view( 'notice', array( 'type' => 'plugin' ) );
+	}
+
+	public static function display_page() {
+		if ( !Akismet::get_api_key() || ( isset( $_GET['view'] ) && $_GET['view'] == 'start' ) )
+			self::display_start_page();
+		elseif ( isset( $_GET['view'] ) && $_GET['view'] == 'stats' )
+			self::display_stats_page();
+		else
+			self::display_configuration_page();
+	}
+
+	public static function display_start_page() {
+		if ( isset( $_GET['action'] ) ) {
+			if ( $_GET['action'] == 'delete-key' ) {
+				if ( isset( $_GET['_wpnonce'] ) && wp_verify_nonce( $_GET['_wpnonce'], self::NONCE ) )
+					delete_option( 'wordpress_api_key' );
+			}
+		}
+
+		if ( $api_key = Akismet::get_api_key() && ( empty( self::$notices['status'] ) || 'existing-key-invalid' != self::$notices['status'] ) ) {
+			self::display_configuration_page();
+			return;
+		}
+		
+		//the user can choose to auto connect their API key by clicking a button on the akismet done page
+		//if jetpack, get verified api key by using connected wpcom user id
+		//if no jetpack, get verified api key by using an akismet token	
+		
+		$akismet_user = false;
+		
+		if ( isset( $_GET['token'] ) && preg_match('/^(\d+)-[0-9a-f]{20}$/', $_GET['token'] ) )
+			$akismet_user = self::verify_wpcom_key( '', '', array( 'token' => $_GET['token'] ) );
+		elseif ( $jetpack_user = self::get_jetpack_user() )
+			$akismet_user = self::verify_wpcom_key( $jetpack_user['api_key'], $jetpack_user['user_id'] );
+			
+		if ( isset( $_GET['action'] ) ) {
+			if ( $_GET['action'] == 'save-key' ) {
+				if ( is_object( $akismet_user ) ) {
+					self::save_key( $akismet_user->api_key );
+					self::display_configuration_page();
+					return;
+				}
+			}
+		}
+
+		Akismet::view( 'start', compact( 'akismet_user' ) );
+
+		/*
+		// To see all variants when testing.
+		$akismet_user->status = 'no-sub';
+		Akismet::view( 'start', compact( 'akismet_user' ) );
+		$akismet_user->status = 'cancelled';
+		Akismet::view( 'start', compact( 'akismet_user' ) );
+		$akismet_user->status = 'suspended';
+		Akismet::view( 'start', compact( 'akismet_user' ) );
+		$akismet_user->status = 'other';
+		Akismet::view( 'start', compact( 'akismet_user' ) );
+		$akismet_user = false;
+		*/
+	}
+
+	public static function display_stats_page() {
+		Akismet::view( 'stats' );
+	}
+
+	public static function display_configuration_page() {
+		$api_key      = Akismet::get_api_key();
+		$akismet_user = self::get_akismet_user( $api_key );
+		
+		if ( ! $akismet_user ) {
+			// This could happen if the user's key became invalid after it was previously valid and successfully set up.
+			self::$notices['status'] = 'existing-key-invalid';
+			self::display_start_page();
+			return;
+		}
+
+		$stat_totals  = self::get_stats( $api_key );
+
+		// If unset, create the new strictness option using the old discard option to determine its default.
+		// If the old option wasn't set, default to discarding the blatant spam.
+		if ( get_option( 'akismet_strictness' ) === false ) {
+			add_option( 'akismet_strictness', ( get_option( 'akismet_discard_month' ) === 'false' ? '0' : '1' ) );
+		}
+		
+		// Sync the local "Total spam blocked" count with the authoritative count from the server.
+		if ( isset( $stat_totals['all'], $stat_totals['all']->spam ) ) {
+			update_option( 'akismet_spam_count', $stat_totals['all']->spam );
+		}
+
+		$notices = array();
+
+		if ( empty( self::$notices ) ) {
+			if ( ! empty( $stat_totals['all'] ) && isset( $stat_totals['all']->time_saved ) && $akismet_user->status == 'active' && $akismet_user->account_type == 'free-api-key' ) {
+
+				$time_saved = false;
+
+				if ( $stat_totals['all']->time_saved > 1800 ) {
+					$total_in_minutes = round( $stat_totals['all']->time_saved / 60 );
+					$total_in_hours   = round( $total_in_minutes / 60 );
+					$total_in_days    = round( $total_in_hours / 8 );
+					$cleaning_up      = __( 'Cleaning up spam takes time.' , 'akismet');
+
+					if ( $total_in_days > 1 )
+						$time_saved = $cleaning_up . ' ' . sprintf( _n( 'Akismet has saved you %s day!', 'Akismet has saved you %s days!', $total_in_days, 'akismet' ), number_format_i18n( $total_in_days ) );
+					elseif ( $total_in_hours > 1 )
+						$time_saved = $cleaning_up . ' ' . sprintf( _n( 'Akismet has saved you %d hour!', 'Akismet has saved you %d hours!', $total_in_hours, 'akismet' ), $total_in_hours );
+					elseif ( $total_in_minutes >= 30 )
+						$time_saved = $cleaning_up . ' ' . sprintf( _n( 
