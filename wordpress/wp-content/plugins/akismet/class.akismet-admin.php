@@ -375,4 +375,286 @@ class Akismet_Admin {
 				data-pending-comment-count="' . esc_attr( $comments_count->moderated ) . '"
 				>';
 			echo '<span class="akismet-label">' . esc_html__('Check for Spam', 'akismet') . '</span>';
-			echo '<span class="checkforspam-progress"></span
+			echo '<span class="checkforspam-progress"></span>';
+		echo '</a>';
+		echo '<span class="checkforspam-spinner"></span>';
+
+	}
+
+	public static function recheck_queue() {
+		global $wpdb;
+
+		Akismet::fix_scheduled_recheck();
+
+		if ( ! ( isset( $_GET['recheckqueue'] ) || ( isset( $_REQUEST['action'] ) && 'akismet_recheck_queue' == $_REQUEST['action'] ) ) ) {
+			return;
+		}
+
+		$result_counts = self::recheck_queue_portion( empty( $_POST['offset'] ) ? 0 : $_POST['offset'], empty( $_POST['limit'] ) ? 100 : $_POST['limit'] );
+
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+			wp_send_json( array(
+				'counts' => $result_counts,
+			));
+		}
+		else {
+			$redirect_to = isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : admin_url( 'edit-comments.php' );
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+	}
+	
+	public static function recheck_queue_portion( $start = 0, $limit = 100 ) {
+		global $wpdb;
+		
+		$paginate = '';
+
+		if ( $limit <= 0 ) {
+			$limit = 100;
+		}
+
+		if ( $start < 0 ) {
+			$start = 0;
+		}
+
+		$moderation = $wpdb->get_col( $wpdb->prepare( "SELECT * FROM {$wpdb->comments} WHERE comment_approved = '0' LIMIT %d OFFSET %d", $limit, $start ) );
+
+		$result_counts = array(
+			'processed' => count( $moderation ),
+			'spam' => 0,
+			'ham' => 0,
+			'error' => 0,
+		);
+
+		foreach ( $moderation as $comment_id ) {
+			$api_response = Akismet::recheck_comment( $comment_id, 'recheck_queue' );
+
+			if ( 'true' === $api_response ) {
+				++$result_counts['spam'];
+			}
+			elseif ( 'false' === $api_response ) {
+				++$result_counts['ham'];
+			}
+			else {
+				++$result_counts['error'];
+			}
+		}
+
+		return $result_counts;
+	}
+
+	// Adds an 'x' link next to author URLs, clicking will remove the author URL and show an undo link
+	public static function remove_comment_author_url() {
+		if ( !empty( $_POST['id'] ) && check_admin_referer( 'comment_author_url_nonce' ) ) {
+			$comment_id = intval( $_POST['id'] );
+			$comment = get_comment( $comment_id, ARRAY_A );
+			if ( $comment && current_user_can( 'edit_comment', $comment['comment_ID'] ) ) {
+				$comment['comment_author_url'] = '';
+				do_action( 'comment_remove_author_url' );
+				print( wp_update_comment( $comment ) );
+				die();
+			}
+		}
+	}
+
+	public static function add_comment_author_url() {
+		if ( !empty( $_POST['id'] ) && !empty( $_POST['url'] ) && check_admin_referer( 'comment_author_url_nonce' ) ) {
+			$comment_id = intval( $_POST['id'] );
+			$comment = get_comment( $comment_id, ARRAY_A );
+			if ( $comment && current_user_can( 'edit_comment', $comment['comment_ID'] ) ) {
+				$comment['comment_author_url'] = esc_url( $_POST['url'] );
+				do_action( 'comment_add_author_url' );
+				print( wp_update_comment( $comment ) );
+				die();
+			}
+		}
+	}
+
+	public static function comment_row_action( $a, $comment ) {
+		$akismet_result = get_comment_meta( $comment->comment_ID, 'akismet_result', true );
+		$akismet_error  = get_comment_meta( $comment->comment_ID, 'akismet_error', true );
+		$user_result    = get_comment_meta( $comment->comment_ID, 'akismet_user_result', true);
+		$comment_status = wp_get_comment_status( $comment->comment_ID );
+		$desc = null;
+		if ( $akismet_error ) {
+			$desc = __( 'Awaiting spam check' , 'akismet');
+		} elseif ( !$user_result || $user_result == $akismet_result ) {
+			// Show the original Akismet result if the user hasn't overridden it, or if their decision was the same
+			if ( $akismet_result == 'true' && $comment_status != 'spam' && $comment_status != 'trash' )
+				$desc = __( 'Flagged as spam by Akismet' , 'akismet');
+			elseif ( $akismet_result == 'false' && $comment_status == 'spam' )
+				$desc = __( 'Cleared by Akismet' , 'akismet');
+		} else {
+			$who = get_comment_meta( $comment->comment_ID, 'akismet_user', true );
+			if ( $user_result == 'true' )
+				$desc = sprintf( __('Flagged as spam by %s', 'akismet'), $who );
+			else
+				$desc = sprintf( __('Un-spammed by %s', 'akismet'), $who );
+		}
+
+		// add a History item to the hover links, just after Edit
+		if ( $akismet_result ) {
+			$b = array();
+			foreach ( $a as $k => $item ) {
+				$b[ $k ] = $item;
+				if (
+					$k == 'edit'
+					|| $k == 'unspam'
+				) {
+					$b['history'] = '<a href="comment.php?action=editcomment&amp;c='.$comment->comment_ID.'#akismet-status" title="'. esc_attr__( 'View comment history' , 'akismet') . '"> '. esc_html__('History', 'akismet') . '</a>';
+				}
+			}
+
+			$a = $b;
+		}
+
+		if ( $desc )
+			echo '<span class="akismet-status" commentid="'.$comment->comment_ID.'"><a href="comment.php?action=editcomment&amp;c='.$comment->comment_ID.'#akismet-status" title="' . esc_attr__( 'View comment history' , 'akismet') . '">'.esc_html( $desc ).'</a></span>';
+
+		$show_user_comments_option = get_option( 'akismet_show_user_comments_approved' );
+		
+		if ( $show_user_comments_option === false ) {
+			// Default to active if the user hasn't made a decision.
+			$show_user_comments_option = '1';
+		}
+		
+		$show_user_comments = apply_filters( 'akismet_show_user_comments_approved', $show_user_comments_option );
+		$show_user_comments = $show_user_comments === 'false' ? false : $show_user_comments; //option used to be saved as 'false' / 'true'
+		
+		if ( $show_user_comments ) {
+			$comment_count = Akismet::get_user_comments_approved( $comment->user_id, $comment->comment_author_email, $comment->comment_author, $comment->comment_author_url );
+			$comment_count = intval( $comment_count );
+			echo '<span class="akismet-user-comment-count" commentid="'.$comment->comment_ID.'" style="display:none;"><br><span class="akismet-user-comment-counts">'. sprintf( esc_html( _n( '%s approved', '%s approved', $comment_count , 'akismet') ), number_format_i18n( $comment_count ) ) . '</span></span>';
+		}
+
+		return $a;
+	}
+
+	public static function comment_status_meta_box( $comment ) {
+		$history = Akismet::get_comment_history( $comment->comment_ID );
+
+		if ( $history ) {
+			echo '<div class="akismet-history" style="margin: 13px;">';
+
+			foreach ( $history as $row ) {
+				$time = date( 'D d M Y @ h:i:m a', $row['time'] ) . ' GMT';
+				
+				$message = '';
+				
+				if ( ! empty( $row['message'] ) ) {
+					// Old versions of Akismet stored the message as a literal string in the commentmeta.
+					// New versions don't do that for two reasons:
+					// 1) Save space.
+					// 2) The message can be translated into the current language of the blog, not stuck 
+					//    in the language of the blog when the comment was made.
+					$message = $row['message'];
+				}
+				
+				// If possible, use a current translation.
+				switch ( $row['event'] ) {
+					case 'recheck-spam';
+						$message = __( 'Akismet re-checked and caught this comment as spam.', 'akismet' );
+					break;
+					case 'check-spam':
+						$message = __( 'Akismet caught this comment as spam.', 'akismet' );
+					break;
+					case 'recheck-ham':
+						$message = __( 'Akismet re-checked and cleared this comment.', 'akismet' );
+					break;
+					case 'check-ham':
+						$message = __( 'Akismet cleared this comment.', 'akismet' );
+					break;
+					case 'wp-blacklisted':
+						$message = __( 'Comment was caught by wp_blacklist_check.', 'akismet' );
+					break;
+					case 'report-spam':
+						if ( isset( $row['user'] ) ) {
+							$message = sprintf( __( '%s reported this comment as spam.', 'akismet' ), $row['user'] );
+						}
+						else if ( ! $message ) {
+							$message = __( 'This comment was reported as spam.', 'akismet' );
+						}
+					break;
+					case 'report-ham':
+						if ( isset( $row['user'] ) ) {
+							$message = sprintf( __( '%s reported this comment as not spam.', 'akismet' ), $row['user'] );
+						}
+						else if ( ! $message ) {
+							$message = __( 'This comment was reported as not spam.', 'akismet' );
+						}
+					break;
+					case 'cron-retry-spam':
+						$message = __( 'Akismet caught this comment as spam during an automatic retry.' , 'akismet');
+					break;
+					case 'cron-retry-ham':
+						$message = __( 'Akismet cleared this comment during an automatic retry.', 'akismet');
+					break;
+					case 'check-error':
+						if ( isset( $row['meta'], $row['meta']['response'] ) ) {
+							$message = sprintf( __( 'Akismet was unable to check this comment (response: %s) but will automatically retry later.', 'akismet'), $row['meta']['response'] );
+						}
+					break;
+					case 'recheck-error':
+						if ( isset( $row['meta'], $row['meta']['response'] ) ) {
+							$message = sprintf( __( 'Akismet was unable to recheck this comment (response: %s).', 'akismet'), $row['meta']['response'] );
+						}
+					break;
+					default:
+						if ( preg_match( '/^status-changed/', $row['event'] ) ) {
+							// Half of these used to be saved without the dash after 'status-changed'.
+							// See https://plugins.trac.wordpress.org/changeset/1150658/akismet/trunk
+							$new_status = preg_replace( '/^status-changed-?/', '', $row['event'] );
+							$message = sprintf( __( 'Comment status was changed to %s', 'akismet' ), $new_status );
+						}
+						else if ( preg_match( '/^status-/', $row['event'] ) ) {
+							$new_status = preg_replace( '/^status-/', '', $row['event'] );
+
+							if ( isset( $row['user'] ) ) {
+								$message = sprintf( __( '%1$s changed the comment status to %2$s.', 'akismet' ), $row['user'], $new_status );
+							}
+						}
+					break;
+					
+				}
+
+				echo '<div style="margin-bottom: 13px;">';
+					echo '<span style="color: #999;" alt="' . $time . '" title="' . $time . '">' . sprintf( esc_html__('%s ago', 'akismet'), human_time_diff( $row['time'] ) ) . '</span>';
+					echo ' - ';
+					echo esc_html( $message );
+				echo '</div>';
+			}
+
+			echo '</div>';
+		}
+	}
+
+	public static function plugin_action_links( $links, $file ) {
+		if ( $file == plugin_basename( plugin_dir_url( __FILE__ ) . '/akismet.php' ) ) {
+			$links[] = '<a href="' . esc_url( self::get_page_url() ) . '">'.esc_html__( 'Settings' , 'akismet').'</a>';
+		}
+
+		return $links;
+	}
+
+	// Total spam in queue
+	// get_option( 'akismet_spam_count' ) is the total caught ever
+	public static function get_spam_count( $type = false ) {
+		global $wpdb;
+
+		if ( !$type ) { // total
+			$count = wp_cache_get( 'akismet_spam_count', 'widget' );
+			if ( false === $count ) {
+				$count = wp_count_comments();
+				$count = $count->spam;
+				wp_cache_set( 'akismet_spam_count', $count, 'widget', 3600 );
+			}
+			return $count;
+		} elseif ( 'comments' == $type || 'comment' == $type ) { // comments
+			$type = '';
+		}
+
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(comment_ID) FROM {$wpdb->comments} WHERE comment_approved = 'spam' AND comment_type = %s", $type ) );
+	}
+
+	// Check connectivity between the WordPress blog and Akismet's servers.
+	// Returns an associative array of server IP addresses, where th
