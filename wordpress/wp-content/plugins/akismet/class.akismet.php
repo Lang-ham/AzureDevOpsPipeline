@@ -723,4 +723,262 @@ class Akismet {
 				$event = 'cron-retry-ham';
 			}
 
-			// If we got 
+			// If we got back a legit response then update the comment history
+			// other wise just bail now and try again later.  No point in
+			// re-trying all the comments once we hit one failure.
+			if ( !empty( $event ) ) {
+				delete_comment_meta( $comment_id, 'akismet_error' );
+				self::update_comment_history( $comment_id, '', $event );
+				update_comment_meta( $comment_id, 'akismet_result', $status );
+				// make sure the comment status is still pending.  if it isn't, that means the user has already moved it elsewhere.
+				$comment = get_comment( $comment_id );
+				if ( $comment && 'unapproved' == wp_get_comment_status( $comment_id ) ) {
+					if ( $status == 'true' ) {
+						wp_spam_comment( $comment_id );
+					} elseif ( $status == 'false' ) {
+						// comment is good, but it's still in the pending queue.  depending on the moderation settings
+						// we may need to change it to approved.
+						if ( check_comment($comment->comment_author, $comment->comment_author_email, $comment->comment_author_url, $comment->comment_content, $comment->comment_author_IP, $comment->comment_agent, $comment->comment_type) )
+							wp_set_comment_status( $comment_id, 1 );
+						else if ( get_comment_meta( $comment_id, 'akismet_delayed_moderation_email', true ) )
+							wp_notify_moderator( $comment_id );
+					}
+				}
+				
+				delete_comment_meta( $comment_id, 'akismet_delayed_moderation_email' );
+			} else {
+				// If this comment has been pending moderation for longer than MAX_DELAY_BEFORE_MODERATION_EMAIL,
+				// send a moderation email now.
+				if ( ( intval( gmdate( 'U' ) ) - strtotime( $comment->comment_date_gmt ) ) < self::MAX_DELAY_BEFORE_MODERATION_EMAIL ) {
+					delete_comment_meta( $comment_id, 'akismet_delayed_moderation_email' );
+					wp_notify_moderator( $comment_id );
+				}
+
+				delete_comment_meta( $comment_id, 'akismet_rechecking' );
+				wp_schedule_single_event( time() + 1200, 'akismet_schedule_cron_recheck' );
+				do_action( 'akismet_scheduled_recheck', 'check-db-comment-' . $status );
+				return;
+			}
+			delete_comment_meta( $comment_id, 'akismet_rechecking' );
+		}
+
+		$remaining = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->commentmeta} WHERE meta_key = 'akismet_error'" );
+		if ( $remaining && !wp_next_scheduled('akismet_schedule_cron_recheck') ) {
+			wp_schedule_single_event( time() + 1200, 'akismet_schedule_cron_recheck' );
+			do_action( 'akismet_scheduled_recheck', 'remaining' );
+		}
+	}
+
+	public static function fix_scheduled_recheck() {
+		$future_check = wp_next_scheduled( 'akismet_schedule_cron_recheck' );
+		if ( !$future_check ) {
+			return;
+		}
+
+		if ( get_option( 'akismet_alert_code' ) > 0 ) {
+			return;
+		}
+
+		$check_range = time() + 1200;
+		if ( $future_check > $check_range ) {
+			wp_clear_scheduled_hook( 'akismet_schedule_cron_recheck' );
+			wp_schedule_single_event( time() + 300, 'akismet_schedule_cron_recheck' );
+			do_action( 'akismet_scheduled_recheck', 'fix-scheduled-recheck' );
+		}
+	}
+
+	public static function add_comment_nonce( $post_id ) {
+		/**
+		 * To disable the Akismet comment nonce, add a filter for the 'akismet_comment_nonce' tag
+		 * and return any string value that is not 'true' or '' (empty string).
+		 *
+		 * Don't return boolean false, because that implies that the 'akismet_comment_nonce' option
+		 * has not been set and that Akismet should just choose the default behavior for that
+		 * situation.
+		 */
+		$akismet_comment_nonce_option = apply_filters( 'akismet_comment_nonce', get_option( 'akismet_comment_nonce' ) );
+
+		if ( $akismet_comment_nonce_option == 'true' || $akismet_comment_nonce_option == '' ) {
+			echo '<p style="display: none;">';
+			wp_nonce_field( 'akismet_comment_nonce_' . $post_id, 'akismet_comment_nonce', FALSE );
+			echo '</p>';
+		}
+	}
+
+	public static function is_test_mode() {
+		return defined('AKISMET_TEST_MODE') && AKISMET_TEST_MODE;
+	}
+	
+	public static function allow_discard() {
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX )
+			return false;
+		if ( is_user_logged_in() )
+			return false;
+	
+		return ( get_option( 'akismet_strictness' ) === '1'  );
+	}
+
+	public static function get_ip_address() {
+		return isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : null;
+	}
+	
+	/**
+	 * Do these two comments, without checking the comment_ID, "match"?
+	 *
+	 * @param mixed $comment1 A comment object or array.
+	 * @param mixed $comment2 A comment object or array.
+	 * @return bool Whether the two comments should be treated as the same comment.
+	 */
+	private static function comments_match( $comment1, $comment2 ) {
+		$comment1 = (array) $comment1;
+		$comment2 = (array) $comment2;
+
+		// Set default values for these strings that we check in order to simplify
+		// the checks and avoid PHP warnings.
+		if ( ! isset( $comment1['comment_author'] ) ) {
+			$comment1['comment_author'] = '';
+		}
+
+		if ( ! isset( $comment2['comment_author'] ) ) {
+			$comment2['comment_author'] = '';
+		}
+
+		if ( ! isset( $comment1['comment_author_email'] ) ) {
+			$comment1['comment_author_email'] = '';
+		}
+
+		if ( ! isset( $comment2['comment_author_email'] ) ) {
+			$comment2['comment_author_email'] = '';
+		}
+
+		$comments_match = (
+			   isset( $comment1['comment_post_ID'], $comment2['comment_post_ID'] )
+			&& intval( $comment1['comment_post_ID'] ) == intval( $comment2['comment_post_ID'] )
+			&& (
+				// The comment author length max is 255 characters, limited by the TINYTEXT column type.
+				// If the comment author includes multibyte characters right around the 255-byte mark, they
+				// may be stripped when the author is saved in the DB, so a 300+ char author may turn into
+				// a 253-char author when it's saved, not 255 exactly.  The longest possible character is
+				// theoretically 6 bytes, so we'll only look at the first 248 bytes to be safe.
+				substr( $comment1['comment_author'], 0, 248 ) == substr( $comment2['comment_author'], 0, 248 )
+				|| substr( stripslashes( $comment1['comment_author'] ), 0, 248 ) == substr( $comment2['comment_author'], 0, 248 )
+				|| substr( $comment1['comment_author'], 0, 248 ) == substr( stripslashes( $comment2['comment_author'] ), 0, 248 )
+				// Certain long comment author names will be truncated to nothing, depending on their encoding.
+				|| ( ! $comment1['comment_author'] && strlen( $comment2['comment_author'] ) > 248 )
+				|| ( ! $comment2['comment_author'] && strlen( $comment1['comment_author'] ) > 248 )
+				)
+			&& (
+				// The email max length is 100 characters, limited by the VARCHAR(100) column type.
+				// Same argument as above for only looking at the first 93 characters.
+				substr( $comment1['comment_author_email'], 0, 93 ) == substr( $comment2['comment_author_email'], 0, 93 )
+				|| substr( stripslashes( $comment1['comment_author_email'] ), 0, 93 ) == substr( $comment2['comment_author_email'], 0, 93 )
+				|| substr( $comment1['comment_author_email'], 0, 93 ) == substr( stripslashes( $comment2['comment_author_email'] ), 0, 93 )
+				// Very long emails can be truncated and then stripped if the [0:100] substring isn't a valid address.
+				|| ( ! $comment1['comment_author_email'] && strlen( $comment2['comment_author_email'] ) > 100 )
+				|| ( ! $comment2['comment_author_email'] && strlen( $comment1['comment_author_email'] ) > 100 )
+			)
+		);
+
+		return $comments_match;
+	}
+	
+	// Does the supplied comment match the details of the one most recently stored in self::$last_comment?
+	public static function matches_last_comment( $comment ) {
+		return self::comments_match( self::$last_comment, $comment );
+	}
+
+	private static function get_user_agent() {
+		return isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : null;
+	}
+
+	private static function get_referer() {
+		return isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : null;
+	}
+
+	// return a comma-separated list of role names for the given user
+	public static function get_user_roles( $user_id ) {
+		$roles = false;
+
+		if ( !class_exists('WP_User') )
+			return false;
+
+		if ( $user_id > 0 ) {
+			$comment_user = new WP_User( $user_id );
+			if ( isset( $comment_user->roles ) )
+				$roles = join( ',', $comment_user->roles );
+		}
+
+		if ( is_multisite() && is_super_admin( $user_id ) ) {
+			if ( empty( $roles ) ) {
+				$roles = 'super_admin';
+			} else {
+				$comment_user->roles[] = 'super_admin';
+				$roles = join( ',', $comment_user->roles );
+			}
+		}
+
+		return $roles;
+	}
+
+	// filter handler used to return a spam result to pre_comment_approved
+	public static function last_comment_status( $approved, $comment ) {
+		if ( is_null( self::$last_comment_result ) ) {
+			// We didn't have reason to store the result of the last check.
+			return $approved;
+		}
+
+		// Only do this if it's the correct comment
+		if ( ! self::matches_last_comment( $comment ) ) {
+			self::log( "comment_is_spam mismatched comment, returning unaltered $approved" );
+			return $approved;
+		}
+
+		if ( 'trash' === $approved ) {
+			// If the last comment we checked has had its approval set to 'trash',
+			// then it failed the comment blacklist check. Let that blacklist override
+			// the spam check, since users have the (valid) expectation that when
+			// they fill out their blacklists, comments that match it will always
+			// end up in the trash.
+			return $approved;
+		}
+
+		// bump the counter here instead of when the filter is added to reduce the possibility of overcounting
+		if ( $incr = apply_filters('akismet_spam_count_incr', 1) )
+			update_option( 'akismet_spam_count', get_option('akismet_spam_count') + $incr );
+
+		return self::$last_comment_result;
+	}
+	
+	/**
+	 * If Akismet is temporarily unreachable, we don't want to "spam" the blogger with
+	 * moderation emails for comments that will be automatically cleared or spammed on
+	 * the next retry.
+	 *
+	 * For comments that will be rechecked later, empty the list of email addresses that
+	 * the moderation email would be sent to.
+	 *
+	 * @param array $emails An array of email addresses that the moderation email will be sent to.
+	 * @param int $comment_id The ID of the relevant comment.
+	 * @return array An array of email addresses that the moderation email will be sent to.
+	 */
+	public static function disable_moderation_emails_if_unreachable( $emails, $comment_id ) {
+		if ( ! empty( self::$prevent_moderation_email_for_these_comments ) && ! empty( $emails ) ) {
+			$comment = get_comment( $comment_id );
+
+			foreach ( self::$prevent_moderation_email_for_these_comments as $possible_match ) {
+				if ( self::comments_match( $possible_match, $comment ) ) {
+					update_comment_meta( $comment_id, 'akismet_delayed_moderation_email', true );
+					return array();
+				}
+			}
+		}
+
+		return $emails;
+	}
+
+	public static function _cmp_time( $a, $b ) {
+		return $a['time'] > $b['time'] ? -1 : 1;
+	}
+
+	public static function _get_microtime() {
+		$mtime = 
