@@ -201,4 +201,266 @@ class Akismet {
 
 			if ( $discard ) {
 				// The spam is obvious, so we're bailing out early. 
-				// akismet_result_spam() won't be called so bump
+				// akismet_result_spam() won't be called so bump the counter here
+				if ( $incr = apply_filters( 'akismet_spam_count_incr', 1 ) ) {
+					update_option( 'akismet_spam_count', get_option( 'akismet_spam_count' ) + $incr );
+				}
+
+				if ( self::$is_rest_api_call ) {
+					return new WP_Error( 'akismet_rest_comment_discarded', __( 'Comment discarded.', 'akismet' ) );
+				}
+				else {
+					// Redirect back to the previous page, or failing that, the post permalink, or failing that, the homepage of the blog.
+					$redirect_to = isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : ( $post ? get_permalink( $post ) : home_url() );
+					wp_safe_redirect( esc_url_raw( $redirect_to ) );
+					die();
+				}
+			}
+			else if ( self::$is_rest_api_call ) {
+				// The way the REST API structures its calls, we can set the comment_approved value right away.
+				$commentdata['comment_approved'] = 'spam';
+			}
+		}
+		
+		// if the response is neither true nor false, hold the comment for moderation and schedule a recheck
+		if ( 'true' != $response[1] && 'false' != $response[1] ) {
+			if ( !current_user_can('moderate_comments') ) {
+				// Comment status should be moderated
+				self::$last_comment_result = '0';
+			}
+
+			if ( ! wp_next_scheduled( 'akismet_schedule_cron_recheck' ) ) {
+				wp_schedule_single_event( time() + 1200, 'akismet_schedule_cron_recheck' );
+				do_action( 'akismet_scheduled_recheck', 'invalid-response-' . $response[1] );
+			}
+
+			self::$prevent_moderation_email_for_these_comments[] = $commentdata;
+		}
+
+		// Delete old comments daily
+		if ( ! wp_next_scheduled( 'akismet_scheduled_delete' ) ) {
+			wp_schedule_event( time(), 'daily', 'akismet_scheduled_delete' );
+		}
+
+		self::set_last_comment( $commentdata );
+		self::fix_scheduled_recheck();
+
+		return $commentdata;
+	}
+	
+	public static function get_last_comment() {
+		return self::$last_comment;
+	}
+	
+	public static function set_last_comment( $comment ) {
+		if ( is_null( $comment ) ) {
+			self::$last_comment = null;
+		}
+		else {
+			// We filter it here so that it matches the filtered comment data that we'll have to compare against later.
+			// wp_filter_comment expects comment_author_IP
+			self::$last_comment = wp_filter_comment(
+				array_merge(
+					array( 'comment_author_IP' => self::get_ip_address() ),
+					$comment
+				)
+			);
+		}
+	}
+
+	// this fires on wp_insert_comment.  we can't update comment_meta when auto_check_comment() runs
+	// because we don't know the comment ID at that point.
+	public static function auto_check_update_meta( $id, $comment ) {
+		// wp_insert_comment() might be called in other contexts, so make sure this is the same comment
+		// as was checked by auto_check_comment
+		if ( is_object( $comment ) && !empty( self::$last_comment ) && is_array( self::$last_comment ) ) {
+			if ( self::matches_last_comment( $comment ) ) {
+					
+					load_plugin_textdomain( 'akismet' );
+					
+					// normal result: true or false
+					if ( self::$last_comment['akismet_result'] == 'true' ) {
+						update_comment_meta( $comment->comment_ID, 'akismet_result', 'true' );
+						self::update_comment_history( $comment->comment_ID, '', 'check-spam' );
+						if ( $comment->comment_approved != 'spam' )
+							self::update_comment_history(
+								$comment->comment_ID,
+								'',
+								'status-changed-'.$comment->comment_approved
+							);
+					}
+					elseif ( self::$last_comment['akismet_result'] == 'false' ) {
+						update_comment_meta( $comment->comment_ID, 'akismet_result', 'false' );
+						self::update_comment_history( $comment->comment_ID, '', 'check-ham' );
+						// Status could be spam or trash, depending on the WP version and whether this change applies:
+						// https://core.trac.wordpress.org/changeset/34726
+						if ( $comment->comment_approved == 'spam' || $comment->comment_approved == 'trash' ) {
+							if ( wp_blacklist_check($comment->comment_author, $comment->comment_author_email, $comment->comment_author_url, $comment->comment_content, $comment->comment_author_IP, $comment->comment_agent) )
+								self::update_comment_history( $comment->comment_ID, '', 'wp-blacklisted' );
+							else
+								self::update_comment_history( $comment->comment_ID, '', 'status-changed-'.$comment->comment_approved );
+						}
+					} // abnormal result: error
+					else {
+						update_comment_meta( $comment->comment_ID, 'akismet_error', time() );
+						self::update_comment_history(
+							$comment->comment_ID,
+							'',
+							'check-error',
+							array( 'response' => substr( self::$last_comment['akismet_result'], 0, 50 ) )
+						);
+					}
+
+					// record the complete original data as submitted for checking
+					if ( isset( self::$last_comment['comment_as_submitted'] ) )
+						update_comment_meta( $comment->comment_ID, 'akismet_as_submitted', self::$last_comment['comment_as_submitted'] );
+
+					if ( isset( self::$last_comment['akismet_pro_tip'] ) )
+						update_comment_meta( $comment->comment_ID, 'akismet_pro_tip', self::$last_comment['akismet_pro_tip'] );
+			}
+		}
+	}
+
+	public static function delete_old_comments() {
+		global $wpdb;
+
+		/**
+		 * Determines how many comments will be deleted in each batch.
+		 *
+		 * @param int The default, as defined by AKISMET_DELETE_LIMIT.
+		 */
+		$delete_limit = apply_filters( 'akismet_delete_comment_limit', defined( 'AKISMET_DELETE_LIMIT' ) ? AKISMET_DELETE_LIMIT : 10000 );
+		$delete_limit = max( 1, intval( $delete_limit ) );
+
+		/**
+		 * Determines how many days a comment will be left in the Spam queue before being deleted.
+		 *
+		 * @param int The default number of days.
+		 */
+		$delete_interval = apply_filters( 'akismet_delete_comment_interval', 15 );
+		$delete_interval = max( 1, intval( $delete_interval ) );
+
+		while ( $comment_ids = $wpdb->get_col( $wpdb->prepare( "SELECT comment_id FROM {$wpdb->comments} WHERE DATE_SUB(NOW(), INTERVAL %d DAY) > comment_date_gmt AND comment_approved = 'spam' LIMIT %d", $delete_interval, $delete_limit ) ) ) {
+			if ( empty( $comment_ids ) )
+				return;
+
+			$wpdb->queries = array();
+
+			foreach ( $comment_ids as $comment_id ) {
+				do_action( 'delete_comment', $comment_id );
+			}
+
+			// Prepared as strings since comment_id is an unsigned BIGINT, and using %d will constrain the value to the maximum signed BIGINT.
+			$format_string = implode( ", ", array_fill( 0, count( $comment_ids ), '%s' ) );
+
+			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->comments} WHERE comment_id IN ( " . $format_string . " )", $comment_ids ) );
+			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->commentmeta} WHERE comment_id IN ( " . $format_string . " )", $comment_ids ) );
+
+			clean_comment_cache( $comment_ids );
+			do_action( 'akismet_delete_comment_batch', count( $comment_ids ) );
+		}
+
+		if ( apply_filters( 'akismet_optimize_table', ( mt_rand(1, 5000) == 11), $wpdb->comments ) ) // lucky number
+			$wpdb->query("OPTIMIZE TABLE {$wpdb->comments}");
+	}
+
+	public static function delete_old_comments_meta() {
+		global $wpdb;
+
+		$interval = apply_filters( 'akismet_delete_commentmeta_interval', 15 );
+
+		# enfore a minimum of 1 day
+		$interval = absint( $interval );
+		if ( $interval < 1 )
+			$interval = 1;
+
+		// akismet_as_submitted meta values are large, so expire them
+		// after $interval days regardless of the comment status
+		while ( $comment_ids = $wpdb->get_col( $wpdb->prepare( "SELECT m.comment_id FROM {$wpdb->commentmeta} as m INNER JOIN {$wpdb->comments} as c USING(comment_id) WHERE m.meta_key = 'akismet_as_submitted' AND DATE_SUB(NOW(), INTERVAL %d DAY) > c.comment_date_gmt LIMIT 10000", $interval ) ) ) {
+			if ( empty( $comment_ids ) )
+				return;
+
+			$wpdb->queries = array();
+
+			foreach ( $comment_ids as $comment_id ) {
+				delete_comment_meta( $comment_id, 'akismet_as_submitted' );
+			}
+
+			do_action( 'akismet_delete_commentmeta_batch', count( $comment_ids ) );
+		}
+
+		if ( apply_filters( 'akismet_optimize_table', ( mt_rand(1, 5000) == 11), $wpdb->commentmeta ) ) // lucky number
+			$wpdb->query("OPTIMIZE TABLE {$wpdb->commentmeta}");
+	}
+
+	// how many approved comments does this author have?
+	public static function get_user_comments_approved( $user_id, $comment_author_email, $comment_author, $comment_author_url ) {
+		global $wpdb;
+
+		if ( !empty( $user_id ) )
+			return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->comments} WHERE user_id = %d AND comment_approved = 1", $user_id ) );
+
+		if ( !empty( $comment_author_email ) )
+			return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_author_email = %s AND comment_author = %s AND comment_author_url = %s AND comment_approved = 1", $comment_author_email, $comment_author, $comment_author_url ) );
+
+		return 0;
+	}
+
+	// get the full comment history for a given comment, as an array in reverse chronological order
+	public static function get_comment_history( $comment_id ) {
+		$history = get_comment_meta( $comment_id, 'akismet_history', false );
+		usort( $history, array( 'Akismet', '_cmp_time' ) );
+		return $history;
+	}
+
+	/**
+	 * Log an event for a given comment, storing it in comment_meta.
+	 *
+	 * @param int $comment_id The ID of the relevant comment.
+	 * @param string $message The string description of the event. No longer used.
+	 * @param string $event The event code.
+	 * @param array $meta Metadata about the history entry. e.g., the user that reported or changed the status of a given comment.
+	 */
+	public static function update_comment_history( $comment_id, $message, $event=null, $meta=null ) {
+		global $current_user;
+
+		$user = '';
+
+		$event = array(
+			'time'    => self::_get_microtime(),
+			'event'   => $event,
+		);
+		
+		if ( is_object( $current_user ) && isset( $current_user->user_login ) ) {
+			$event['user'] = $current_user->user_login;
+		}
+		
+		if ( ! empty( $meta ) ) {
+			$event['meta'] = $meta;
+		}
+
+		// $unique = false so as to allow multiple values per comment
+		$r = add_comment_meta( $comment_id, 'akismet_history', $event, false );
+	}
+
+	public static function check_db_comment( $id, $recheck_reason = 'recheck_queue' ) {
+		global $wpdb;
+
+		$c = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->comments} WHERE comment_ID = %d", $id ), ARRAY_A );
+		
+		if ( ! $c ) {
+			return new WP_Error( 'invalid-comment-id', __( 'Comment not found.', 'akismet' ) );
+		}
+
+		$c['user_ip']        = $c['comment_author_IP'];
+		$c['user_agent']     = $c['comment_agent'];
+		$c['referrer']       = '';
+		$c['blog']           = get_option( 'home' );
+		$c['blog_lang']      = get_locale();
+		$c['blog_charset']   = get_option('blog_charset');
+		$c['permalink']      = get_permalink($c['comment_post_ID']);
+		$c['recheck_reason'] = $recheck_reason;
+
+		$c['user_role'] = '';
+		if ( ! empty( $c['user_ID'] ) ) {
+			$c['user_role'] = Akismet
