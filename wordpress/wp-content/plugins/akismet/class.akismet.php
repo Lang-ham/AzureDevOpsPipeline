@@ -463,4 +463,264 @@ class Akismet {
 
 		$c['user_role'] = '';
 		if ( ! empty( $c['user_ID'] ) ) {
-			$c['user_role'] = Akismet
+			$c['user_role'] = Akismet::get_user_roles( $c['user_ID'] );
+		}
+
+		if ( self::is_test_mode() )
+			$c['is_test'] = 'true';
+
+		$response = self::http_post( Akismet::build_query( $c ), 'comment-check' );
+
+		if ( ! empty( $response[1] ) ) {
+			return $response[1];
+		}
+
+		return false;
+	}
+	
+	public static function recheck_comment( $id, $recheck_reason = 'recheck_queue' ) {
+		add_comment_meta( $id, 'akismet_rechecking', true );
+		
+		$api_response = self::check_db_comment( $id, $recheck_reason );
+
+		delete_comment_meta( $id, 'akismet_rechecking' );
+
+		if ( is_wp_error( $api_response ) ) {
+			// Invalid comment ID.
+		}
+		else if ( 'true' === $api_response ) {
+			wp_set_comment_status( $id, 'spam' );
+			update_comment_meta( $id, 'akismet_result', 'true' );
+			delete_comment_meta( $id, 'akismet_error' );
+			delete_comment_meta( $id, 'akismet_delayed_moderation_email' );
+			Akismet::update_comment_history( $id, '', 'recheck-spam' );
+		}
+		elseif ( 'false' === $api_response ) {
+			update_comment_meta( $id, 'akismet_result', 'false' );
+			delete_comment_meta( $id, 'akismet_error' );
+			delete_comment_meta( $id, 'akismet_delayed_moderation_email' );
+			Akismet::update_comment_history( $id, '', 'recheck-ham' );
+		}
+		else {
+			// abnormal result: error
+			update_comment_meta( $id, 'akismet_result', 'error' );
+			Akismet::update_comment_history(
+				$id,
+				'',
+				'recheck-error',
+				array( 'response' => substr( $api_response, 0, 50 ) )
+			);
+		}
+
+		return $api_response;
+	}
+
+	public static function transition_comment_status( $new_status, $old_status, $comment ) {
+		
+		if ( $new_status == $old_status )
+			return;
+
+		# we don't need to record a history item for deleted comments
+		if ( $new_status == 'delete' )
+			return;
+		
+		if ( !current_user_can( 'edit_post', $comment->comment_post_ID ) && !current_user_can( 'moderate_comments' ) )
+			return;
+
+		if ( defined('WP_IMPORTING') && WP_IMPORTING == true )
+			return;
+			
+		// if this is present, it means the status has been changed by a re-check, not an explicit user action
+		if ( get_comment_meta( $comment->comment_ID, 'akismet_rechecking' ) )
+			return;
+		
+		// Assumption alert:
+		// We want to submit comments to Akismet only when a moderator explicitly spams or approves it - not if the status
+		// is changed automatically by another plugin.  Unfortunately WordPress doesn't provide an unambiguous way to
+		// determine why the transition_comment_status action was triggered.  And there are several different ways by which
+		// to spam and unspam comments: bulk actions, ajax, links in moderation emails, the dashboard, and perhaps others.
+		// We'll assume that this is an explicit user action if certain POST/GET variables exist.
+		if (
+			 // status=spam: Marking as spam via the REST API or...
+			 // status=unspam: I'm not sure. Maybe this used to be used instead of status=approved? Or the UI for removing from spam but not approving has been since removed?...
+			 // status=approved: Unspamming via the REST API (Calypso) or...
+			 ( isset( $_POST['status'] ) && in_array( $_POST['status'], array( 'spam', 'unspam', 'approved', ) ) )
+			 // spam=1: Clicking "Spam" underneath a comment in wp-admin and allowing the AJAX request to happen.
+			 || ( isset( $_POST['spam'] ) && (int) $_POST['spam'] == 1 )
+			 // unspam=1: Clicking "Not Spam" underneath a comment in wp-admin and allowing the AJAX request to happen. Or, clicking "Undo" after marking something as spam.
+			 || ( isset( $_POST['unspam'] ) && (int) $_POST['unspam'] == 1 )
+			 // comment_status=spam/unspam: It's unclear where this is happening.
+			 || ( isset( $_POST['comment_status'] )  && in_array( $_POST['comment_status'], array( 'spam', 'unspam' ) ) )
+			 // action=spam: Choosing "Mark as Spam" from the Bulk Actions dropdown in wp-admin (or the "Spam it" link in notification emails).
+			 // action=unspam: Choosing "Not Spam" from the Bulk Actions dropdown in wp-admin.
+			 // action=spamcomment: Following the "Spam" link below a comment in wp-admin (not allowing AJAX request to happen).
+			 // action=unspamcomment: Following the "Not Spam" link below a comment in wp-admin (not allowing AJAX request to happen).
+			 || ( isset( $_GET['action'] ) && in_array( $_GET['action'], array( 'spam', 'unspam', 'spamcomment', 'unspamcomment', ) ) )
+			 // action=editedcomment: Editing a comment via wp-admin (and possibly changing its status).
+			 || ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'editedcomment' ) ) )
+			 // for=jetpack: Moderation via the WordPress app, Calypso, anything powered by the Jetpack connection.
+			 || ( isset( $_GET['for'] ) && ( 'jetpack' == $_GET['for'] ) && ( ! defined( 'IS_WPCOM' ) || ! IS_WPCOM ) ) 
+			 // Certain WordPress.com API requests
+			 || ( defined( 'REST_API_REQUEST' ) && REST_API_REQUEST )
+			 // WordPress.org REST API requests
+			 || ( defined( 'REST_REQUEST' ) && REST_REQUEST )
+		 ) {
+			if ( $new_status == 'spam' && ( $old_status == 'approved' || $old_status == 'unapproved' || !$old_status ) ) {
+				return self::submit_spam_comment( $comment->comment_ID );
+			} elseif ( $old_status == 'spam' && ( $new_status == 'approved' || $new_status == 'unapproved' ) ) {
+				return self::submit_nonspam_comment( $comment->comment_ID );
+			}
+		}
+
+		self::update_comment_history( $comment->comment_ID, '', 'status-' . $new_status );
+	}
+	
+	public static function submit_spam_comment( $comment_id ) {
+		global $wpdb, $current_user, $current_site;
+
+		$comment_id = (int) $comment_id;
+
+		$comment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->comments} WHERE comment_ID = %d", $comment_id ) );
+
+		if ( !$comment ) // it was deleted
+			return;
+
+		if ( 'spam' != $comment->comment_approved )
+			return;
+
+		// use the original version stored in comment_meta if available
+		$as_submitted = self::sanitize_comment_as_submitted( get_comment_meta( $comment_id, 'akismet_as_submitted', true ) );
+
+		if ( $as_submitted && is_array( $as_submitted ) && isset( $as_submitted['comment_content'] ) )
+			$comment = (object) array_merge( (array)$comment, $as_submitted );
+
+		$comment->blog         = get_option( 'home' );
+		$comment->blog_lang    = get_locale();
+		$comment->blog_charset = get_option('blog_charset');
+		$comment->permalink    = get_permalink($comment->comment_post_ID);
+
+		if ( is_object($current_user) )
+			$comment->reporter = $current_user->user_login;
+
+		if ( is_object($current_site) )
+			$comment->site_domain = $current_site->domain;
+
+		$comment->user_role = '';
+		if ( ! empty( $comment->user_ID ) ) {
+			$comment->user_role = Akismet::get_user_roles( $comment->user_ID );
+		}
+
+		if ( self::is_test_mode() )
+			$comment->is_test = 'true';
+
+		$post = get_post( $comment->comment_post_ID );
+
+		if ( ! is_null( $post ) ) {
+			$comment->comment_post_modified_gmt = $post->post_modified_gmt;
+		}
+
+		$response = Akismet::http_post( Akismet::build_query( $comment ), 'submit-spam' );
+		if ( $comment->reporter ) {
+			self::update_comment_history( $comment_id, '', 'report-spam' );
+			update_comment_meta( $comment_id, 'akismet_user_result', 'true' );
+			update_comment_meta( $comment_id, 'akismet_user', $comment->reporter );
+		}
+
+		do_action('akismet_submit_spam_comment', $comment_id, $response[1]);
+	}
+
+	public static function submit_nonspam_comment( $comment_id ) {
+		global $wpdb, $current_user, $current_site;
+
+		$comment_id = (int) $comment_id;
+
+		$comment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->comments} WHERE comment_ID = %d", $comment_id ) );
+		if ( !$comment ) // it was deleted
+			return;
+
+		// use the original version stored in comment_meta if available
+		$as_submitted = self::sanitize_comment_as_submitted( get_comment_meta( $comment_id, 'akismet_as_submitted', true ) );
+
+		if ( $as_submitted && is_array($as_submitted) && isset($as_submitted['comment_content']) )
+			$comment = (object) array_merge( (array)$comment, $as_submitted );
+
+		$comment->blog         = get_option( 'home' );
+		$comment->blog_lang    = get_locale();
+		$comment->blog_charset = get_option('blog_charset');
+		$comment->permalink    = get_permalink( $comment->comment_post_ID );
+		$comment->user_role    = '';
+
+		if ( is_object($current_user) )
+			$comment->reporter = $current_user->user_login;
+
+		if ( is_object($current_site) )
+			$comment->site_domain = $current_site->domain;
+
+		if ( ! empty( $comment->user_ID ) ) {
+			$comment->user_role = Akismet::get_user_roles( $comment->user_ID );
+		}
+
+		if ( Akismet::is_test_mode() )
+			$comment->is_test = 'true';
+
+		$post = get_post( $comment->comment_post_ID );
+
+		if ( ! is_null( $post ) ) {
+			$comment->comment_post_modified_gmt = $post->post_modified_gmt;
+		}
+
+		$response = self::http_post( Akismet::build_query( $comment ), 'submit-ham' );
+		if ( $comment->reporter ) {
+			self::update_comment_history( $comment_id, '', 'report-ham' );
+			update_comment_meta( $comment_id, 'akismet_user_result', 'false' );
+			update_comment_meta( $comment_id, 'akismet_user', $comment->reporter );
+		}
+
+		do_action('akismet_submit_nonspam_comment', $comment_id, $response[1]);
+	}
+
+	public static function cron_recheck() {
+		global $wpdb;
+
+		$api_key = self::get_api_key();
+
+		$status = self::verify_key( $api_key );
+		if ( get_option( 'akismet_alert_code' ) || $status == 'invalid' ) {
+			// since there is currently a problem with the key, reschedule a check for 6 hours hence
+			wp_schedule_single_event( time() + 21600, 'akismet_schedule_cron_recheck' );
+			do_action( 'akismet_scheduled_recheck', 'key-problem-' . get_option( 'akismet_alert_code' ) . '-' . $status );
+			return false;
+		}
+
+		delete_option('akismet_available_servers');
+
+		$comment_errors = $wpdb->get_col( "SELECT comment_id FROM {$wpdb->commentmeta} WHERE meta_key = 'akismet_error'	LIMIT 100" );
+		
+		load_plugin_textdomain( 'akismet' );
+
+		foreach ( (array) $comment_errors as $comment_id ) {
+			// if the comment no longer exists, or is too old, remove the meta entry from the queue to avoid getting stuck
+			$comment = get_comment( $comment_id );
+
+			if (
+				! $comment // Comment has been deleted
+				|| strtotime( $comment->comment_date_gmt ) < strtotime( "-15 days" ) // Comment is too old.
+				|| $comment->comment_approved !== "0" // Comment is no longer in the Pending queue
+				) {
+				echo "Deleting";
+				delete_comment_meta( $comment_id, 'akismet_error' );
+				delete_comment_meta( $comment_id, 'akismet_delayed_moderation_email' );
+				continue;
+			}
+
+			add_comment_meta( $comment_id, 'akismet_rechecking', true );
+			$status = self::check_db_comment( $comment_id, 'retry' );
+
+			$event = '';
+			if ( $status == 'true' ) {
+				$event = 'cron-retry-spam';
+			} elseif ( $status == 'false' ) {
+				$event = 'cron-retry-ham';
+			}
+
+			// If we got 
