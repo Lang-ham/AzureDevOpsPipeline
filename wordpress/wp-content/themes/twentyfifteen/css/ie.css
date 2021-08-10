@@ -1,0 +1,186 @@
+/*
+Theme Name: Twenty Fifteen
+Description: Global Styles for older IE versions (previous to IE9).
+*/
+
+body,
+button,
+input,
+select,
+textarea {
+	font-size: 19px;
+	line-height: 1.6842;
+}
+
+button,
+input {
+	line-height: normal;
+}
+
+p,
+address,
+pre,
+hr,
+ul,
+ol,
+dl,
+dd,
+table {
+	margin-bottom: 1.6842em;
+}
+
+ul,
+ol {
+	margin-left: 0;
+}
+
+li > ul,
+li > ol,
+blockquote > ul,
+blockquote > ol {
+	margin-left: 1.3333em;
+}
+
+blockquote {
+	border-color: inherit;
+	border-style: solid;
+	border-width: 0 0 0 4px;
+	font-size: 22px;
+	line-height: 1.8182;
+	margin-bottom: 1.8182em;
+	margin-left: -1.0909em;
+	padding-left: 0.9091em;
+}
+
+blockquote > blockquote {
+	margin-left: 0;
+}
+
+blockquote p {
+	margin-bottom: 1.8182em;
+}
+
+blockquote cite,
+blockquote small {
+	font-size: 19px;
+	line-height: 1.6842;
+}
+
+pre {
+	line-height: 1.2632;
+}
+
+.entry-content img,
+.entry-summary img,
+.page-content img,
+.comment-content img,
+.widget img {
+	max-width: 660px;
+}
+
+img.size-full,
+img.size-large,
+img.header-image,
+img.wp-post-image,
+img[class*="align"],
+img[class*="wp-image-"],
+img[class*="attachment-"] {
+	height: auto;
+	width: auto; /* Prevent stretching of full-size and large-size images with height and width attributes in IE8 */
+}
+
+button,
+input[type="button"],
+input[type="reset"],
+input[type="submit"],
+.post-password-form input[type="submit"],
+.widecolumn #submit,
+.widecolumn .mu_register input[type="submit"] {
+	font-size: 16px;
+	padding: 0.8125em 1.625em;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="url"],
+input[type="password"],
+input[type="search"],
+textarea {
+	padding: 0.5278em;
+}
+
+.main-navigation {
+	font-size: 16px;
+	line-height: 1.5;
+	margin: 9.0909%;
+}
+
+.main-navigation ul ul {
+	border-bottom: 0;
+	border-top: 0;
+	margin-left: 1em;
+}
+
+.main-navigation a {
+	padding: 0.75em 0;
+}
+
+.main-navigation .menu-item-has-children > a {
+	padding-right: 48px;
+}
+
+.main-navigation .menu-item-description {
+	font-size: 13px;
+	line-height: 1.8462;
+	margin-top: 0;
+}
+
+.social-navigation {
+	margin: 9.0909%;
+	max-width: 660px;
+	padding-top: 0;
+}
+
+.social-navigation ul {
+	margin-bottom: -1.2632em;
+}
+
+.social-navigation a {
+	width: 2.5263em;
+	height: 2.5263em;
+}
+
+.secondary-toggle {
+	margin-top: -32px;
+	right: 7.6897%;
+	width: 64px;
+	height: 64px;
+}
+
+.secondary-toggle:before {
+	line-height: 64px;
+}
+
+.post-password-form label,
+.post-navigation .meta-nav,
+.comment-navigation,
+.image-navigation,
+.author-heading,
+.author-bio,
+.entry-footer,
+.page-links a,
+.page-links span,
+.comment-metadata,
+.pingback .edit-link,
+.comment-list .reply,
+.comment-notes,
+.comment-awaiting-moderation,
+.logged-in-as,
+.comment-form label,
+.form-allowed-tags,
+.site-info,
+.wp-caption-text,
+.gallery-caption,
+.entry-caption,
+.widecolumn label,
+.widecolumn .mu_register l

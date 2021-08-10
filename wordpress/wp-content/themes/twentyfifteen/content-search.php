@@ -24,4 +24,14 @@
 	<?php if ( 'post' == get_post_type() ) : ?>
 
 		<footer class="entry-footer">
-			<?p
+			<?php twentyfifteen_entry_meta(); ?>
+			<?php edit_post_link( __( 'Edit', 'twentyfifteen' ), '<span class="edit-link">', '</span>' ); ?>
+		</footer><!-- .entry-footer -->
+
+	<?php else : ?>
+
+		<?php edit_post_link( __( 'Edit', 'twentyfifteen' ), '<footer class="entry-footer"><span class="edit-link">', '</span></footer><!-- .entry-footer -->' ); ?>
+
+	<?php endif; ?>
+
+</article><!-- #post-## -->
