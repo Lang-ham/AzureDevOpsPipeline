@@ -1326,4 +1326,26 @@ p {
 	 * @return mixed
 	 */
 	private static function sanitize_comment_as_submitted( $meta_value ) {
-		if ( empty( $meta_value )
+		if ( empty( $meta_value ) ) {
+			return $meta_value;
+		}
+
+		$meta_value = (array) $meta_value;
+
+		foreach ( $meta_value as $key => $value ) {
+			if ( ! isset( self::$comment_as_submitted_allowed_keys[$key] ) || ! is_scalar( $value ) ) {
+				unset( $meta_value[$key] );
+			}
+		}
+
+		return $meta_value;
+	}
+	
+	public static function predefined_api_key() {
+		if ( defined( 'WPCOM_API_KEY' ) ) {
+			return true;
+		}
+		
+		return apply_filters( 'akismet_predefined_api_key', false );
+	}
+}
