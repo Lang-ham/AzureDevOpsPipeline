@@ -905,4 +905,44 @@ video {
 .rtl .page-title,
 .rtl .taxonomy-description {
 	margin-right: -7px;
-	margin-lef
+	margin-left: auto;
+}
+
+.rtl .comment-list .children > li {
+	padding-right: 1.4737em;
+	padding-left: 0;
+}
+
+.rtl .comment-author {
+	padding-right: 4.6315em;
+	padding-left: 0;
+}
+
+.rtl .comment-author .avatar {
+	right: 0;
+	left: auto;
+}
+
+.rtl .comment-content ul,
+.rtl .comment-content ol {
+	margin-right: 0;
+	margin-left: auto;
+}
+
+.rtl .comment-content li > ul,
+.rtl .comment-content li > ol,
+.rtl .comment-content blockquote > ul,
+.rtl .comment-content blockquote > ol {
+	margin-right: 1.3333em;
+	margin-left: auto;
+}
+
+.rtl .comment-metadata {
+	padding-right: 5.5em;
+	padding-left: 0;
+}
+
+.rtl .bypostauthor > article .fn:after {
+	right: 6px;
+	left: auto;
+}
