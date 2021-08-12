@@ -70,4 +70,83 @@ A number of new icons and a couple of quick updates.
 * New: Spotify
 * New: Twitch
 * Update: Fixed geometry in Edit icon
-* Update: Updated Foursquare ico
+* Update: Updated Foursquare icon
+
+Twitch and Spotify mark the last social icons that will be added to Genericons.
+Future social icons will have to happen in a separate font. 
+
+**3.1**
+
+Genericons is now generated using a commandline tool called FontCustom. This makes it far easier to add new icons to the font, but the switch means the download zip now has a different layout, fonts have different filenames, there's now no .otf font included (but the .ttf should suffice), and the font now has slightly different metrics. I've taken great care to ensure this new version should work as a drop-in replacement, but please be mindful and test carefully if you choose to upgrade.
+
+* Per feedback, the baked-in 16px width and height has been removed from the helper CSS. It wasn't really necessary (the glyph itself has these dimensions naturally), and it caused some headaches.
+* Base64 encoding is now included by default in the helper CSS. This makes it drop-in easy to get Genericons working in Firefox even when using a CDN. 
+* Title attribute on website tool.
+* New: Website.
+* New: Ellipsis.
+* New: Foursquare.
+* New: X-post.
+* New: Sitemap.
+* New: Hierarchy.
+* New: Paintbrush.
+* Updated: Show and Hide icons were updated for clarity.
+
+**3.0.3**
+
+Bunch of updates mostly.
+
+* Two new icons, Dropbox and Fullscreen.
+* Updates to all icons containing an exclamation mark.
+* Updates to Image and Quote.
+* Nicer "Share" icon.
+* Bigger default Linkedin icon.
+
+**3.0.2**
+
+A slew of new stuff and updates.
+
+* Social icons: Skype, Digg, Reddit, Stumbleupon, Pocket.
+* New generic icons: heart, lock and print.
+* New editing icons: code, bold, italic, image
+* New interaction icons: subscribe, unsubscribe, subscribed, reply all, reply, flag.
+* The hyperlink icon has been updated to be clearer, chunkier.
+* The "home" icon has been updated for style, size and clarity.
+* The email icon has been updated for style and clarity, and to fit with the new subscribe icons.
+* The document icon has been updated for style.
+* The "pin" icon has been updated for style and clarity.
+* The Twitter icon has been scaled down to fit with the other social icons.
+
+**3.0.1**
+
+Mostly maintenance. 
+
+* Fixed an issue with the example page that showed an old "top" icon instead of the actual NEW "refresh" icon.
+* Added inverse Google+ and Path.
+* Replaced tabs with spaces in the helper CSS.
+* Changed the Genericons.com copy/paste tool to serve span's instead of div's for casual icon insertion. It's being converted to "inline-block" anyway.
+
+**3.0**
+
+Mainly maintenance and a few new icons.
+
+* Fast forward, rewind, PollDaddy, Notice, Info, Help, Portfolio
+* Updated the feed icon. It's a bit smaller now for consistency, the previous one was rather big.
+* So, the previous version numbering, 2.09, wasn't very PHP version compare friendly. So from now on it'll be 3.0, 3.1 etc. Props Ipstenu.
+* Genericons.com now has a mini release blog.
+* The CSS has prettier formatting, props Konstantin Obenland.
+
+**2.09**
+
+Updated Facebook icon to new version. Updated Instagram logo to use new one-color version. Updated Google+ icon to use same radius as Instagram and Facebook. Added a bunch of new icons, cog, unapprove, cart, media player buttons, tablet, send to tablet.                                            
+
+**2.06**
+
+Included Base64 encoded version. This is necessary for Genericons to work with CDNs in Firefox. Firefox blocks fonts linked from a different domain. A CDN (typically s.example.com) usually puts the font on a subdomain, and is hence blocked in Firefox.
+
+**2.05**
+
+Added a bunch of new icons, including upload to cloud, download to cloud, many more.
+
+**2.0**
+
+Initial public release
