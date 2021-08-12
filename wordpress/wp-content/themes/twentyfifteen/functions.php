@@ -267,4 +267,161 @@ function twentyfifteen_scripts() {
 	wp_enqueue_style( 'twentyfifteen-ie7', get_template_directory_uri() . '/css/ie7.css', array( 'twentyfifteen-style' ), '20141010' );
 	wp_style_add_data( 'twentyfifteen-ie7', 'conditional', 'lt IE 8' );
 
-	wp_enqueue_script( 'twentyfifteen-skip-link-focus-fix', get_template_directory_uri() . 
+	wp_enqueue_script( 'twentyfifteen-skip-link-focus-fix', get_template_directory_uri() . '/js/skip-link-focus-fix.js', array(), '20141010', true );
+
+	if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) {
+		wp_enqueue_script( 'comment-reply' );
+	}
+
+	if ( is_singular() && wp_attachment_is_image() ) {
+		wp_enqueue_script( 'twentyfifteen-keyboard-image-navigation', get_template_directory_uri() . '/js/keyboard-image-navigation.js', array( 'jquery' ), '20141010' );
+	}
+
+	wp_enqueue_script( 'twentyfifteen-script', get_template_directory_uri() . '/js/functions.js', array( 'jquery' ), '20150330', true );
+	wp_localize_script( 'twentyfifteen-script', 'screenReaderText', array(
+		'expand'   => '<span class="screen-reader-text">' . __( 'expand child menu', 'twentyfifteen' ) . '</span>',
+		'collapse' => '<span class="screen-reader-text">' . __( 'collapse child menu', 'twentyfifteen' ) . '</span>',
+	) );
+}
+add_action( 'wp_enqueue_scripts', 'twentyfifteen_scripts' );
+
+/**
+ * Add preconnect for Google Fonts.
+ *
+ * @since Twenty Fifteen 1.7
+ *
+ * @param array   $urls          URLs to print for resource hints.
+ * @param string  $relation_type The relation type the URLs are printed.
+ * @return array URLs to print for resource hints.
+ */
+function twentyfifteen_resource_hints( $urls, $relation_type ) {
+	if ( wp_style_is( 'twentyfifteen-fonts', 'queue' ) && 'preconnect' === $relation_type ) {
+		if ( version_compare( $GLOBALS['wp_version'], '4.7-alpha', '>=' ) ) {
+			$urls[] = array(
+				'href' => 'https://fonts.gstatic.com',
+				'crossorigin',
+			);
+		} else {
+			$urls[] = 'https://fonts.gstatic.com';
+		}
+	}
+
+	return $urls;
+}
+add_filter( 'wp_resource_hints', 'twentyfifteen_resource_hints', 10, 2 );
+
+/**
+ * Add featured image as background image to post navigation elements.
+ *
+ * @since Twenty Fifteen 1.0
+ *
+ * @see wp_add_inline_style()
+ */
+function twentyfifteen_post_nav_background() {
+	if ( ! is_single() ) {
+		return;
+	}
+
+	$previous = ( is_attachment() ) ? get_post( get_post()->post_parent ) : get_adjacent_post( false, '', true );
+	$next     = get_adjacent_post( false, '', false );
+	$css      = '';
+
+	if ( is_attachment() && 'attachment' == $previous->post_type ) {
+		return;
+	}
+
+	if ( $previous &&  has_post_thumbnail( $previous->ID ) ) {
+		$prevthumb = wp_get_attachment_image_src( get_post_thumbnail_id( $previous->ID ), 'post-thumbnail' );
+		$css .= '
+			.post-navigation .nav-previous { background-image: url(' . esc_url( $prevthumb[0] ) . '); }
+			.post-navigation .nav-previous .post-title, .post-navigation .nav-previous a:hover .post-title, .post-navigation .nav-previous .meta-nav { color: #fff; }
+			.post-navigation .nav-previous a:before { background-color: rgba(0, 0, 0, 0.4); }
+		';
+	}
+
+	if ( $next && has_post_thumbnail( $next->ID ) ) {
+		$nextthumb = wp_get_attachment_image_src( get_post_thumbnail_id( $next->ID ), 'post-thumbnail' );
+		$css .= '
+			.post-navigation .nav-next { background-image: url(' . esc_url( $nextthumb[0] ) . '); border-top: 0; }
+			.post-navigation .nav-next .post-title, .post-navigation .nav-next a:hover .post-title, .post-navigation .nav-next .meta-nav { color: #fff; }
+			.post-navigation .nav-next a:before { background-color: rgba(0, 0, 0, 0.4); }
+		';
+	}
+
+	wp_add_inline_style( 'twentyfifteen-style', $css );
+}
+add_action( 'wp_enqueue_scripts', 'twentyfifteen_post_nav_background' );
+
+/**
+ * Display descriptions in main navigation.
+ *
+ * @since Twenty Fifteen 1.0
+ *
+ * @param string  $item_output The menu item output.
+ * @param WP_Post $item        Menu item object.
+ * @param int     $depth       Depth of the menu.
+ * @param array   $args        wp_nav_menu() arguments.
+ * @return string Menu item with possible description.
+ */
+function twentyfifteen_nav_description( $item_output, $item, $depth, $args ) {
+	if ( 'primary' == $args->theme_location && $item->description ) {
+		$item_output = str_replace( $args->link_after . '</a>', '<div class="menu-item-description">' . $item->description . '</div>' . $args->link_after . '</a>', $item_output );
+	}
+
+	return $item_output;
+}
+add_filter( 'walker_nav_menu_start_el', 'twentyfifteen_nav_description', 10, 4 );
+
+/**
+ * Add a `screen-reader-text` class to the search form's submit button.
+ *
+ * @since Twenty Fifteen 1.0
+ *
+ * @param string $html Search form HTML.
+ * @return string Modified search form HTML.
+ */
+function twentyfifteen_search_form_modify( $html ) {
+	return str_replace( 'class="search-submit"', 'class="search-submit screen-reader-text"', $html );
+}
+add_filter( 'get_search_form', 'twentyfifteen_search_form_modify' );
+
+/**
+ * Modifies tag cloud widget arguments to display all tags in the same font size
+ * and use list format for better accessibility.
+ *
+ * @since Twenty Fifteen 1.9
+ *
+ * @param array $args Arguments for tag cloud widget.
+ * @return array The filtered arguments for tag cloud widget.
+ */
+function twentyfifteen_widget_tag_cloud_args( $args ) {
+	$args['largest']  = 22;
+	$args['smallest'] = 8;
+	$args['unit']     = 'pt';
+	$args['format']   = 'list';
+
+	return $args;
+}
+add_filter( 'widget_tag_cloud_args', 'twentyfifteen_widget_tag_cloud_args' );
+
+
+/**
+ * Implement the Custom Header feature.
+ *
+ * @since Twenty Fifteen 1.0
+ */
+require get_template_directory() . '/inc/custom-header.php';
+
+/**
+ * Custom template tags for this theme.
+ *
+ * @since Twenty Fifteen 1.0
+ */
+require get_template_directory() . '/inc/template-tags.php';
+
+/**
+ * Customizer additions.
+ *
+ * @since Twenty Fifteen 1.0
+ */
+require get_template_directory() . '/inc/customizer.php';
