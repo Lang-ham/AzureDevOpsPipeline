@@ -5984,4 +5984,80 @@ p > video {
 	.comment-list .pingback,
 	.comment-list .trackback,
 	.no-comments {
-		border-co
+		border-color: #eaeaea !important; /* Make sure color schemes don't affect to print */
+	}
+
+	.site {
+		margin: 0 7.6923%;
+	}
+
+	.sidebar {
+		position: relative !important; /* Make sure sticky sidebar doesn't affect to print */
+	}
+
+	.site-branding {
+		padding: 0;
+	}
+
+	.site-header {
+		padding: 7.6923% 0;
+	}
+
+	.site-description {
+		display: block;
+	}
+
+	.hentry + .hentry {
+		margin-top: 7.6923%;
+	}
+
+	.hentry.has-post-thumbnail {
+		padding-top: 7.6923%;
+	}
+
+	.sticky-post {
+		background: #000 !important;
+		color: #fff !important;
+	}
+
+	.entry-header,
+	.entry-footer {
+		padding: 0;
+	}
+
+	.entry-content,
+	.entry-summary {
+		padding: 0 0 7.6923%;
+	}
+
+	.post-thumbnail img {
+		margin: 0;
+	}
+
+	.author-info {
+		margin: 0;
+	}
+
+	.page-content {
+		padding: 7.6923% 0 0;
+	}
+
+	.page-header {
+		padding: 3.84615% 0;
+	}
+
+	.comments-area {
+		border: 0;
+		padding: 7.6923% 0 0;
+	}
+
+	.site-footer {
+		margin-top: 7.6923%;
+		padding: 3.84615% 0;
+	}
+
+	.widecolumn {
+		margin: 7.6923% 0 0;
+		padding: 0;
+	}
+}
