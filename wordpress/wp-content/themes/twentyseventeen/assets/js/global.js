@@ -236,4 +236,14 @@
 	$( window ).resize( function() {
 		clearTimeout( resizeTimer );
 		resizeTimer = setTimeout( function() {
-			belowEntryMetaClass( 'blockquote.alignleft
+			belowEntryMetaClass( 'blockquote.alignleft, blockquote.alignright' );
+		}, 300 );
+		setTimeout( adjustHeaderHeight, 1000 );
+	});
+
+	// Add header video class after the video is loaded.
+	$( document ).on( 'wp-custom-header-video-loaded', function() {
+		$body.addClass( 'has-header-video' );
+	});
+
+})( jQuery );
