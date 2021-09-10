@@ -370,3 +370,65 @@ require get_template_directory() . '/inc/customizer.php';
  */
 function twentysixteen_content_image_sizes_attr( $sizes, $size ) {
 	$width = $size[0];
+
+	if ( 840 <= $width ) {
+		$sizes = '(max-width: 709px) 85vw, (max-width: 909px) 67vw, (max-width: 1362px) 62vw, 840px';
+	}
+
+	if ( 'page' === get_post_type() ) {
+		if ( 840 > $width ) {
+			$sizes = '(max-width: ' . $width . 'px) 85vw, ' . $width . 'px';
+		}
+	} else {
+		if ( 840 > $width && 600 <= $width ) {
+			$sizes = '(max-width: 709px) 85vw, (max-width: 909px) 67vw, (max-width: 984px) 61vw, (max-width: 1362px) 45vw, 600px';
+		} elseif ( 600 > $width ) {
+			$sizes = '(max-width: ' . $width . 'px) 85vw, ' . $width . 'px';
+		}
+	}
+
+	return $sizes;
+}
+add_filter( 'wp_calculate_image_sizes', 'twentysixteen_content_image_sizes_attr', 10 , 2 );
+
+/**
+ * Add custom image sizes attribute to enhance responsive image functionality
+ * for post thumbnails
+ *
+ * @since Twenty Sixteen 1.0
+ *
+ * @param array $attr Attributes for the image markup.
+ * @param int   $attachment Image attachment ID.
+ * @param array $size Registered image size or flat array of height and width dimensions.
+ * @return array The filtered attributes for the image markup.
+ */
+function twentysixteen_post_thumbnail_sizes_attr( $attr, $attachment, $size ) {
+	if ( 'post-thumbnail' === $size ) {
+		if ( is_active_sidebar( 'sidebar-1' ) ) {
+			$attr['sizes'] = '(max-width: 709px) 85vw, (max-width: 909px) 67vw, (max-width: 984px) 60vw, (max-width: 1362px) 62vw, 840px';
+		} else {
+			$attr['sizes'] = '(max-width: 709px) 85vw, (max-width: 909px) 67vw, (max-width: 1362px) 88vw, 1200px';
+		}
+	}
+	return $attr;
+}
+add_filter( 'wp_get_attachment_image_attributes', 'twentysixteen_post_thumbnail_sizes_attr', 10 , 3 );
+
+/**
+ * Modifies tag cloud widget arguments to display all tags in the same font size
+ * and use list format for better accessibility.
+ *
+ * @since Twenty Sixteen 1.1
+ *
+ * @param array $args Arguments for tag cloud widget.
+ * @return array The filtered arguments for tag cloud widget.
+ */
+function twentysixteen_widget_tag_cloud_args( $args ) {
+	$args['largest']  = 1;
+	$args['smallest'] = 1;
+	$args['unit']     = 'em';
+	$args['format']   = 'list'; 
+
+	return $args;
+}
+add_filter( 'widget_tag_cloud_args', 'twentysixteen_widget_tag_cloud_args' );
