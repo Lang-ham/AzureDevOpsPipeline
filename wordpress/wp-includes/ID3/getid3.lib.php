@@ -567,4 +567,324 @@ class getid3_lib
 		if (!self::intValueSupported($end)) {
 			return false;
 		}
-		switch ($algori
+		switch ($algorithm) {
+			case 'md5':
+				$hash_function = 'md5_file';
+				$unix_call     = 'md5sum';
+				$windows_call  = 'md5sum.exe';
+				$hash_length   = 32;
+				break;
+
+			case 'sha1':
+				$hash_function = 'sha1_file';
+				$unix_call     = 'sha1sum';
+				$windows_call  = 'sha1sum.exe';
+				$hash_length   = 40;
+				break;
+
+			default:
+				throw new Exception('Invalid algorithm ('.$algorithm.') in self::hash_data()');
+				break;
+		}
+		$size = $end - $offset;
+		while (true) {
+			if (GETID3_OS_ISWINDOWS) {
+
+				// It seems that sha1sum.exe for Windows only works on physical files, does not accept piped data
+				// Fall back to create-temp-file method:
+				if ($algorithm == 'sha1') {
+					break;
+				}
+
+				$RequiredFiles = array('cygwin1.dll', 'head.exe', 'tail.exe', $windows_call);
+				foreach ($RequiredFiles as $required_file) {
+					if (!is_readable(GETID3_HELPERAPPSDIR.$required_file)) {
+						// helper apps not available - fall back to old method
+						break 2;
+					}
+				}
+				$commandline  = GETID3_HELPERAPPSDIR.'head.exe -c '.$end.' '.escapeshellarg(str_replace('/', DIRECTORY_SEPARATOR, $file)).' | ';
+				$commandline .= GETID3_HELPERAPPSDIR.'tail.exe -c '.$size.' | ';
+				$commandline .= GETID3_HELPERAPPSDIR.$windows_call;
+
+			} else {
+
+				$commandline  = 'head -c'.$end.' '.escapeshellarg($file).' | ';
+				$commandline .= 'tail -c'.$size.' | ';
+				$commandline .= $unix_call;
+
+			}
+			if (preg_match('#(1|ON)#i', ini_get('safe_mode'))) {
+				//throw new Exception('PHP running in Safe Mode - backtick operator not available, using slower non-system-call '.$algorithm.' algorithm');
+				break;
+			}
+			return substr(`$commandline`, 0, $hash_length);
+		}
+
+		if (empty($tempdir)) {
+			// yes this is ugly, feel free to suggest a better way
+			require_once(dirname(__FILE__).'/getid3.php');
+			$getid3_temp = new getID3();
+			$tempdir = $getid3_temp->tempdir;
+			unset($getid3_temp);
+		}
+		// try to create a temporary file in the system temp directory - invalid dirname should force to system temp dir
+		if (($data_filename = tempnam($tempdir, 'gI3')) === false) {
+			// can't find anywhere to create a temp file, just fail
+			return false;
+		}
+
+		// Init
+		$result = false;
+
+		// copy parts of file
+		try {
+			self::CopyFileParts($file, $data_filename, $offset, $end - $offset);
+			$result = $hash_function($data_filename);
+		} catch (Exception $e) {
+			throw new Exception('self::CopyFileParts() failed in getid_lib::hash_data(): '.$e->getMessage());
+		}
+		unlink($data_filename);
+		return $result;
+	}
+
+	public static function CopyFileParts($filename_source, $filename_dest, $offset, $length) {
+		if (!self::intValueSupported($offset + $length)) {
+			throw new Exception('cannot copy file portion, it extends beyond the '.round(PHP_INT_MAX / 1073741824).'GB limit');
+		}
+		if (is_readable($filename_source) && is_file($filename_source) && ($fp_src = fopen($filename_source, 'rb'))) {
+			if (($fp_dest = fopen($filename_dest, 'wb'))) {
+				if (fseek($fp_src, $offset) == 0) {
+					$byteslefttowrite = $length;
+					while (($byteslefttowrite > 0) && ($buffer = fread($fp_src, min($byteslefttowrite, getID3::FREAD_BUFFER_SIZE)))) {
+						$byteswritten = fwrite($fp_dest, $buffer, $byteslefttowrite);
+						$byteslefttowrite -= $byteswritten;
+					}
+					return true;
+				} else {
+					throw new Exception('failed to seek to offset '.$offset.' in '.$filename_source);
+				}
+				fclose($fp_dest);
+			} else {
+				throw new Exception('failed to create file for writing '.$filename_dest);
+			}
+			fclose($fp_src);
+		} else {
+			throw new Exception('failed to open file for reading '.$filename_source);
+		}
+		return false;
+	}
+
+	public static function iconv_fallback_int_utf8($charval) {
+		if ($charval < 128) {
+			// 0bbbbbbb
+			$newcharstring = chr($charval);
+		} elseif ($charval < 2048) {
+			// 110bbbbb 10bbbbbb
+			$newcharstring  = chr(($charval >>   6) | 0xC0);
+			$newcharstring .= chr(($charval & 0x3F) | 0x80);
+		} elseif ($charval < 65536) {
+			// 1110bbbb 10bbbbbb 10bbbbbb
+			$newcharstring  = chr(($charval >>  12) | 0xE0);
+			$newcharstring .= chr(($charval >>   6) | 0xC0);
+			$newcharstring .= chr(($charval & 0x3F) | 0x80);
+		} else {
+			// 11110bbb 10bbbbbb 10bbbbbb 10bbbbbb
+			$newcharstring  = chr(($charval >>  18) | 0xF0);
+			$newcharstring .= chr(($charval >>  12) | 0xC0);
+			$newcharstring .= chr(($charval >>   6) | 0xC0);
+			$newcharstring .= chr(($charval & 0x3F) | 0x80);
+		}
+		return $newcharstring;
+	}
+
+	// ISO-8859-1 => UTF-8
+	public static function iconv_fallback_iso88591_utf8($string, $bom=false) {
+		if (function_exists('utf8_encode')) {
+			return utf8_encode($string);
+		}
+		// utf8_encode() unavailable, use getID3()'s iconv_fallback() conversions (possibly PHP is compiled without XML support)
+		$newcharstring = '';
+		if ($bom) {
+			$newcharstring .= "\xEF\xBB\xBF";
+		}
+		for ($i = 0; $i < strlen($string); $i++) {
+			$charval = ord($string{$i});
+			$newcharstring .= self::iconv_fallback_int_utf8($charval);
+		}
+		return $newcharstring;
+	}
+
+	// ISO-8859-1 => UTF-16BE
+	public static function iconv_fallback_iso88591_utf16be($string, $bom=false) {
+		$newcharstring = '';
+		if ($bom) {
+			$newcharstring .= "\xFE\xFF";
+		}
+		for ($i = 0; $i < strlen($string); $i++) {
+			$newcharstring .= "\x00".$string{$i};
+		}
+		return $newcharstring;
+	}
+
+	// ISO-8859-1 => UTF-16LE
+	public static function iconv_fallback_iso88591_utf16le($string, $bom=false) {
+		$newcharstring = '';
+		if ($bom) {
+			$newcharstring .= "\xFF\xFE";
+		}
+		for ($i = 0; $i < strlen($string); $i++) {
+			$newcharstring .= $string{$i}."\x00";
+		}
+		return $newcharstring;
+	}
+
+	// ISO-8859-1 => UTF-16LE (BOM)
+	public static function iconv_fallback_iso88591_utf16($string) {
+		return self::iconv_fallback_iso88591_utf16le($string, true);
+	}
+
+	// UTF-8 => ISO-8859-1
+	public static function iconv_fallback_utf8_iso88591($string) {
+		if (function_exists('utf8_decode')) {
+			return utf8_decode($string);
+		}
+		// utf8_decode() unavailable, use getID3()'s iconv_fallback() conversions (possibly PHP is compiled without XML support)
+		$newcharstring = '';
+		$offset = 0;
+		$stringlength = strlen($string);
+		while ($offset < $stringlength) {
+			if ((ord($string{$offset}) | 0x07) == 0xF7) {
+				// 11110bbb 10bbbbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x07) << 18) &
+						   ((ord($string{($offset + 1)}) & 0x3F) << 12) &
+						   ((ord($string{($offset + 2)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 3)}) & 0x3F);
+				$offset += 4;
+			} elseif ((ord($string{$offset}) | 0x0F) == 0xEF) {
+				// 1110bbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x0F) << 12) &
+						   ((ord($string{($offset + 1)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 2)}) & 0x3F);
+				$offset += 3;
+			} elseif ((ord($string{$offset}) | 0x1F) == 0xDF) {
+				// 110bbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x1F) <<  6) &
+							(ord($string{($offset + 1)}) & 0x3F);
+				$offset += 2;
+			} elseif ((ord($string{$offset}) | 0x7F) == 0x7F) {
+				// 0bbbbbbb
+				$charval = ord($string{$offset});
+				$offset += 1;
+			} else {
+				// error? throw some kind of warning here?
+				$charval = false;
+				$offset += 1;
+			}
+			if ($charval !== false) {
+				$newcharstring .= (($charval < 256) ? chr($charval) : '?');
+			}
+		}
+		return $newcharstring;
+	}
+
+	// UTF-8 => UTF-16BE
+	public static function iconv_fallback_utf8_utf16be($string, $bom=false) {
+		$newcharstring = '';
+		if ($bom) {
+			$newcharstring .= "\xFE\xFF";
+		}
+		$offset = 0;
+		$stringlength = strlen($string);
+		while ($offset < $stringlength) {
+			if ((ord($string{$offset}) | 0x07) == 0xF7) {
+				// 11110bbb 10bbbbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x07) << 18) &
+						   ((ord($string{($offset + 1)}) & 0x3F) << 12) &
+						   ((ord($string{($offset + 2)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 3)}) & 0x3F);
+				$offset += 4;
+			} elseif ((ord($string{$offset}) | 0x0F) == 0xEF) {
+				// 1110bbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x0F) << 12) &
+						   ((ord($string{($offset + 1)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 2)}) & 0x3F);
+				$offset += 3;
+			} elseif ((ord($string{$offset}) | 0x1F) == 0xDF) {
+				// 110bbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x1F) <<  6) &
+							(ord($string{($offset + 1)}) & 0x3F);
+				$offset += 2;
+			} elseif ((ord($string{$offset}) | 0x7F) == 0x7F) {
+				// 0bbbbbbb
+				$charval = ord($string{$offset});
+				$offset += 1;
+			} else {
+				// error? throw some kind of warning here?
+				$charval = false;
+				$offset += 1;
+			}
+			if ($charval !== false) {
+				$newcharstring .= (($charval < 65536) ? self::BigEndian2String($charval, 2) : "\x00".'?');
+			}
+		}
+		return $newcharstring;
+	}
+
+	// UTF-8 => UTF-16LE
+	public static function iconv_fallback_utf8_utf16le($string, $bom=false) {
+		$newcharstring = '';
+		if ($bom) {
+			$newcharstring .= "\xFF\xFE";
+		}
+		$offset = 0;
+		$stringlength = strlen($string);
+		while ($offset < $stringlength) {
+			if ((ord($string{$offset}) | 0x07) == 0xF7) {
+				// 11110bbb 10bbbbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x07) << 18) &
+						   ((ord($string{($offset + 1)}) & 0x3F) << 12) &
+						   ((ord($string{($offset + 2)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 3)}) & 0x3F);
+				$offset += 4;
+			} elseif ((ord($string{$offset}) | 0x0F) == 0xEF) {
+				// 1110bbbb 10bbbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x0F) << 12) &
+						   ((ord($string{($offset + 1)}) & 0x3F) <<  6) &
+							(ord($string{($offset + 2)}) & 0x3F);
+				$offset += 3;
+			} elseif ((ord($string{$offset}) | 0x1F) == 0xDF) {
+				// 110bbbbb 10bbbbbb
+				$charval = ((ord($string{($offset + 0)}) & 0x1F) <<  6) &
+							(ord($string{($offset + 1)}) & 0x3F);
+				$offset += 2;
+			} elseif ((ord($string{$offset}) | 0x7F) == 0x7F) {
+				// 0bbbbbbb
+				$charval = ord($string{$offset});
+				$offset += 1;
+			} else {
+				// error? maybe throw some warning here?
+				$charval = false;
+				$offset += 1;
+			}
+			if ($charval !== false) {
+				$newcharstring .= (($charval < 65536) ? self::LittleEndian2String($charval, 2) : '?'."\x00");
+			}
+		}
+		return $newcharstring;
+	}
+
+	// UTF-8 => UTF-16LE (BOM)
+	public static function iconv_fallback_utf8_utf16($string) {
+		return self::iconv_fallback_utf8_utf16le($string, true);
+	}
+
+	// UTF-16BE => UTF-8
+	public static function iconv_fallback_utf16be_utf8($string) {
+		if (substr($string, 0, 2) == "\xFE\xFF") {
+			// strip BOM
+			$string = substr($string, 2);
+		}
+		$newcharstring = '';
+		for ($i = 0; $i < strlen($string); $i += 2) {
+			$charval = self::BigEndian2Int(substr($string, $i
