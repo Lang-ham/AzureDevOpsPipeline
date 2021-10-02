@@ -1213,4 +1213,224 @@ class getid3_lib
 		return $GetDataImageSize;
 	}
 
-	public static function ImageExtFromMim
+	public static function ImageExtFromMime($mime_type) {
+		// temporary way, works OK for now, but should be reworked in the future
+		return str_replace(array('image/', 'x-', 'jpeg'), array('', '', 'jpg'), $mime_type);
+	}
+
+	public static function ImageTypesLookup($imagetypeid) {
+		static $ImageTypesLookup = array();
+		if (empty($ImageTypesLookup)) {
+			$ImageTypesLookup[1]  = 'gif';
+			$ImageTypesLookup[2]  = 'jpeg';
+			$ImageTypesLookup[3]  = 'png';
+			$ImageTypesLookup[4]  = 'swf';
+			$ImageTypesLookup[5]  = 'psd';
+			$ImageTypesLookup[6]  = 'bmp';
+			$ImageTypesLookup[7]  = 'tiff (little-endian)';
+			$ImageTypesLookup[8]  = 'tiff (big-endian)';
+			$ImageTypesLookup[9]  = 'jpc';
+			$ImageTypesLookup[10] = 'jp2';
+			$ImageTypesLookup[11] = 'jpx';
+			$ImageTypesLookup[12] = 'jb2';
+			$ImageTypesLookup[13] = 'swc';
+			$ImageTypesLookup[14] = 'iff';
+		}
+		return (isset($ImageTypesLookup[$imagetypeid]) ? $ImageTypesLookup[$imagetypeid] : '');
+	}
+
+	public static function CopyTagsToComments(&$ThisFileInfo) {
+
+		// Copy all entries from ['tags'] into common ['comments']
+		if (!empty($ThisFileInfo['tags'])) {
+			foreach ($ThisFileInfo['tags'] as $tagtype => $tagarray) {
+				foreach ($tagarray as $tagname => $tagdata) {
+					foreach ($tagdata as $key => $value) {
+						if (!empty($value)) {
+							if (empty($ThisFileInfo['comments'][$tagname])) {
+
+								// fall through and append value
+
+							} elseif ($tagtype == 'id3v1') {
+
+								$newvaluelength = strlen(trim($value));
+								foreach ($ThisFileInfo['comments'][$tagname] as $existingkey => $existingvalue) {
+									$oldvaluelength = strlen(trim($existingvalue));
+									if (($newvaluelength <= $oldvaluelength) && (substr($existingvalue, 0, $newvaluelength) == trim($value))) {
+										// new value is identical but shorter-than (or equal-length to) one already in comments - skip
+										break 2;
+									}
+								}
+
+							} elseif (!is_array($value)) {
+
+								$newvaluelength = strlen(trim($value));
+								foreach ($ThisFileInfo['comments'][$tagname] as $existingkey => $existingvalue) {
+									$oldvaluelength = strlen(trim($existingvalue));
+									if ((strlen($existingvalue) > 10) && ($newvaluelength > $oldvaluelength) && (substr(trim($value), 0, strlen($existingvalue)) == $existingvalue)) {
+										$ThisFileInfo['comments'][$tagname][$existingkey] = trim($value);
+										//break 2;
+										break;
+									}
+								}
+
+							}
+							if (is_array($value) || empty($ThisFileInfo['comments'][$tagname]) || !in_array(trim($value), $ThisFileInfo['comments'][$tagname])) {
+								$value = (is_string($value) ? trim($value) : $value);
+								if (!is_int($key) && !ctype_digit($key)) {
+									$ThisFileInfo['comments'][$tagname][$key] = $value;
+								} else {
+									if (isset($ThisFileInfo['comments'][$tagname])) {
+										$ThisFileInfo['comments'][$tagname] = array($value);
+									} else {
+										$ThisFileInfo['comments'][$tagname][] = $value;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// attempt to standardize spelling of returned keys
+			$StandardizeFieldNames = array(
+				'tracknumber' => 'track_number',
+				'track'       => 'track_number',
+			);
+			foreach ($StandardizeFieldNames as $badkey => $goodkey) {
+				if (array_key_exists($badkey, $ThisFileInfo['comments']) && !array_key_exists($goodkey, $ThisFileInfo['comments'])) {
+					$ThisFileInfo['comments'][$goodkey] = $ThisFileInfo['comments'][$badkey];
+					unset($ThisFileInfo['comments'][$badkey]);
+				}
+			}
+
+			// Copy to ['comments_html']
+			if (!empty($ThisFileInfo['comments'])) {
+				foreach ($ThisFileInfo['comments'] as $field => $values) {
+					if ($field == 'picture') {
+						// pictures can take up a lot of space, and we don't need multiple copies of them
+						// let there be a single copy in [comments][picture], and not elsewhere
+						continue;
+					}
+					foreach ($values as $index => $value) {
+						if (is_array($value)) {
+							$ThisFileInfo['comments_html'][$field][$index] = $value;
+						} else {
+							$ThisFileInfo['comments_html'][$field][$index] = str_replace('&#0;', '', self::MultiByteCharString2HTML($value, $ThisFileInfo['encoding']));
+						}
+					}
+				}
+			}
+
+		}
+		return true;
+	}
+
+
+	public static function EmbeddedLookup($key, $begin, $end, $file, $name) {
+
+		// Cached
+		static $cache;
+		if (isset($cache[$file][$name])) {
+			return (isset($cache[$file][$name][$key]) ? $cache[$file][$name][$key] : '');
+		}
+
+		// Init
+		$keylength  = strlen($key);
+		$line_count = $end - $begin - 7;
+
+		// Open php file
+		$fp = fopen($file, 'r');
+
+		// Discard $begin lines
+		for ($i = 0; $i < ($begin + 3); $i++) {
+			fgets($fp, 1024);
+		}
+
+		// Loop thru line
+		while (0 < $line_count--) {
+
+			// Read line
+			$line = ltrim(fgets($fp, 1024), "\t ");
+
+			// METHOD A: only cache the matching key - less memory but slower on next lookup of not-previously-looked-up key
+			//$keycheck = substr($line, 0, $keylength);
+			//if ($key == $keycheck)  {
+			//	$cache[$file][$name][$keycheck] = substr($line, $keylength + 1);
+			//	break;
+			//}
+
+			// METHOD B: cache all keys in this lookup - more memory but faster on next lookup of not-previously-looked-up key
+			//$cache[$file][$name][substr($line, 0, $keylength)] = trim(substr($line, $keylength + 1));
+			$explodedLine = explode("\t", $line, 2);
+			$ThisKey   = (isset($explodedLine[0]) ? $explodedLine[0] : '');
+			$ThisValue = (isset($explodedLine[1]) ? $explodedLine[1] : '');
+			$cache[$file][$name][$ThisKey] = trim($ThisValue);
+		}
+
+		// Close and return
+		fclose($fp);
+		return (isset($cache[$file][$name][$key]) ? $cache[$file][$name][$key] : '');
+	}
+
+	public static function IncludeDependency($filename, $sourcefile, $DieOnFailure=false) {
+		global $GETID3_ERRORARRAY;
+
+		if (file_exists($filename)) {
+			if (include_once($filename)) {
+				return true;
+			} else {
+				$diemessage = basename($sourcefile).' depends on '.$filename.', which has errors';
+			}
+		} else {
+			$diemessage = basename($sourcefile).' depends on '.$filename.', which is missing';
+		}
+		if ($DieOnFailure) {
+			throw new Exception($diemessage);
+		} else {
+			$GETID3_ERRORARRAY[] = $diemessage;
+		}
+		return false;
+	}
+
+	public static function trimNullByte($string) {
+		return trim($string, "\x00");
+	}
+
+	public static function getFileSizeSyscall($path) {
+		$filesize = false;
+
+		if (GETID3_OS_ISWINDOWS) {
+			if (class_exists('COM')) { // From PHP 5.3.15 and 5.4.5, COM and DOTNET is no longer built into the php core.you have to add COM support in php.ini:
+				$filesystem = new COM('Scripting.FileSystemObject');
+				$file = $filesystem->GetFile($path);
+				$filesize = $file->Size();
+				unset($filesystem, $file);
+			} else {
+				$commandline = 'for %I in ('.escapeshellarg($path).') do @echo %~zI';
+			}
+		} else {
+			$commandline = 'ls -l '.escapeshellarg($path).' | awk \'{print $5}\'';
+		}
+		if (isset($commandline)) {
+			$output = trim(`$commandline`);
+			if (ctype_digit($output)) {
+				$filesize = (float) $output;
+			}
+		}
+		return $filesize;
+	}
+
+
+	/**
+	* Workaround for Bug #37268 (https://bugs.php.net/bug.php?id=37268)
+	* @param string $path A path.
+	* @param string $suffix If the name component ends in suffix this will also be cut off.
+	* @return string
+	*/
+	public static function mb_basename($path, $suffix = null) {
+		$splited = preg_split('#/#', rtrim($path, '/ '));
+		return substr(basename('X'.$splited[count($splited) - 1], $suffix), 1);
+	}
+
+}
