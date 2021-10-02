@@ -887,4 +887,330 @@ class getid3_lib
 		}
 		$newcharstring = '';
 		for ($i = 0; $i < strlen($string); $i += 2) {
-			$charval = self::BigEndian2Int(substr($string, $i
+			$charval = self::BigEndian2Int(substr($string, $i, 2));
+			$newcharstring .= self::iconv_fallback_int_utf8($charval);
+		}
+		return $newcharstring;
+	}
+
+	// UTF-16LE => UTF-8
+	public static function iconv_fallback_utf16le_utf8($string) {
+		if (substr($string, 0, 2) == "\xFF\xFE") {
+			// strip BOM
+			$string = substr($string, 2);
+		}
+		$newcharstring = '';
+		for ($i = 0; $i < strlen($string); $i += 2) {
+			$charval = self::LittleEndian2Int(substr($string, $i, 2));
+			$newcharstring .= self::iconv_fallback_int_utf8($charval);
+		}
+		return $newcharstring;
+	}
+
+	// UTF-16BE => ISO-8859-1
+	public static function iconv_fallback_utf16be_iso88591($string) {
+		if (substr($string, 0, 2) == "\xFE\xFF") {
+			// strip BOM
+			$string = substr($string, 2);
+		}
+		$newcharstring = '';
+		for ($i = 0; $i < strlen($string); $i += 2) {
+			$charval = self::BigEndian2Int(substr($string, $i, 2));
+			$newcharstring .= (($charval < 256) ? chr($charval) : '?');
+		}
+		return $newcharstring;
+	}
+
+	// UTF-16LE => ISO-8859-1
+	public static function iconv_fallback_utf16le_iso88591($string) {
+		if (substr($string, 0, 2) == "\xFF\xFE") {
+			// strip BOM
+			$string = substr($string, 2);
+		}
+		$newcharstring = '';
+		for ($i = 0; $i < strlen($string); $i += 2) {
+			$charval = self::LittleEndian2Int(substr($string, $i, 2));
+			$newcharstring .= (($charval < 256) ? chr($charval) : '?');
+		}
+		return $newcharstring;
+	}
+
+	// UTF-16 (BOM) => ISO-8859-1
+	public static function iconv_fallback_utf16_iso88591($string) {
+		$bom = substr($string, 0, 2);
+		if ($bom == "\xFE\xFF") {
+			return self::iconv_fallback_utf16be_iso88591(substr($string, 2));
+		} elseif ($bom == "\xFF\xFE") {
+			return self::iconv_fallback_utf16le_iso88591(substr($string, 2));
+		}
+		return $string;
+	}
+
+	// UTF-16 (BOM) => UTF-8
+	public static function iconv_fallback_utf16_utf8($string) {
+		$bom = substr($string, 0, 2);
+		if ($bom == "\xFE\xFF") {
+			return self::iconv_fallback_utf16be_utf8(substr($string, 2));
+		} elseif ($bom == "\xFF\xFE") {
+			return self::iconv_fallback_utf16le_utf8(substr($string, 2));
+		}
+		return $string;
+	}
+
+	public static function iconv_fallback($in_charset, $out_charset, $string) {
+
+		if ($in_charset == $out_charset) {
+			return $string;
+		}
+
+		// mb_convert_encoding() availble
+		if (function_exists('mb_convert_encoding')) {
+			if ($converted_string = @mb_convert_encoding($string, $out_charset, $in_charset)) {
+				switch ($out_charset) {
+					case 'ISO-8859-1':
+						$converted_string = rtrim($converted_string, "\x00");
+						break;
+				}
+				return $converted_string;
+			}
+			return $string;
+		}
+		// iconv() availble
+		else if (function_exists('iconv')) {
+			if ($converted_string = @iconv($in_charset, $out_charset.'//TRANSLIT', $string)) {
+				switch ($out_charset) {
+					case 'ISO-8859-1':
+						$converted_string = rtrim($converted_string, "\x00");
+						break;
+				}
+				return $converted_string;
+			}
+
+			// iconv() may sometimes fail with "illegal character in input string" error message
+			// and return an empty string, but returning the unconverted string is more useful
+			return $string;
+		}
+
+
+		// neither mb_convert_encoding or iconv() is available
+		static $ConversionFunctionList = array();
+		if (empty($ConversionFunctionList)) {
+			$ConversionFunctionList['ISO-8859-1']['UTF-8']    = 'iconv_fallback_iso88591_utf8';
+			$ConversionFunctionList['ISO-8859-1']['UTF-16']   = 'iconv_fallback_iso88591_utf16';
+			$ConversionFunctionList['ISO-8859-1']['UTF-16BE'] = 'iconv_fallback_iso88591_utf16be';
+			$ConversionFunctionList['ISO-8859-1']['UTF-16LE'] = 'iconv_fallback_iso88591_utf16le';
+			$ConversionFunctionList['UTF-8']['ISO-8859-1']    = 'iconv_fallback_utf8_iso88591';
+			$ConversionFunctionList['UTF-8']['UTF-16']        = 'iconv_fallback_utf8_utf16';
+			$ConversionFunctionList['UTF-8']['UTF-16BE']      = 'iconv_fallback_utf8_utf16be';
+			$ConversionFunctionList['UTF-8']['UTF-16LE']      = 'iconv_fallback_utf8_utf16le';
+			$ConversionFunctionList['UTF-16']['ISO-8859-1']   = 'iconv_fallback_utf16_iso88591';
+			$ConversionFunctionList['UTF-16']['UTF-8']        = 'iconv_fallback_utf16_utf8';
+			$ConversionFunctionList['UTF-16LE']['ISO-8859-1'] = 'iconv_fallback_utf16le_iso88591';
+			$ConversionFunctionList['UTF-16LE']['UTF-8']      = 'iconv_fallback_utf16le_utf8';
+			$ConversionFunctionList['UTF-16BE']['ISO-8859-1'] = 'iconv_fallback_utf16be_iso88591';
+			$ConversionFunctionList['UTF-16BE']['UTF-8']      = 'iconv_fallback_utf16be_utf8';
+		}
+		if (isset($ConversionFunctionList[strtoupper($in_charset)][strtoupper($out_charset)])) {
+			$ConversionFunction = $ConversionFunctionList[strtoupper($in_charset)][strtoupper($out_charset)];
+			return self::$ConversionFunction($string);
+		}
+		throw new Exception('PHP does not has mb_convert_encoding() or iconv() support - cannot convert from '.$in_charset.' to '.$out_charset);
+	}
+
+	public static function recursiveMultiByteCharString2HTML($data, $charset='ISO-8859-1') {
+		if (is_string($data)) {
+			return self::MultiByteCharString2HTML($data, $charset);
+		} elseif (is_array($data)) {
+			$return_data = array();
+			foreach ($data as $key => $value) {
+				$return_data[$key] = self::recursiveMultiByteCharString2HTML($value, $charset);
+			}
+			return $return_data;
+		}
+		// integer, float, objects, resources, etc
+		return $data;
+	}
+
+	public static function MultiByteCharString2HTML($string, $charset='ISO-8859-1') {
+		$string = (string) $string; // in case trying to pass a numeric (float, int) string, would otherwise return an empty string
+		$HTMLstring = '';
+
+		switch (strtolower($charset)) {
+			case '1251':
+			case '1252':
+			case '866':
+			case '932':
+			case '936':
+			case '950':
+			case 'big5':
+			case 'big5-hkscs':
+			case 'cp1251':
+			case 'cp1252':
+			case 'cp866':
+			case 'euc-jp':
+			case 'eucjp':
+			case 'gb2312':
+			case 'ibm866':
+			case 'iso-8859-1':
+			case 'iso-8859-15':
+			case 'iso8859-1':
+			case 'iso8859-15':
+			case 'koi8-r':
+			case 'koi8-ru':
+			case 'koi8r':
+			case 'shift_jis':
+			case 'sjis':
+			case 'win-1251':
+			case 'windows-1251':
+			case 'windows-1252':
+				$HTMLstring = htmlentities($string, ENT_COMPAT, $charset);
+				break;
+
+			case 'utf-8':
+				$strlen = strlen($string);
+				for ($i = 0; $i < $strlen; $i++) {
+					$char_ord_val = ord($string{$i});
+					$charval = 0;
+					if ($char_ord_val < 0x80) {
+						$charval = $char_ord_val;
+					} elseif ((($char_ord_val & 0xF0) >> 4) == 0x0F  &&  $i+3 < $strlen) {
+						$charval  = (($char_ord_val & 0x07) << 18);
+						$charval += ((ord($string{++$i}) & 0x3F) << 12);
+						$charval += ((ord($string{++$i}) & 0x3F) << 6);
+						$charval +=  (ord($string{++$i}) & 0x3F);
+					} elseif ((($char_ord_val & 0xE0) >> 5) == 0x07  &&  $i+2 < $strlen) {
+						$charval  = (($char_ord_val & 0x0F) << 12);
+						$charval += ((ord($string{++$i}) & 0x3F) << 6);
+						$charval +=  (ord($string{++$i}) & 0x3F);
+					} elseif ((($char_ord_val & 0xC0) >> 6) == 0x03  &&  $i+1 < $strlen) {
+						$charval  = (($char_ord_val & 0x1F) << 6);
+						$charval += (ord($string{++$i}) & 0x3F);
+					}
+					if (($charval >= 32) && ($charval <= 127)) {
+						$HTMLstring .= htmlentities(chr($charval));
+					} else {
+						$HTMLstring .= '&#'.$charval.';';
+					}
+				}
+				break;
+
+			case 'utf-16le':
+				for ($i = 0; $i < strlen($string); $i += 2) {
+					$charval = self::LittleEndian2Int(substr($string, $i, 2));
+					if (($charval >= 32) && ($charval <= 127)) {
+						$HTMLstring .= chr($charval);
+					} else {
+						$HTMLstring .= '&#'.$charval.';';
+					}
+				}
+				break;
+
+			case 'utf-16be':
+				for ($i = 0; $i < strlen($string); $i += 2) {
+					$charval = self::BigEndian2Int(substr($string, $i, 2));
+					if (($charval >= 32) && ($charval <= 127)) {
+						$HTMLstring .= chr($charval);
+					} else {
+						$HTMLstring .= '&#'.$charval.';';
+					}
+				}
+				break;
+
+			default:
+				$HTMLstring = 'ERROR: Character set "'.$charset.'" not supported in MultiByteCharString2HTML()';
+				break;
+		}
+		return $HTMLstring;
+	}
+
+
+
+	public static function RGADnameLookup($namecode) {
+		static $RGADname = array();
+		if (empty($RGADname)) {
+			$RGADname[0] = 'not set';
+			$RGADname[1] = 'Track Gain Adjustment';
+			$RGADname[2] = 'Album Gain Adjustment';
+		}
+
+		return (isset($RGADname[$namecode]) ? $RGADname[$namecode] : '');
+	}
+
+
+	public static function RGADoriginatorLookup($originatorcode) {
+		static $RGADoriginator = array();
+		if (empty($RGADoriginator)) {
+			$RGADoriginator[0] = 'unspecified';
+			$RGADoriginator[1] = 'pre-set by artist/producer/mastering engineer';
+			$RGADoriginator[2] = 'set by user';
+			$RGADoriginator[3] = 'determined automatically';
+		}
+
+		return (isset($RGADoriginator[$originatorcode]) ? $RGADoriginator[$originatorcode] : '');
+	}
+
+
+	public static function RGADadjustmentLookup($rawadjustment, $signbit) {
+		$adjustment = $rawadjustment / 10;
+		if ($signbit == 1) {
+			$adjustment *= -1;
+		}
+		return (float) $adjustment;
+	}
+
+
+	public static function RGADgainString($namecode, $originatorcode, $replaygain) {
+		if ($replaygain < 0) {
+			$signbit = '1';
+		} else {
+			$signbit = '0';
+		}
+		$storedreplaygain = intval(round($replaygain * 10));
+		$gainstring  = str_pad(decbin($namecode), 3, '0', STR_PAD_LEFT);
+		$gainstring .= str_pad(decbin($originatorcode), 3, '0', STR_PAD_LEFT);
+		$gainstring .= $signbit;
+		$gainstring .= str_pad(decbin($storedreplaygain), 9, '0', STR_PAD_LEFT);
+
+		return $gainstring;
+	}
+
+	public static function RGADamplitude2dB($amplitude) {
+		return 20 * log10($amplitude);
+	}
+
+
+	public static function GetDataImageSize($imgData, &$imageinfo=array()) {
+		static $tempdir = '';
+		if (empty($tempdir)) {
+			if (function_exists('sys_get_temp_dir')) {
+				$tempdir = sys_get_temp_dir(); // https://github.com/JamesHeinrich/getID3/issues/52
+			}
+
+			// yes this is ugly, feel free to suggest a better way
+			if (include_once(dirname(__FILE__).'/getid3.php')) {
+				if ($getid3_temp = new getID3()) {
+					if ($getid3_temp_tempdir = $getid3_temp->tempdir) {
+						$tempdir = $getid3_temp_tempdir;
+					}
+					unset($getid3_temp, $getid3_temp_tempdir);
+				}
+			}
+		}
+		$GetDataImageSize = false;
+		if ($tempfilename = tempnam($tempdir, 'gI3')) {
+			if (is_writable($tempfilename) && is_file($tempfilename) && ($tmp = fopen($tempfilename, 'wb'))) {
+				fwrite($tmp, $imgData);
+				fclose($tmp);
+				$GetDataImageSize = @getimagesize($tempfilename, $imageinfo);
+				if (($GetDataImageSize === false) || !isset($GetDataImageSize[0]) || !isset($GetDataImageSize[1])) {
+					return false;
+				}
+				$GetDataImageSize['height'] = $GetDataImageSize[0];
+				$GetDataImageSize['width']  = $GetDataImageSize[1];
+			}
+			unlink($tempfilename);
+		}
+		return $GetDataImageSize;
+	}
+
+	public static function ImageExtFromMim
