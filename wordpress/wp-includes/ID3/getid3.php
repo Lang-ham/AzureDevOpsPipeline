@@ -944,4 +944,316 @@ class getID3
 				'jpg'  => array(
 							'pattern'   => '^\\xFF\\xD8\\xFF',
 							'group'     => 'graphic',
-							'module'    =>
+							'module'    => 'jpg',
+							'mime_type' => 'image/jpeg',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// PCD  - still image - Kodak Photo CD
+				'pcd'  => array(
+							'pattern'   => '^.{2048}PCD_IPI\\x00',
+							'group'     => 'graphic',
+							'module'    => 'pcd',
+							'mime_type' => 'image/x-photo-cd',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// PNG  - still image - Portable Network Graphics (PNG)
+				'png'  => array(
+							'pattern'   => '^\\x89\\x50\\x4E\\x47\\x0D\\x0A\\x1A\\x0A',
+							'group'     => 'graphic',
+							'module'    => 'png',
+							'mime_type' => 'image/png',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// SVG  - still image - Scalable Vector Graphics (SVG)
+				'svg'  => array(
+							'pattern'   => '(<!DOCTYPE svg PUBLIC |xmlns="http://www\\.w3\\.org/2000/svg")',
+							'group'     => 'graphic',
+							'module'    => 'svg',
+							'mime_type' => 'image/svg+xml',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// TIFF - still image - Tagged Information File Format (TIFF)
+				'tiff' => array(
+							'pattern'   => '^(II\\x2A\\x00|MM\\x00\\x2A)',
+							'group'     => 'graphic',
+							'module'    => 'tiff',
+							'mime_type' => 'image/tiff',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// EFAX - still image - eFax (TIFF derivative)
+				'efax'  => array(
+							'pattern'   => '^\\xDC\\xFE',
+							'group'     => 'graphic',
+							'module'    => 'efax',
+							'mime_type' => 'image/efax',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// Data formats
+
+				// ISO  - data        - International Standards Organization (ISO) CD-ROM Image
+				'iso'  => array(
+							'pattern'   => '^.{32769}CD001',
+							'group'     => 'misc',
+							'module'    => 'iso',
+							'mime_type' => 'application/octet-stream',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+							'iconv_req' => false,
+						),
+
+				// RAR  - data        - RAR compressed data
+				'rar'  => array(
+							'pattern'   => '^Rar\\!',
+							'group'     => 'archive',
+							'module'    => 'rar',
+							'mime_type' => 'application/octet-stream',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// SZIP - audio/data  - SZIP compressed data
+				'szip' => array(
+							'pattern'   => '^SZ\\x0A\\x04',
+							'group'     => 'archive',
+							'module'    => 'szip',
+							'mime_type' => 'application/octet-stream',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// TAR  - data        - TAR compressed data
+				'tar'  => array(
+							'pattern'   => '^.{100}[0-9\\x20]{7}\\x00[0-9\\x20]{7}\\x00[0-9\\x20]{7}\\x00[0-9\\x20\\x00]{12}[0-9\\x20\\x00]{12}',
+							'group'     => 'archive',
+							'module'    => 'tar',
+							'mime_type' => 'application/x-tar',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// GZIP  - data        - GZIP compressed data
+				'gz'  => array(
+							'pattern'   => '^\\x1F\\x8B\\x08',
+							'group'     => 'archive',
+							'module'    => 'gzip',
+							'mime_type' => 'application/x-gzip',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// ZIP  - data         - ZIP compressed data
+				'zip'  => array(
+							'pattern'   => '^PK\\x03\\x04',
+							'group'     => 'archive',
+							'module'    => 'zip',
+							'mime_type' => 'application/zip',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+
+				// Misc other formats
+
+				// PAR2 - data        - Parity Volume Set Specification 2.0
+				'par2' => array (
+							'pattern'   => '^PAR2\\x00PKT',
+							'group'     => 'misc',
+							'module'    => 'par2',
+							'mime_type' => 'application/octet-stream',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// PDF  - data        - Portable Document Format
+				'pdf'  => array(
+							'pattern'   => '^\\x25PDF',
+							'group'     => 'misc',
+							'module'    => 'pdf',
+							'mime_type' => 'application/pdf',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// MSOFFICE  - data   - ZIP compressed data
+				'msoffice' => array(
+							'pattern'   => '^\\xD0\\xCF\\x11\\xE0\\xA1\\xB1\\x1A\\xE1', // D0CF11E == DOCFILE == Microsoft Office Document
+							'group'     => 'misc',
+							'module'    => 'msoffice',
+							'mime_type' => 'application/octet-stream',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				 // CUE  - data       - CUEsheet (index to single-file disc images)
+				 'cue' => array(
+							'pattern'   => '', // empty pattern means cannot be automatically detected, will fall through all other formats and match based on filename and very basic file contents
+							'group'     => 'misc',
+							'module'    => 'cue',
+							'mime_type' => 'application/octet-stream',
+						   ),
+
+			);
+		}
+
+		return $format_info;
+	}
+
+
+
+	public function GetFileFormat(&$filedata, $filename='') {
+		// this function will determine the format of a file based on usually
+		// the first 2-4 bytes of the file (8 bytes for PNG, 16 bytes for JPG,
+		// and in the case of ISO CD image, 6 bytes offset 32kb from the start
+		// of the file).
+
+		// Identify file format - loop through $format_info and detect with reg expr
+		foreach ($this->GetFileFormatArray() as $format_name => $info) {
+			// The /s switch on preg_match() forces preg_match() NOT to treat
+			// newline (0x0A) characters as special chars but do a binary match
+			if (!empty($info['pattern']) && preg_match('#'.$info['pattern'].'#s', $filedata)) {
+				$info['include'] = 'module.'.$info['group'].'.'.$info['module'].'.php';
+				return $info;
+			}
+		}
+
+
+		if (preg_match('#\\.mp[123a]$#i', $filename)) {
+			// Too many mp3 encoders on the market put gabage in front of mpeg files
+			// use assume format on these if format detection failed
+			$GetFileFormatArray = $this->GetFileFormatArray();
+			$info = $GetFileFormatArray['mp3'];
+			$info['include'] = 'module.'.$info['group'].'.'.$info['module'].'.php';
+			return $info;
+		} elseif (preg_match('#\\.cue$#i', $filename) && preg_match('#FILE "[^"]+" (BINARY|MOTOROLA|AIFF|WAVE|MP3)#', $filedata)) {
+			// there's not really a useful consistent "magic" at the beginning of .cue files to identify them
+			// so until I think of something better, just go by filename if all other format checks fail
+			// and verify there's at least one instance of "TRACK xx AUDIO" in the file
+			$GetFileFormatArray = $this->GetFileFormatArray();
+			$info = $GetFileFormatArray['cue'];
+			$info['include']   = 'module.'.$info['group'].'.'.$info['module'].'.php';
+			return $info;
+		}
+
+		return false;
+	}
+
+
+	// converts array to $encoding charset from $this->encoding
+	public function CharConvert(&$array, $encoding) {
+
+		// identical encoding - end here
+		if ($encoding == $this->encoding) {
+			return;
+		}
+
+		// loop thru array
+		foreach ($array as $key => $value) {
+
+			// go recursive
+			if (is_array($value)) {
+				$this->CharConvert($array[$key], $encoding);
+			}
+
+			// convert string
+			elseif (is_string($value)) {
+				$array[$key] = trim(getid3_lib::iconv_fallback($encoding, $this->encoding, $value));
+			}
+		}
+	}
+
+
+	public function HandleAllTags() {
+
+		// key name => array (tag name, character encoding)
+		static $tags;
+		if (empty($tags)) {
+			$tags = array(
+				'asf'       => array('asf'           , 'UTF-16LE'),
+				'midi'      => array('midi'          , 'ISO-8859-1'),
+				'nsv'       => array('nsv'           , 'ISO-8859-1'),
+				'ogg'       => array('vorbiscomment' , 'UTF-8'),
+				'png'       => array('png'           , 'UTF-8'),
+				'tiff'      => array('tiff'          , 'ISO-8859-1'),
+				'quicktime' => array('quicktime'     , 'UTF-8'),
+				'real'      => array('real'          , 'ISO-8859-1'),
+				'vqf'       => array('vqf'           , 'ISO-8859-1'),
+				'zip'       => array('zip'           , 'ISO-8859-1'),
+				'riff'      => array('riff'          , 'ISO-8859-1'),
+				'lyrics3'   => array('lyrics3'       , 'ISO-8859-1'),
+				'id3v1'     => array('id3v1'         , $this->encoding_id3v1),
+				'id3v2'     => array('id3v2'         , 'UTF-8'), // not according to the specs (every frame can have a different encoding), but getID3() force-converts all encodings to UTF-8
+				'ape'       => array('ape'           , 'UTF-8'),
+				'cue'       => array('cue'           , 'ISO-8859-1'),
+				'matroska'  => array('matroska'      , 'UTF-8'),
+				'flac'      => array('vorbiscomment' , 'UTF-8'),
+				'divxtag'   => array('divx'          , 'ISO-8859-1'),
+				'iptc'      => array('iptc'          , 'ISO-8859-1'),
+			);
+		}
+
+		// loop through comments array
+		foreach ($tags as $comment_name => $tagname_encoding_array) {
+			list($tag_name, $encoding) = $tagname_encoding_array;
+
+			// fill in default encoding type if not already present
+			if (isset($this->info[$comment_name]) && !isset($this->info[$comment_name]['encoding'])) {
+				$this->info[$comment_name]['encoding'] = $encoding;
+			}
+
+			// copy comments if key name set
+			if (!empty($this->info[$comment_name]['comments'])) {
+				foreach ($this->info[$comment_name]['comments'] as $tag_key => $valuearray) {
+					foreach ($valuearray as $key => $value) {
+						if (is_string($value)) {
+							$value = trim($value, " \r\n\t"); // do not trim nulls from $value!! Unicode characters will get mangled if trailing nulls are removed!
+						}
+						if ($value) {
+							if (!is_numeric($key)) {
+								$this->info['tags'][trim($tag_name)][trim($tag_key)][$key] = $value;
+							} else {
+								$this->info['tags'][trim($tag_name)][trim($tag_key)][]     = $value;
+							}
+						}
+					}
+					if ($tag_key == 'picture') {
+						unset($this->info[$comment_name]['comments'][$tag_key]);
+					}
+				}
+
+				if (!isset($this->info['tags'][$tag_name])) {
+					// comments are set but contain nothing but empty strings, so skip
+					continue;
+				}
+
+				$this->CharConvert($this->info['tags'][$tag_name], $this->info[$comment_name]['encoding']);           // only copy gets converted!
+
+				if ($this->option_tags_html) {
+					foreach ($this->info['tags'][$tag_name] as $tag_key => $valuearray) {
+						$this->info['tags_html'][$tag_name][$tag_key] = getid3_lib::recursiveMultiByteCharString2HTML($valuearray, $this->info[$comment_name]['encoding']);
+					}
+				}
+
+			}
+
+		}
+
+		// pictures can take up a lot of space, and we don't need multiple copies of them
+		// let there be a single copy in [comments][picture], and not elsewhere
+		if (!empty(
