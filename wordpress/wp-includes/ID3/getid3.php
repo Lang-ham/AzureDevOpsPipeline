@@ -600,4 +600,348 @@ class getID3
 				// AAC  - audio       - Advanced Audio Coding (AAC) - ADTS format (very similar to MP3)
 				'adts' => array(
 							'pattern'   => '^\\xFF[\\xF0-\\xF1\\xF8-\\xF9]',
-							'group'     => 
+							'group'     => 'audio',
+							'module'    => 'aac',
+							'mime_type' => 'application/octet-stream',
+							'fail_ape'  => 'WARNING',
+						),
+
+
+				// AU   - audio       - NeXT/Sun AUdio (AU)
+				'au'   => array(
+							'pattern'   => '^\\.snd',
+							'group'     => 'audio',
+							'module'    => 'au',
+							'mime_type' => 'audio/basic',
+						),
+
+				// AMR  - audio       - Adaptive Multi Rate
+				'amr'  => array(
+							'pattern'   => '^\\x23\\x21AMR\\x0A', // #!AMR[0A]
+							'group'     => 'audio',
+							'module'    => 'amr',
+							'mime_type' => 'audio/amr',
+						),
+
+				// AVR  - audio       - Audio Visual Research
+				'avr'  => array(
+							'pattern'   => '^2BIT',
+							'group'     => 'audio',
+							'module'    => 'avr',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// BONK - audio       - Bonk v0.9+
+				'bonk' => array(
+							'pattern'   => '^\\x00(BONK|INFO|META| ID3)',
+							'group'     => 'audio',
+							'module'    => 'bonk',
+							'mime_type' => 'audio/xmms-bonk',
+						),
+
+				// DSF  - audio       - Direct Stream Digital (DSD) Storage Facility files (DSF) - https://en.wikipedia.org/wiki/Direct_Stream_Digital
+				'dsf'  => array(
+							'pattern'   => '^DSD ',  // including trailing space: 44 53 44 20
+							'group'     => 'audio',
+							'module'    => 'dsf',
+							'mime_type' => 'audio/dsd',
+						),
+
+				// DSS  - audio       - Digital Speech Standard
+				'dss'  => array(
+							'pattern'   => '^[\\x02-\\x06]ds[s2]',
+							'group'     => 'audio',
+							'module'    => 'dss',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// DTS  - audio       - Dolby Theatre System
+				'dts'  => array(
+							'pattern'   => '^\\x7F\\xFE\\x80\\x01',
+							'group'     => 'audio',
+							'module'    => 'dts',
+							'mime_type' => 'audio/dts',
+						),
+
+				// FLAC - audio       - Free Lossless Audio Codec
+				'flac' => array(
+							'pattern'   => '^fLaC',
+							'group'     => 'audio',
+							'module'    => 'flac',
+							'mime_type' => 'audio/x-flac',
+						),
+
+				// LA   - audio       - Lossless Audio (LA)
+				'la'   => array(
+							'pattern'   => '^LA0[2-4]',
+							'group'     => 'audio',
+							'module'    => 'la',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// LPAC - audio       - Lossless Predictive Audio Compression (LPAC)
+				'lpac' => array(
+							'pattern'   => '^LPAC',
+							'group'     => 'audio',
+							'module'    => 'lpac',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// MIDI - audio       - MIDI (Musical Instrument Digital Interface)
+				'midi' => array(
+							'pattern'   => '^MThd',
+							'group'     => 'audio',
+							'module'    => 'midi',
+							'mime_type' => 'audio/midi',
+						),
+
+				// MAC  - audio       - Monkey's Audio Compressor
+				'mac'  => array(
+							'pattern'   => '^MAC ',
+							'group'     => 'audio',
+							'module'    => 'monkey',
+							'mime_type' => 'application/octet-stream',
+						),
+
+// has been known to produce false matches in random files (e.g. JPEGs), leave out until more precise matching available
+//				// MOD  - audio       - MODule (assorted sub-formats)
+//				'mod'  => array(
+//							'pattern'   => '^.{1080}(M\\.K\\.|M!K!|FLT4|FLT8|[5-9]CHN|[1-3][0-9]CH)',
+//							'group'     => 'audio',
+//							'module'    => 'mod',
+//							'option'    => 'mod',
+//							'mime_type' => 'audio/mod',
+//						),
+
+				// MOD  - audio       - MODule (Impulse Tracker)
+				'it'   => array(
+							'pattern'   => '^IMPM',
+							'group'     => 'audio',
+							'module'    => 'mod',
+							//'option'    => 'it',
+							'mime_type' => 'audio/it',
+						),
+
+				// MOD  - audio       - MODule (eXtended Module, various sub-formats)
+				'xm'   => array(
+							'pattern'   => '^Extended Module',
+							'group'     => 'audio',
+							'module'    => 'mod',
+							//'option'    => 'xm',
+							'mime_type' => 'audio/xm',
+						),
+
+				// MOD  - audio       - MODule (ScreamTracker)
+				's3m'  => array(
+							'pattern'   => '^.{44}SCRM',
+							'group'     => 'audio',
+							'module'    => 'mod',
+							//'option'    => 's3m',
+							'mime_type' => 'audio/s3m',
+						),
+
+				// MPC  - audio       - Musepack / MPEGplus
+				'mpc'  => array(
+							'pattern'   => '^(MPCK|MP\\+|[\\x00\\x01\\x10\\x11\\x40\\x41\\x50\\x51\\x80\\x81\\x90\\x91\\xC0\\xC1\\xD0\\xD1][\\x20-\\x37][\\x00\\x20\\x40\\x60\\x80\\xA0\\xC0\\xE0])',
+							'group'     => 'audio',
+							'module'    => 'mpc',
+							'mime_type' => 'audio/x-musepack',
+						),
+
+				// MP3  - audio       - MPEG-audio Layer 3 (very similar to AAC-ADTS)
+				'mp3'  => array(
+							'pattern'   => '^\\xFF[\\xE2-\\xE7\\xF2-\\xF7\\xFA-\\xFF][\\x00-\\x0B\\x10-\\x1B\\x20-\\x2B\\x30-\\x3B\\x40-\\x4B\\x50-\\x5B\\x60-\\x6B\\x70-\\x7B\\x80-\\x8B\\x90-\\x9B\\xA0-\\xAB\\xB0-\\xBB\\xC0-\\xCB\\xD0-\\xDB\\xE0-\\xEB\\xF0-\\xFB]',
+							'group'     => 'audio',
+							'module'    => 'mp3',
+							'mime_type' => 'audio/mpeg',
+						),
+
+				// OFR  - audio       - OptimFROG
+				'ofr'  => array(
+							'pattern'   => '^(\\*RIFF|OFR)',
+							'group'     => 'audio',
+							'module'    => 'optimfrog',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// RKAU - audio       - RKive AUdio compressor
+				'rkau' => array(
+							'pattern'   => '^RKA',
+							'group'     => 'audio',
+							'module'    => 'rkau',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// SHN  - audio       - Shorten
+				'shn'  => array(
+							'pattern'   => '^ajkg',
+							'group'     => 'audio',
+							'module'    => 'shorten',
+							'mime_type' => 'audio/xmms-shn',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// TTA  - audio       - TTA Lossless Audio Compressor (http://tta.corecodec.org)
+				'tta'  => array(
+							'pattern'   => '^TTA',  // could also be '^TTA(\\x01|\\x02|\\x03|2|1)'
+							'group'     => 'audio',
+							'module'    => 'tta',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// VOC  - audio       - Creative Voice (VOC)
+				'voc'  => array(
+							'pattern'   => '^Creative Voice File',
+							'group'     => 'audio',
+							'module'    => 'voc',
+							'mime_type' => 'audio/voc',
+						),
+
+				// VQF  - audio       - transform-domain weighted interleave Vector Quantization Format (VQF)
+				'vqf'  => array(
+							'pattern'   => '^TWIN',
+							'group'     => 'audio',
+							'module'    => 'vqf',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// WV  - audio        - WavPack (v4.0+)
+				'wv'   => array(
+							'pattern'   => '^wvpk',
+							'group'     => 'audio',
+							'module'    => 'wavpack',
+							'mime_type' => 'application/octet-stream',
+						),
+
+
+				// Audio-Video formats
+
+				// ASF  - audio/video - Advanced Streaming Format, Windows Media Video, Windows Media Audio
+				'asf'  => array(
+							'pattern'   => '^\\x30\\x26\\xB2\\x75\\x8E\\x66\\xCF\\x11\\xA6\\xD9\\x00\\xAA\\x00\\x62\\xCE\\x6C',
+							'group'     => 'audio-video',
+							'module'    => 'asf',
+							'mime_type' => 'video/x-ms-asf',
+							'iconv_req' => false,
+						),
+
+				// BINK - audio/video - Bink / Smacker
+				'bink' => array(
+							'pattern'   => '^(BIK|SMK)',
+							'group'     => 'audio-video',
+							'module'    => 'bink',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// FLV  - audio/video - FLash Video
+				'flv' => array(
+							'pattern'   => '^FLV[\\x01]',
+							'group'     => 'audio-video',
+							'module'    => 'flv',
+							'mime_type' => 'video/x-flv',
+						),
+
+				// MKAV - audio/video - Mastroka
+				'matroska' => array(
+							'pattern'   => '^\\x1A\\x45\\xDF\\xA3',
+							'group'     => 'audio-video',
+							'module'    => 'matroska',
+							'mime_type' => 'video/x-matroska', // may also be audio/x-matroska
+						),
+
+				// MPEG - audio/video - MPEG (Moving Pictures Experts Group)
+				'mpeg' => array(
+							'pattern'   => '^\\x00\\x00\\x01[\\xB3\\xBA]',
+							'group'     => 'audio-video',
+							'module'    => 'mpeg',
+							'mime_type' => 'video/mpeg',
+						),
+
+				// NSV  - audio/video - Nullsoft Streaming Video (NSV)
+				'nsv'  => array(
+							'pattern'   => '^NSV[sf]',
+							'group'     => 'audio-video',
+							'module'    => 'nsv',
+							'mime_type' => 'application/octet-stream',
+						),
+
+				// Ogg  - audio/video - Ogg (Ogg-Vorbis, Ogg-FLAC, Speex, Ogg-Theora(*), Ogg-Tarkin(*))
+				'ogg'  => array(
+							'pattern'   => '^OggS',
+							'group'     => 'audio',
+							'module'    => 'ogg',
+							'mime_type' => 'application/ogg',
+							'fail_id3'  => 'WARNING',
+							'fail_ape'  => 'WARNING',
+						),
+
+				// QT   - audio/video - Quicktime
+				'quicktime' => array(
+							'pattern'   => '^.{4}(cmov|free|ftyp|mdat|moov|pnot|skip|wide)',
+							'group'     => 'audio-video',
+							'module'    => 'quicktime',
+							'mime_type' => 'video/quicktime',
+						),
+
+				// RIFF - audio/video - Resource Interchange File Format (RIFF) / WAV / AVI / CD-audio / SDSS = renamed variant used by SmartSound QuickTracks (www.smartsound.com) / FORM = Audio Interchange File Format (AIFF)
+				'riff' => array(
+							'pattern'   => '^(RIFF|SDSS|FORM)',
+							'group'     => 'audio-video',
+							'module'    => 'riff',
+							'mime_type' => 'audio/x-wav',
+							'fail_ape'  => 'WARNING',
+						),
+
+				// Real - audio/video - RealAudio, RealVideo
+				'real' => array(
+							'pattern'   => '^\\.(RMF|ra)',
+							'group'     => 'audio-video',
+							'module'    => 'real',
+							'mime_type' => 'audio/x-realaudio',
+						),
+
+				// SWF - audio/video - ShockWave Flash
+				'swf' => array(
+							'pattern'   => '^(F|C)WS',
+							'group'     => 'audio-video',
+							'module'    => 'swf',
+							'mime_type' => 'application/x-shockwave-flash',
+						),
+
+				// TS - audio/video - MPEG-2 Transport Stream
+				'ts' => array(
+							'pattern'   => '^(\\x47.{187}){10,}', // packets are 188 bytes long and start with 0x47 "G".  Check for at least 10 packets matching this pattern
+							'group'     => 'audio-video',
+							'module'    => 'ts',
+							'mime_type' => 'video/MP2T',
+						),
+
+
+				// Still-Image formats
+
+				// BMP  - still image - Bitmap (Windows, OS/2; uncompressed, RLE8, RLE4)
+				'bmp'  => array(
+							'pattern'   => '^BM',
+							'group'     => 'graphic',
+							'module'    => 'bmp',
+							'mime_type' => 'image/bmp',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// GIF  - still image - Graphics Interchange Format
+				'gif'  => array(
+							'pattern'   => '^GIF',
+							'group'     => 'graphic',
+							'module'    => 'gif',
+							'mime_type' => 'image/gif',
+							'fail_id3'  => 'ERROR',
+							'fail_ape'  => 'ERROR',
+						),
+
+				// JPEG - still image - Joint Photographic Experts Group (JPEG)
+				'jpg'  => array(
+							'pattern'   => '^\\xFF\\xD8\\xFF',
+							'group'     => 'graphic',
+							'module'    =>
