@@ -1256,4 +1256,290 @@ class getID3
 
 		// pictures can take up a lot of space, and we don't need multiple copies of them
 		// let there be a single copy in [comments][picture], and not elsewhere
-		if (!empty(
+		if (!empty($this->info['tags'])) {
+			$unset_keys = array('tags', 'tags_html');
+			foreach ($this->info['tags'] as $tagtype => $tagarray) {
+				foreach ($tagarray as $tagname => $tagdata) {
+					if ($tagname == 'picture') {
+						foreach ($tagdata as $key => $tagarray) {
+							$this->info['comments']['picture'][] = $tagarray;
+							if (isset($tagarray['data']) && isset($tagarray['image_mime'])) {
+								if (isset($this->info['tags'][$tagtype][$tagname][$key])) {
+									unset($this->info['tags'][$tagtype][$tagname][$key]);
+								}
+								if (isset($this->info['tags_html'][$tagtype][$tagname][$key])) {
+									unset($this->info['tags_html'][$tagtype][$tagname][$key]);
+								}
+							}
+						}
+					}
+				}
+				foreach ($unset_keys as $unset_key) {
+					// remove possible empty keys from (e.g. [tags][id3v2][picture])
+					if (empty($this->info[$unset_key][$tagtype]['picture'])) {
+						unset($this->info[$unset_key][$tagtype]['picture']);
+					}
+					if (empty($this->info[$unset_key][$tagtype])) {
+						unset($this->info[$unset_key][$tagtype]);
+					}
+					if (empty($this->info[$unset_key])) {
+						unset($this->info[$unset_key]);
+					}
+				}
+				// remove duplicate copy of picture data from (e.g. [id3v2][comments][picture])
+				if (isset($this->info[$tagtype]['comments']['picture'])) {
+					unset($this->info[$tagtype]['comments']['picture']);
+				}
+				if (empty($this->info[$tagtype]['comments'])) {
+					unset($this->info[$tagtype]['comments']);
+				}
+				if (empty($this->info[$tagtype])) {
+					unset($this->info[$tagtype]);
+				}
+			}
+		}
+		return true;
+	}
+
+	public function getHashdata($algorithm) {
+		switch ($algorithm) {
+			case 'md5':
+			case 'sha1':
+				break;
+
+			default:
+				return $this->error('bad algorithm "'.$algorithm.'" in getHashdata()');
+				break;
+		}
+
+		if (!empty($this->info['fileformat']) && !empty($this->info['dataformat']) && ($this->info['fileformat'] == 'ogg') && ($this->info['audio']['dataformat'] == 'vorbis')) {
+
+			// We cannot get an identical md5_data value for Ogg files where the comments
+			// span more than 1 Ogg page (compared to the same audio data with smaller
+			// comments) using the normal getID3() method of MD5'ing the data between the
+			// end of the comments and the end of the file (minus any trailing tags),
+			// because the page sequence numbers of the pages that the audio data is on
+			// do not match. Under normal circumstances, where comments are smaller than
+			// the nominal 4-8kB page size, then this is not a problem, but if there are
+			// very large comments, the only way around it is to strip off the comment
+			// tags with vorbiscomment and MD5 that file.
+			// This procedure must be applied to ALL Ogg files, not just the ones with
+			// comments larger than 1 page, because the below method simply MD5's the
+			// whole file with the comments stripped, not just the portion after the
+			// comments block (which is the standard getID3() method.
+
+			// The above-mentioned problem of comments spanning multiple pages and changing
+			// page sequence numbers likely happens for OggSpeex and OggFLAC as well, but
+			// currently vorbiscomment only works on OggVorbis files.
+
+			if (preg_match('#(1|ON)#i', ini_get('safe_mode'))) {
+
+				$this->warning('Failed making system call to vorbiscomment.exe - '.$algorithm.'_data is incorrect - error returned: PHP running in Safe Mode (backtick operator not available)');
+				$this->info[$algorithm.'_data'] = false;
+
+			} else {
+
+				// Prevent user from aborting script
+				$old_abort = ignore_user_abort(true);
+
+				// Create empty file
+				$empty = tempnam(GETID3_TEMP_DIR, 'getID3');
+				touch($empty);
+
+				// Use vorbiscomment to make temp file without comments
+				$temp = tempnam(GETID3_TEMP_DIR, 'getID3');
+				$file = $this->info['filenamepath'];
+
+				if (GETID3_OS_ISWINDOWS) {
+
+					if (file_exists(GETID3_HELPERAPPSDIR.'vorbiscomment.exe')) {
+
+						$commandline = '"'.GETID3_HELPERAPPSDIR.'vorbiscomment.exe" -w -c "'.$empty.'" "'.$file.'" "'.$temp.'"';
+						$VorbisCommentError = `$commandline`;
+
+					} else {
+
+						$VorbisCommentError = 'vorbiscomment.exe not found in '.GETID3_HELPERAPPSDIR;
+
+					}
+
+				} else {
+
+					$commandline = 'vorbiscomment -w -c "'.$empty.'" "'.$file.'" "'.$temp.'" 2>&1';
+					$commandline = 'vorbiscomment -w -c '.escapeshellarg($empty).' '.escapeshellarg($file).' '.escapeshellarg($temp).' 2>&1';
+					$VorbisCommentError = `$commandline`;
+
+				}
+
+				if (!empty($VorbisCommentError)) {
+
+					$this->warning('Failed making system call to vorbiscomment(.exe) - '.$algorithm.'_data will be incorrect. If vorbiscomment is unavailable, please download from http://www.vorbis.com/download.psp and put in the getID3() directory. Error returned: '.$VorbisCommentError);
+					$this->info[$algorithm.'_data'] = false;
+
+				} else {
+
+					// Get hash of newly created file
+					switch ($algorithm) {
+						case 'md5':
+							$this->info[$algorithm.'_data'] = md5_file($temp);
+							break;
+
+						case 'sha1':
+							$this->info[$algorithm.'_data'] = sha1_file($temp);
+							break;
+					}
+				}
+
+				// Clean up
+				unlink($empty);
+				unlink($temp);
+
+				// Reset abort setting
+				ignore_user_abort($old_abort);
+
+			}
+
+		} else {
+
+			if (!empty($this->info['avdataoffset']) || (isset($this->info['avdataend']) && ($this->info['avdataend'] < $this->info['filesize']))) {
+
+				// get hash from part of file
+				$this->info[$algorithm.'_data'] = getid3_lib::hash_data($this->info['filenamepath'], $this->info['avdataoffset'], $this->info['avdataend'], $algorithm);
+
+			} else {
+
+				// get hash from whole file
+				switch ($algorithm) {
+					case 'md5':
+						$this->info[$algorithm.'_data'] = md5_file($this->info['filenamepath']);
+						break;
+
+					case 'sha1':
+						$this->info[$algorithm.'_data'] = sha1_file($this->info['filenamepath']);
+						break;
+				}
+			}
+
+		}
+		return true;
+	}
+
+
+	public function ChannelsBitratePlaytimeCalculations() {
+
+		// set channelmode on audio
+		if (!empty($this->info['audio']['channelmode']) || !isset($this->info['audio']['channels'])) {
+			// ignore
+		} elseif ($this->info['audio']['channels'] == 1) {
+			$this->info['audio']['channelmode'] = 'mono';
+		} elseif ($this->info['audio']['channels'] == 2) {
+			$this->info['audio']['channelmode'] = 'stereo';
+		}
+
+		// Calculate combined bitrate - audio + video
+		$CombinedBitrate  = 0;
+		$CombinedBitrate += (isset($this->info['audio']['bitrate']) ? $this->info['audio']['bitrate'] : 0);
+		$CombinedBitrate += (isset($this->info['video']['bitrate']) ? $this->info['video']['bitrate'] : 0);
+		if (($CombinedBitrate > 0) && empty($this->info['bitrate'])) {
+			$this->info['bitrate'] = $CombinedBitrate;
+		}
+		//if ((isset($this->info['video']) && !isset($this->info['video']['bitrate'])) || (isset($this->info['audio']) && !isset($this->info['audio']['bitrate']))) {
+		//	// for example, VBR MPEG video files cannot determine video bitrate:
+		//	// should not set overall bitrate and playtime from audio bitrate only
+		//	unset($this->info['bitrate']);
+		//}
+
+		// video bitrate undetermined, but calculable
+		if (isset($this->info['video']['dataformat']) && $this->info['video']['dataformat'] && (!isset($this->info['video']['bitrate']) || ($this->info['video']['bitrate'] == 0))) {
+			// if video bitrate not set
+			if (isset($this->info['audio']['bitrate']) && ($this->info['audio']['bitrate'] > 0) && ($this->info['audio']['bitrate'] == $this->info['bitrate'])) {
+				// AND if audio bitrate is set to same as overall bitrate
+				if (isset($this->info['playtime_seconds']) && ($this->info['playtime_seconds'] > 0)) {
+					// AND if playtime is set
+					if (isset($this->info['avdataend']) && isset($this->info['avdataoffset'])) {
+						// AND if AV data offset start/end is known
+						// THEN we can calculate the video bitrate
+						$this->info['bitrate'] = round((($this->info['avdataend'] - $this->info['avdataoffset']) * 8) / $this->info['playtime_seconds']);
+						$this->info['video']['bitrate'] = $this->info['bitrate'] - $this->info['audio']['bitrate'];
+					}
+				}
+			}
+		}
+
+		if ((!isset($this->info['playtime_seconds']) || ($this->info['playtime_seconds'] <= 0)) && !empty($this->info['bitrate'])) {
+			$this->info['playtime_seconds'] = (($this->info['avdataend'] - $this->info['avdataoffset']) * 8) / $this->info['bitrate'];
+		}
+
+		if (!isset($this->info['bitrate']) && !empty($this->info['playtime_seconds'])) {
+			$this->info['bitrate'] = (($this->info['avdataend'] - $this->info['avdataoffset']) * 8) / $this->info['playtime_seconds'];
+		}
+		if (isset($this->info['bitrate']) && empty($this->info['audio']['bitrate']) && empty($this->info['video']['bitrate'])) {
+			if (isset($this->info['audio']['dataformat']) && empty($this->info['video']['resolution_x'])) {
+				// audio only
+				$this->info['audio']['bitrate'] = $this->info['bitrate'];
+			} elseif (isset($this->info['video']['resolution_x']) && empty($this->info['audio']['dataformat'])) {
+				// video only
+				$this->info['video']['bitrate'] = $this->info['bitrate'];
+			}
+		}
+
+		// Set playtime string
+		if (!empty($this->info['playtime_seconds']) && empty($this->info['playtime_string'])) {
+			$this->info['playtime_string'] = getid3_lib::PlaytimeString($this->info['playtime_seconds']);
+		}
+	}
+
+
+	public function CalculateCompressionRatioVideo() {
+		if (empty($this->info['video'])) {
+			return false;
+		}
+		if (empty($this->info['video']['resolution_x']) || empty($this->info['video']['resolution_y'])) {
+			return false;
+		}
+		if (empty($this->info['video']['bits_per_sample'])) {
+			return false;
+		}
+
+		switch ($this->info['video']['dataformat']) {
+			case 'bmp':
+			case 'gif':
+			case 'jpeg':
+			case 'jpg':
+			case 'png':
+			case 'tiff':
+				$FrameRate = 1;
+				$PlaytimeSeconds = 1;
+				$BitrateCompressed = $this->info['filesize'] * 8;
+				break;
+
+			default:
+				if (!empty($this->info['video']['frame_rate'])) {
+					$FrameRate = $this->info['video']['frame_rate'];
+				} else {
+					return false;
+				}
+				if (!empty($this->info['playtime_seconds'])) {
+					$PlaytimeSeconds = $this->info['playtime_seconds'];
+				} else {
+					return false;
+				}
+				if (!empty($this->info['video']['bitrate'])) {
+					$BitrateCompressed = $this->info['video']['bitrate'];
+				} else {
+					return false;
+				}
+				break;
+		}
+		$BitrateUncompressed = $this->info['video']['resolution_x'] * $this->info['video']['resolution_y'] * $this->info['video']['bits_per_sample'] * $FrameRate;
+
+		$this->info['video']['compression_ratio'] = $BitrateCompressed / $BitrateUncompressed;
+		return true;
+	}
+
+
+	public function CalculateCompressionRatioAudio() {
+		if (empty($this->info['audio']['bitrate']) || empty($this->info['audio']['channels']) || empty($this->info['audio']['sample_rate']) || !is_numeric($this->info['audio']['sample_rate'])) {
+			return false;
+		}
+		$this->info['audio']['compression_ratio'] = $this->info
