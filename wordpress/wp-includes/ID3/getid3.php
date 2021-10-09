@@ -1542,4 +1542,303 @@ class getID3
 		if (empty($this->info['audio']['bitrate']) || empty($this->info['audio']['channels']) || empty($this->info['audio']['sample_rate']) || !is_numeric($this->info['audio']['sample_rate'])) {
 			return false;
 		}
-		$this->info['audio']['compression_ratio'] = $this->info
+		$this->info['audio']['compression_ratio'] = $this->info['audio']['bitrate'] / ($this->info['audio']['channels'] * $this->info['audio']['sample_rate'] * (!empty($this->info['audio']['bits_per_sample']) ? $this->info['audio']['bits_per_sample'] : 16));
+
+		if (!empty($this->info['audio']['streams'])) {
+			foreach ($this->info['audio']['streams'] as $streamnumber => $streamdata) {
+				if (!empty($streamdata['bitrate']) && !empty($streamdata['channels']) && !empty($streamdata['sample_rate'])) {
+					$this->info['audio']['streams'][$streamnumber]['compression_ratio'] = $streamdata['bitrate'] / ($streamdata['channels'] * $streamdata['sample_rate'] * (!empty($streamdata['bits_per_sample']) ? $streamdata['bits_per_sample'] : 16));
+				}
+			}
+		}
+		return true;
+	}
+
+
+	public function CalculateReplayGain() {
+		if (isset($this->info['replay_gain'])) {
+			if (!isset($this->info['replay_gain']['reference_volume'])) {
+				$this->info['replay_gain']['reference_volume'] = (double) 89.0;
+			}
+			if (isset($this->info['replay_gain']['track']['adjustment'])) {
+				$this->info['replay_gain']['track']['volume'] = $this->info['replay_gain']['reference_volume'] - $this->info['replay_gain']['track']['adjustment'];
+			}
+			if (isset($this->info['replay_gain']['album']['adjustment'])) {
+				$this->info['replay_gain']['album']['volume'] = $this->info['replay_gain']['reference_volume'] - $this->info['replay_gain']['album']['adjustment'];
+			}
+
+			if (isset($this->info['replay_gain']['track']['peak'])) {
+				$this->info['replay_gain']['track']['max_noclip_gain'] = 0 - getid3_lib::RGADamplitude2dB($this->info['replay_gain']['track']['peak']);
+			}
+			if (isset($this->info['replay_gain']['album']['peak'])) {
+				$this->info['replay_gain']['album']['max_noclip_gain'] = 0 - getid3_lib::RGADamplitude2dB($this->info['replay_gain']['album']['peak']);
+			}
+		}
+		return true;
+	}
+
+	public function ProcessAudioStreams() {
+		if (!empty($this->info['audio']['bitrate']) || !empty($this->info['audio']['channels']) || !empty($this->info['audio']['sample_rate'])) {
+			if (!isset($this->info['audio']['streams'])) {
+				foreach ($this->info['audio'] as $key => $value) {
+					if ($key != 'streams') {
+						$this->info['audio']['streams'][0][$key] = $value;
+					}
+				}
+			}
+		}
+		return true;
+	}
+
+	public function getid3_tempnam() {
+		return tempnam($this->tempdir, 'gI3');
+	}
+
+	public function include_module($name) {
+		//if (!file_exists($this->include_path.'module.'.$name.'.php')) {
+		if (!file_exists(GETID3_INCLUDEPATH.'module.'.$name.'.php')) {
+			throw new getid3_exception('Required module.'.$name.'.php is missing.');
+		}
+		include_once(GETID3_INCLUDEPATH.'module.'.$name.'.php');
+		return true;
+	}
+
+    public static function is_writable ($filename) {
+        $ret = is_writable($filename);
+
+        if (!$ret) {
+            $perms = fileperms($filename);
+            $ret = ($perms & 0x0080) || ($perms & 0x0010) || ($perms & 0x0002);
+        }
+
+        return $ret;
+    }
+
+}
+
+
+abstract class getid3_handler {
+
+	/**
+	* @var getID3
+	*/
+	protected $getid3;                       // pointer
+
+	protected $data_string_flag     = false; // analyzing filepointer or string
+	protected $data_string          = '';    // string to analyze
+	protected $data_string_position = 0;     // seek position in string
+	protected $data_string_length   = 0;     // string length
+
+	private $dependency_to = null;
+
+
+	public function __construct(getID3 $getid3, $call_module=null) {
+		$this->getid3 = $getid3;
+
+		if ($call_module) {
+			$this->dependency_to = str_replace('getid3_', '', $call_module);
+		}
+	}
+
+
+	// Analyze from file pointer
+	abstract public function Analyze();
+
+
+	// Analyze from string instead
+	public function AnalyzeString($string) {
+		// Enter string mode
+		$this->setStringMode($string);
+
+		// Save info
+		$saved_avdataoffset = $this->getid3->info['avdataoffset'];
+		$saved_avdataend    = $this->getid3->info['avdataend'];
+		$saved_filesize     = (isset($this->getid3->info['filesize']) ? $this->getid3->info['filesize'] : null); // may be not set if called as dependency without openfile() call
+
+		// Reset some info
+		$this->getid3->info['avdataoffset'] = 0;
+		$this->getid3->info['avdataend']    = $this->getid3->info['filesize'] = $this->data_string_length;
+
+		// Analyze
+		$this->Analyze();
+
+		// Restore some info
+		$this->getid3->info['avdataoffset'] = $saved_avdataoffset;
+		$this->getid3->info['avdataend']    = $saved_avdataend;
+		$this->getid3->info['filesize']     = $saved_filesize;
+
+		// Exit string mode
+		$this->data_string_flag = false;
+	}
+
+	public function setStringMode($string) {
+		$this->data_string_flag   = true;
+		$this->data_string        = $string;
+		$this->data_string_length = strlen($string);
+	}
+
+	protected function ftell() {
+		if ($this->data_string_flag) {
+			return $this->data_string_position;
+		}
+		return ftell($this->getid3->fp);
+	}
+
+	protected function fread($bytes) {
+		if ($this->data_string_flag) {
+			$this->data_string_position += $bytes;
+			return substr($this->data_string, $this->data_string_position - $bytes, $bytes);
+		}
+		$pos = $this->ftell() + $bytes;
+		if (!getid3_lib::intValueSupported($pos)) {
+			throw new getid3_exception('cannot fread('.$bytes.' from '.$this->ftell().') because beyond PHP filesystem limit', 10);
+		}
+
+		//return fread($this->getid3->fp, $bytes);
+		/*
+		* http://www.getid3.org/phpBB3/viewtopic.php?t=1930
+		* "I found out that the root cause for the problem was how getID3 uses the PHP system function fread().
+		* It seems to assume that fread() would always return as many bytes as were requested.
+		* However, according the PHP manual (http://php.net/manual/en/function.fread.php), this is the case only with regular local files, but not e.g. with Linux pipes.
+		* The call may return only part of the requested data and a new call is needed to get more."
+		*/
+		$contents = '';
+		do {
+			$part = fread($this->getid3->fp, $bytes);
+			$partLength  = strlen($part);
+			$bytes      -= $partLength;
+			$contents   .= $part;
+		} while (($bytes > 0) && ($partLength > 0));
+		return $contents;
+	}
+
+	protected function fseek($bytes, $whence=SEEK_SET) {
+		if ($this->data_string_flag) {
+			switch ($whence) {
+				case SEEK_SET:
+					$this->data_string_position = $bytes;
+					break;
+
+				case SEEK_CUR:
+					$this->data_string_position += $bytes;
+					break;
+
+				case SEEK_END:
+					$this->data_string_position = $this->data_string_length + $bytes;
+					break;
+			}
+			return 0;
+		} else {
+			$pos = $bytes;
+			if ($whence == SEEK_CUR) {
+				$pos = $this->ftell() + $bytes;
+			} elseif ($whence == SEEK_END) {
+				$pos = $this->getid3->info['filesize'] + $bytes;
+			}
+			if (!getid3_lib::intValueSupported($pos)) {
+				throw new getid3_exception('cannot fseek('.$pos.') because beyond PHP filesystem limit', 10);
+			}
+		}
+		return fseek($this->getid3->fp, $bytes, $whence);
+	}
+
+	protected function feof() {
+		if ($this->data_string_flag) {
+			return $this->data_string_position >= $this->data_string_length;
+		}
+		return feof($this->getid3->fp);
+	}
+
+	final protected function isDependencyFor($module) {
+		return $this->dependency_to == $module;
+	}
+
+	protected function error($text) {
+		$this->getid3->info['error'][] = $text;
+
+		return false;
+	}
+
+	protected function warning($text) {
+		return $this->getid3->warning($text);
+	}
+
+	protected function notice($text) {
+		// does nothing for now
+	}
+
+	public function saveAttachment($name, $offset, $length, $image_mime=null) {
+		try {
+
+			// do not extract at all
+			if ($this->getid3->option_save_attachments === getID3::ATTACHMENTS_NONE) {
+
+				$attachment = null; // do not set any
+
+			// extract to return array
+			} elseif ($this->getid3->option_save_attachments === getID3::ATTACHMENTS_INLINE) {
+
+				$this->fseek($offset);
+				$attachment = $this->fread($length); // get whole data in one pass, till it is anyway stored in memory
+				if ($attachment === false || strlen($attachment) != $length) {
+					throw new Exception('failed to read attachment data');
+				}
+
+			// assume directory path is given
+			} else {
+
+				// set up destination path
+				$dir = rtrim(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $this->getid3->option_save_attachments), DIRECTORY_SEPARATOR);
+				if (!is_dir($dir) || !getID3::is_writable($dir)) { // check supplied directory
+					throw new Exception('supplied path ('.$dir.') does not exist, or is not writable');
+				}
+				$dest = $dir.DIRECTORY_SEPARATOR.$name.($image_mime ? '.'.getid3_lib::ImageExtFromMime($image_mime) : '');
+
+				// create dest file
+				if (($fp_dest = fopen($dest, 'wb')) == false) {
+					throw new Exception('failed to create file '.$dest);
+				}
+
+				// copy data
+				$this->fseek($offset);
+				$buffersize = ($this->data_string_flag ? $length : $this->getid3->fread_buffer_size());
+				$bytesleft = $length;
+				while ($bytesleft > 0) {
+					if (($buffer = $this->fread(min($buffersize, $bytesleft))) === false || ($byteswritten = fwrite($fp_dest, $buffer)) === false || ($byteswritten === 0)) {
+						throw new Exception($buffer === false ? 'not enough data to read' : 'failed to write to destination file, may be not enough disk space');
+					}
+					$bytesleft -= $byteswritten;
+				}
+
+				fclose($fp_dest);
+				$attachment = $dest;
+
+			}
+
+		} catch (Exception $e) {
+
+			// close and remove dest file if created
+			if (isset($fp_dest) && is_resource($fp_dest)) {
+				fclose($fp_dest);
+				unlink($dest);
+			}
+
+			// do not set any is case of error
+			$attachment = null;
+			$this->warning('Failed to extract attachment '.$name.': '.$e->getMessage());
+
+		}
+
+		// seek to the end of attachment
+		$this->fseek($offset + $length);
+
+		return $attachment;
+	}
+
+}
+
+
+class getid3_exception extends Exception
+{
+	public $message;
+}
