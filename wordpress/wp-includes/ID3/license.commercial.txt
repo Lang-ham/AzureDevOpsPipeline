@@ -21,4 +21,7 @@ as is most convenient. This license does not entitle the licensee to
 receive any technical support, updates or bugfixes, except as such are
 made publicly available to all getID3() users.
 
-The licensee may not sub-license 
+The licensee may not sub-license getID3() itself, meaning that any
+commercially released product containing all or parts of getID3() must
+have added functionality beyond what is available in getID3();
+getID3() itself may not be re-licensed by the licensee.
