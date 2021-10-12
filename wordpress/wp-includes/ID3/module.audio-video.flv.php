@@ -456,4 +456,290 @@ class AMFStream {
 	}
 
 	public function peekUTF() {
-		$pos = $this->p
+		$pos = $this->pos;
+		$val = $this->readUTF();
+		$this->pos = $pos;
+		return $val;
+	}
+
+	public function peekLongUTF() {
+		$pos = $this->pos;
+		$val = $this->readLongUTF();
+		$this->pos = $pos;
+		return $val;
+	}
+}
+
+class AMFReader {
+	public $stream;
+
+	public function __construct(&$stream) {
+		$this->stream =& $stream;
+	}
+
+	public function readData() {
+		$value = null;
+
+		$type = $this->stream->readByte();
+		switch ($type) {
+
+			// Double
+			case 0:
+				$value = $this->readDouble();
+			break;
+
+			// Boolean
+			case 1:
+				$value = $this->readBoolean();
+				break;
+
+			// String
+			case 2:
+				$value = $this->readString();
+				break;
+
+			// Object
+			case 3:
+				$value = $this->readObject();
+				break;
+
+			// null
+			case 6:
+				return null;
+				break;
+
+			// Mixed array
+			case 8:
+				$value = $this->readMixedArray();
+				break;
+
+			// Array
+			case 10:
+				$value = $this->readArray();
+				break;
+
+			// Date
+			case 11:
+				$value = $this->readDate();
+				break;
+
+			// Long string
+			case 13:
+				$value = $this->readLongString();
+				break;
+
+			// XML (handled as string)
+			case 15:
+				$value = $this->readXML();
+				break;
+
+			// Typed object (handled as object)
+			case 16:
+				$value = $this->readTypedObject();
+				break;
+
+			// Long string
+			default:
+				$value = '(unknown or unsupported data type)';
+				break;
+		}
+
+		return $value;
+	}
+
+	public function readDouble() {
+		return $this->stream->readDouble();
+	}
+
+	public function readBoolean() {
+		return $this->stream->readByte() == 1;
+	}
+
+	public function readString() {
+		return $this->stream->readUTF();
+	}
+
+	public function readObject() {
+		// Get highest numerical index - ignored
+//		$highestIndex = $this->stream->readLong();
+
+		$data = array();
+
+		while ($key = $this->stream->readUTF()) {
+			$data[$key] = $this->readData();
+		}
+		// Mixed array record ends with empty string (0x00 0x00) and 0x09
+		if (($key == '') && ($this->stream->peekByte() == 0x09)) {
+			// Consume byte
+			$this->stream->readByte();
+		}
+		return $data;
+	}
+
+	public function readMixedArray() {
+		// Get highest numerical index - ignored
+		$highestIndex = $this->stream->readLong();
+
+		$data = array();
+
+		while ($key = $this->stream->readUTF()) {
+			if (is_numeric($key)) {
+				$key = (float) $key;
+			}
+			$data[$key] = $this->readData();
+		}
+		// Mixed array record ends with empty string (0x00 0x00) and 0x09
+		if (($key == '') && ($this->stream->peekByte() == 0x09)) {
+			// Consume byte
+			$this->stream->readByte();
+		}
+
+		return $data;
+	}
+
+	public function readArray() {
+		$length = $this->stream->readLong();
+		$data = array();
+
+		for ($i = 0; $i < $length; $i++) {
+			$data[] = $this->readData();
+		}
+		return $data;
+	}
+
+	public function readDate() {
+		$timestamp = $this->stream->readDouble();
+		$timezone = $this->stream->readInt();
+		return $timestamp;
+	}
+
+	public function readLongString() {
+		return $this->stream->readLongUTF();
+	}
+
+	public function readXML() {
+		return $this->stream->readLongUTF();
+	}
+
+	public function readTypedObject() {
+		$className = $this->stream->readUTF();
+		return $this->readObject();
+	}
+}
+
+class AVCSequenceParameterSetReader {
+	public $sps;
+	public $start = 0;
+	public $currentBytes = 0;
+	public $currentBits = 0;
+	public $width;
+	public $height;
+
+	public function __construct($sps) {
+		$this->sps = $sps;
+	}
+
+	public function readData() {
+		$this->skipBits(8);
+		$this->skipBits(8);
+		$profile = $this->getBits(8);                               // read profile
+		if ($profile > 0) {
+			$this->skipBits(8);
+			$level_idc = $this->getBits(8);                         // level_idc
+			$this->expGolombUe();                                   // seq_parameter_set_id // sps
+			$this->expGolombUe();                                   // log2_max_frame_num_minus4
+			$picOrderType = $this->expGolombUe();                   // pic_order_cnt_type
+			if ($picOrderType == 0) {
+				$this->expGolombUe();                               // log2_max_pic_order_cnt_lsb_minus4
+			} elseif ($picOrderType == 1) {
+				$this->skipBits(1);                                 // delta_pic_order_always_zero_flag
+				$this->expGolombSe();                               // offset_for_non_ref_pic
+				$this->expGolombSe();                               // offset_for_top_to_bottom_field
+				$num_ref_frames_in_pic_order_cnt_cycle = $this->expGolombUe(); // num_ref_frames_in_pic_order_cnt_cycle
+				for ($i = 0; $i < $num_ref_frames_in_pic_order_cnt_cycle; $i++) {
+					$this->expGolombSe();                           // offset_for_ref_frame[ i ]
+				}
+			}
+			$this->expGolombUe();                                   // num_ref_frames
+			$this->skipBits(1);                                     // gaps_in_frame_num_value_allowed_flag
+			$pic_width_in_mbs_minus1 = $this->expGolombUe();        // pic_width_in_mbs_minus1
+			$pic_height_in_map_units_minus1 = $this->expGolombUe(); // pic_height_in_map_units_minus1
+
+			$frame_mbs_only_flag = $this->getBits(1);               // frame_mbs_only_flag
+			if ($frame_mbs_only_flag == 0) {
+				$this->skipBits(1);                                 // mb_adaptive_frame_field_flag
+			}
+			$this->skipBits(1);                                     // direct_8x8_inference_flag
+			$frame_cropping_flag = $this->getBits(1);               // frame_cropping_flag
+
+			$frame_crop_left_offset   = 0;
+			$frame_crop_right_offset  = 0;
+			$frame_crop_top_offset    = 0;
+			$frame_crop_bottom_offset = 0;
+
+			if ($frame_cropping_flag) {
+				$frame_crop_left_offset   = $this->expGolombUe();   // frame_crop_left_offset
+				$frame_crop_right_offset  = $this->expGolombUe();   // frame_crop_right_offset
+				$frame_crop_top_offset    = $this->expGolombUe();   // frame_crop_top_offset
+				$frame_crop_bottom_offset = $this->expGolombUe();   // frame_crop_bottom_offset
+			}
+			$this->skipBits(1);                                     // vui_parameters_present_flag
+			// etc
+
+			$this->width  = (($pic_width_in_mbs_minus1 + 1) * 16) - ($frame_crop_left_offset * 2) - ($frame_crop_right_offset * 2);
+			$this->height = ((2 - $frame_mbs_only_flag) * ($pic_height_in_map_units_minus1 + 1) * 16) - ($frame_crop_top_offset * 2) - ($frame_crop_bottom_offset * 2);
+		}
+	}
+
+	public function skipBits($bits) {
+		$newBits = $this->currentBits + $bits;
+		$this->currentBytes += (int)floor($newBits / 8);
+		$this->currentBits = $newBits % 8;
+	}
+
+	public function getBit() {
+		$result = (getid3_lib::BigEndian2Int(substr($this->sps, $this->currentBytes, 1)) >> (7 - $this->currentBits)) & 0x01;
+		$this->skipBits(1);
+		return $result;
+	}
+
+	public function getBits($bits) {
+		$result = 0;
+		for ($i = 0; $i < $bits; $i++) {
+			$result = ($result << 1) + $this->getBit();
+		}
+		return $result;
+	}
+
+	public function expGolombUe() {
+		$significantBits = 0;
+		$bit = $this->getBit();
+		while ($bit == 0) {
+			$significantBits++;
+			$bit = $this->getBit();
+
+			if ($significantBits > 31) {
+				// something is broken, this is an emergency escape to prevent infinite loops
+				return 0;
+			}
+		}
+		return (1 << $significantBits) + $this->getBits($significantBits) - 1;
+	}
+
+	public function expGolombSe() {
+		$result = $this->expGolombUe();
+		if (($result & 0x01) == 0) {
+			return -($result >> 1);
+		} else {
+			return ($result + 1) >> 1;
+		}
+	}
+
+	public function getWidth() {
+		return $this->width;
+	}
+
+	public function getHeight() {
+		return $this->height;
+	}
+}
