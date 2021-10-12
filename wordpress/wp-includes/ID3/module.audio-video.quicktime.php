@@ -1767,3 +1767,901 @@ if (!empty($atom_structure['sample_description_table'][$i]['width']) && !empty($
 	public function QuicktimeLanguageLookup($languageid) {
 		// http://developer.apple.com/library/mac/#documentation/QuickTime/QTFF/QTFFChap4/qtff4.html#//apple_ref/doc/uid/TP40000939-CH206-34353
 		static $QuicktimeLanguageLookup = array();
+		if (empty($QuicktimeLanguageLookup)) {
+			$QuicktimeLanguageLookup[0]     = 'English';
+			$QuicktimeLanguageLookup[1]     = 'French';
+			$QuicktimeLanguageLookup[2]     = 'German';
+			$QuicktimeLanguageLookup[3]     = 'Italian';
+			$QuicktimeLanguageLookup[4]     = 'Dutch';
+			$QuicktimeLanguageLookup[5]     = 'Swedish';
+			$QuicktimeLanguageLookup[6]     = 'Spanish';
+			$QuicktimeLanguageLookup[7]     = 'Danish';
+			$QuicktimeLanguageLookup[8]     = 'Portuguese';
+			$QuicktimeLanguageLookup[9]     = 'Norwegian';
+			$QuicktimeLanguageLookup[10]    = 'Hebrew';
+			$QuicktimeLanguageLookup[11]    = 'Japanese';
+			$QuicktimeLanguageLookup[12]    = 'Arabic';
+			$QuicktimeLanguageLookup[13]    = 'Finnish';
+			$QuicktimeLanguageLookup[14]    = 'Greek';
+			$QuicktimeLanguageLookup[15]    = 'Icelandic';
+			$QuicktimeLanguageLookup[16]    = 'Maltese';
+			$QuicktimeLanguageLookup[17]    = 'Turkish';
+			$QuicktimeLanguageLookup[18]    = 'Croatian';
+			$QuicktimeLanguageLookup[19]    = 'Chinese (Traditional)';
+			$QuicktimeLanguageLookup[20]    = 'Urdu';
+			$QuicktimeLanguageLookup[21]    = 'Hindi';
+			$QuicktimeLanguageLookup[22]    = 'Thai';
+			$QuicktimeLanguageLookup[23]    = 'Korean';
+			$QuicktimeLanguageLookup[24]    = 'Lithuanian';
+			$QuicktimeLanguageLookup[25]    = 'Polish';
+			$QuicktimeLanguageLookup[26]    = 'Hungarian';
+			$QuicktimeLanguageLookup[27]    = 'Estonian';
+			$QuicktimeLanguageLookup[28]    = 'Lettish';
+			$QuicktimeLanguageLookup[28]    = 'Latvian';
+			$QuicktimeLanguageLookup[29]    = 'Saamisk';
+			$QuicktimeLanguageLookup[29]    = 'Lappish';
+			$QuicktimeLanguageLookup[30]    = 'Faeroese';
+			$QuicktimeLanguageLookup[31]    = 'Farsi';
+			$QuicktimeLanguageLookup[31]    = 'Persian';
+			$QuicktimeLanguageLookup[32]    = 'Russian';
+			$QuicktimeLanguageLookup[33]    = 'Chinese (Simplified)';
+			$QuicktimeLanguageLookup[34]    = 'Flemish';
+			$QuicktimeLanguageLookup[35]    = 'Irish';
+			$QuicktimeLanguageLookup[36]    = 'Albanian';
+			$QuicktimeLanguageLookup[37]    = 'Romanian';
+			$QuicktimeLanguageLookup[38]    = 'Czech';
+			$QuicktimeLanguageLookup[39]    = 'Slovak';
+			$QuicktimeLanguageLookup[40]    = 'Slovenian';
+			$QuicktimeLanguageLookup[41]    = 'Yiddish';
+			$QuicktimeLanguageLookup[42]    = 'Serbian';
+			$QuicktimeLanguageLookup[43]    = 'Macedonian';
+			$QuicktimeLanguageLookup[44]    = 'Bulgarian';
+			$QuicktimeLanguageLookup[45]    = 'Ukrainian';
+			$QuicktimeLanguageLookup[46]    = 'Byelorussian';
+			$QuicktimeLanguageLookup[47]    = 'Uzbek';
+			$QuicktimeLanguageLookup[48]    = 'Kazakh';
+			$QuicktimeLanguageLookup[49]    = 'Azerbaijani';
+			$QuicktimeLanguageLookup[50]    = 'AzerbaijanAr';
+			$QuicktimeLanguageLookup[51]    = 'Armenian';
+			$QuicktimeLanguageLookup[52]    = 'Georgian';
+			$QuicktimeLanguageLookup[53]    = 'Moldavian';
+			$QuicktimeLanguageLookup[54]    = 'Kirghiz';
+			$QuicktimeLanguageLookup[55]    = 'Tajiki';
+			$QuicktimeLanguageLookup[56]    = 'Turkmen';
+			$QuicktimeLanguageLookup[57]    = 'Mongolian';
+			$QuicktimeLanguageLookup[58]    = 'MongolianCyr';
+			$QuicktimeLanguageLookup[59]    = 'Pashto';
+			$QuicktimeLanguageLookup[60]    = 'Kurdish';
+			$QuicktimeLanguageLookup[61]    = 'Kashmiri';
+			$QuicktimeLanguageLookup[62]    = 'Sindhi';
+			$QuicktimeLanguageLookup[63]    = 'Tibetan';
+			$QuicktimeLanguageLookup[64]    = 'Nepali';
+			$QuicktimeLanguageLookup[65]    = 'Sanskrit';
+			$QuicktimeLanguageLookup[66]    = 'Marathi';
+			$QuicktimeLanguageLookup[67]    = 'Bengali';
+			$QuicktimeLanguageLookup[68]    = 'Assamese';
+			$QuicktimeLanguageLookup[69]    = 'Gujarati';
+			$QuicktimeLanguageLookup[70]    = 'Punjabi';
+			$QuicktimeLanguageLookup[71]    = 'Oriya';
+			$QuicktimeLanguageLookup[72]    = 'Malayalam';
+			$QuicktimeLanguageLookup[73]    = 'Kannada';
+			$QuicktimeLanguageLookup[74]    = 'Tamil';
+			$QuicktimeLanguageLookup[75]    = 'Telugu';
+			$QuicktimeLanguageLookup[76]    = 'Sinhalese';
+			$QuicktimeLanguageLookup[77]    = 'Burmese';
+			$QuicktimeLanguageLookup[78]    = 'Khmer';
+			$QuicktimeLanguageLookup[79]    = 'Lao';
+			$QuicktimeLanguageLookup[80]    = 'Vietnamese';
+			$QuicktimeLanguageLookup[81]    = 'Indonesian';
+			$QuicktimeLanguageLookup[82]    = 'Tagalog';
+			$QuicktimeLanguageLookup[83]    = 'MalayRoman';
+			$QuicktimeLanguageLookup[84]    = 'MalayArabic';
+			$QuicktimeLanguageLookup[85]    = 'Amharic';
+			$QuicktimeLanguageLookup[86]    = 'Tigrinya';
+			$QuicktimeLanguageLookup[87]    = 'Galla';
+			$QuicktimeLanguageLookup[87]    = 'Oromo';
+			$QuicktimeLanguageLookup[88]    = 'Somali';
+			$QuicktimeLanguageLookup[89]    = 'Swahili';
+			$QuicktimeLanguageLookup[90]    = 'Ruanda';
+			$QuicktimeLanguageLookup[91]    = 'Rundi';
+			$QuicktimeLanguageLookup[92]    = 'Chewa';
+			$QuicktimeLanguageLookup[93]    = 'Malagasy';
+			$QuicktimeLanguageLookup[94]    = 'Esperanto';
+			$QuicktimeLanguageLookup[128]   = 'Welsh';
+			$QuicktimeLanguageLookup[129]   = 'Basque';
+			$QuicktimeLanguageLookup[130]   = 'Catalan';
+			$QuicktimeLanguageLookup[131]   = 'Latin';
+			$QuicktimeLanguageLookup[132]   = 'Quechua';
+			$QuicktimeLanguageLookup[133]   = 'Guarani';
+			$QuicktimeLanguageLookup[134]   = 'Aymara';
+			$QuicktimeLanguageLookup[135]   = 'Tatar';
+			$QuicktimeLanguageLookup[136]   = 'Uighur';
+			$QuicktimeLanguageLookup[137]   = 'Dzongkha';
+			$QuicktimeLanguageLookup[138]   = 'JavaneseRom';
+			$QuicktimeLanguageLookup[32767] = 'Unspecified';
+		}
+		if (($languageid > 138) && ($languageid < 32767)) {
+			/*
+			ISO Language Codes - http://www.loc.gov/standards/iso639-2/php/code_list.php
+			Because the language codes specified by ISO 639-2/T are three characters long, they must be packed to fit into a 16-bit field.
+			The packing algorithm must map each of the three characters, which are always lowercase, into a 5-bit integer and then concatenate
+			these integers into the least significant 15 bits of a 16-bit integer, leaving the 16-bit integer's most significant bit set to zero.
+
+			One algorithm for performing this packing is to treat each ISO character as a 16-bit integer. Subtract 0x60 from the first character
+			and multiply by 2^10 (0x400), subtract 0x60 from the second character and multiply by 2^5 (0x20), subtract 0x60 from the third character,
+			and add the three 16-bit values. This will result in a single 16-bit value with the three codes correctly packed into the 15 least
+			significant bits and the most significant bit set to zero.
+			*/
+			$iso_language_id  = '';
+			$iso_language_id .= chr((($languageid & 0x7C00) >> 10) + 0x60);
+			$iso_language_id .= chr((($languageid & 0x03E0) >>  5) + 0x60);
+			$iso_language_id .= chr((($languageid & 0x001F) >>  0) + 0x60);
+			$QuicktimeLanguageLookup[$languageid] = getid3_id3v2::LanguageLookup($iso_language_id);
+		}
+		return (isset($QuicktimeLanguageLookup[$languageid]) ? $QuicktimeLanguageLookup[$languageid] : 'invalid');
+	}
+
+	public function QuicktimeVideoCodecLookup($codecid) {
+		static $QuicktimeVideoCodecLookup = array();
+		if (empty($QuicktimeVideoCodecLookup)) {
+			$QuicktimeVideoCodecLookup['.SGI'] = 'SGI';
+			$QuicktimeVideoCodecLookup['3IV1'] = '3ivx MPEG-4 v1';
+			$QuicktimeVideoCodecLookup['3IV2'] = '3ivx MPEG-4 v2';
+			$QuicktimeVideoCodecLookup['3IVX'] = '3ivx MPEG-4';
+			$QuicktimeVideoCodecLookup['8BPS'] = 'Planar RGB';
+			$QuicktimeVideoCodecLookup['avc1'] = 'H.264/MPEG-4 AVC';
+			$QuicktimeVideoCodecLookup['avr '] = 'AVR-JPEG';
+			$QuicktimeVideoCodecLookup['b16g'] = '16Gray';
+			$QuicktimeVideoCodecLookup['b32a'] = '32AlphaGray';
+			$QuicktimeVideoCodecLookup['b48r'] = '48RGB';
+			$QuicktimeVideoCodecLookup['b64a'] = '64ARGB';
+			$QuicktimeVideoCodecLookup['base'] = 'Base';
+			$QuicktimeVideoCodecLookup['clou'] = 'Cloud';
+			$QuicktimeVideoCodecLookup['cmyk'] = 'CMYK';
+			$QuicktimeVideoCodecLookup['cvid'] = 'Cinepak';
+			$QuicktimeVideoCodecLookup['dmb1'] = 'OpenDML JPEG';
+			$QuicktimeVideoCodecLookup['dvc '] = 'DVC-NTSC';
+			$QuicktimeVideoCodecLookup['dvcp'] = 'DVC-PAL';
+			$QuicktimeVideoCodecLookup['dvpn'] = 'DVCPro-NTSC';
+			$QuicktimeVideoCodecLookup['dvpp'] = 'DVCPro-PAL';
+			$QuicktimeVideoCodecLookup['fire'] = 'Fire';
+			$QuicktimeVideoCodecLookup['flic'] = 'FLC';
+			$QuicktimeVideoCodecLookup['gif '] = 'GIF';
+			$QuicktimeVideoCodecLookup['h261'] = 'H261';
+			$QuicktimeVideoCodecLookup['h263'] = 'H263';
+			$QuicktimeVideoCodecLookup['IV41'] = 'Indeo4';
+			$QuicktimeVideoCodecLookup['jpeg'] = 'JPEG';
+			$QuicktimeVideoCodecLookup['kpcd'] = 'PhotoCD';
+			$QuicktimeVideoCodecLookup['mjpa'] = 'Motion JPEG-A';
+			$QuicktimeVideoCodecLookup['mjpb'] = 'Motion JPEG-B';
+			$QuicktimeVideoCodecLookup['msvc'] = 'Microsoft Video1';
+			$QuicktimeVideoCodecLookup['myuv'] = 'MPEG YUV420';
+			$QuicktimeVideoCodecLookup['path'] = 'Vector';
+			$QuicktimeVideoCodecLookup['png '] = 'PNG';
+			$QuicktimeVideoCodecLookup['PNTG'] = 'MacPaint';
+			$QuicktimeVideoCodecLookup['qdgx'] = 'QuickDrawGX';
+			$QuicktimeVideoCodecLookup['qdrw'] = 'QuickDraw';
+			$QuicktimeVideoCodecLookup['raw '] = 'RAW';
+			$QuicktimeVideoCodecLookup['ripl'] = 'WaterRipple';
+			$QuicktimeVideoCodecLookup['rpza'] = 'Video';
+			$QuicktimeVideoCodecLookup['smc '] = 'Graphics';
+			$QuicktimeVideoCodecLookup['SVQ1'] = 'Sorenson Video 1';
+			$QuicktimeVideoCodecLookup['SVQ1'] = 'Sorenson Video 3';
+			$QuicktimeVideoCodecLookup['syv9'] = 'Sorenson YUV9';
+			$QuicktimeVideoCodecLookup['tga '] = 'Targa';
+			$QuicktimeVideoCodecLookup['tiff'] = 'TIFF';
+			$QuicktimeVideoCodecLookup['WRAW'] = 'Windows RAW';
+			$QuicktimeVideoCodecLookup['WRLE'] = 'BMP';
+			$QuicktimeVideoCodecLookup['y420'] = 'YUV420';
+			$QuicktimeVideoCodecLookup['yuv2'] = 'ComponentVideo';
+			$QuicktimeVideoCodecLookup['yuvs'] = 'ComponentVideoUnsigned';
+			$QuicktimeVideoCodecLookup['yuvu'] = 'ComponentVideoSigned';
+		}
+		return (isset($QuicktimeVideoCodecLookup[$codecid]) ? $QuicktimeVideoCodecLookup[$codecid] : '');
+	}
+
+	public function QuicktimeAudioCodecLookup($codecid) {
+		static $QuicktimeAudioCodecLookup = array();
+		if (empty($QuicktimeAudioCodecLookup)) {
+			$QuicktimeAudioCodecLookup['.mp3']          = 'Fraunhofer MPEG Layer-III alias';
+			$QuicktimeAudioCodecLookup['aac ']          = 'ISO/IEC 14496-3 AAC';
+			$QuicktimeAudioCodecLookup['agsm']          = 'Apple GSM 10:1';
+			$QuicktimeAudioCodecLookup['alac']          = 'Apple Lossless Audio Codec';
+			$QuicktimeAudioCodecLookup['alaw']          = 'A-law 2:1';
+			$QuicktimeAudioCodecLookup['conv']          = 'Sample Format';
+			$QuicktimeAudioCodecLookup['dvca']          = 'DV';
+			$QuicktimeAudioCodecLookup['dvi ']          = 'DV 4:1';
+			$QuicktimeAudioCodecLookup['eqal']          = 'Frequency Equalizer';
+			$QuicktimeAudioCodecLookup['fl32']          = '32-bit Floating Point';
+			$QuicktimeAudioCodecLookup['fl64']          = '64-bit Floating Point';
+			$QuicktimeAudioCodecLookup['ima4']          = 'Interactive Multimedia Association 4:1';
+			$QuicktimeAudioCodecLookup['in24']          = '24-bit Integer';
+			$QuicktimeAudioCodecLookup['in32']          = '32-bit Integer';
+			$QuicktimeAudioCodecLookup['lpc ']          = 'LPC 23:1';
+			$QuicktimeAudioCodecLookup['MAC3']          = 'Macintosh Audio Compression/Expansion (MACE) 3:1';
+			$QuicktimeAudioCodecLookup['MAC6']          = 'Macintosh Audio Compression/Expansion (MACE) 6:1';
+			$QuicktimeAudioCodecLookup['mixb']          = '8-bit Mixer';
+			$QuicktimeAudioCodecLookup['mixw']          = '16-bit Mixer';
+			$QuicktimeAudioCodecLookup['mp4a']          = 'ISO/IEC 14496-3 AAC';
+			$QuicktimeAudioCodecLookup['MS'."\x00\x02"] = 'Microsoft ADPCM';
+			$QuicktimeAudioCodecLookup['MS'."\x00\x11"] = 'DV IMA';
+			$QuicktimeAudioCodecLookup['MS'."\x00\x55"] = 'Fraunhofer MPEG Layer III';
+			$QuicktimeAudioCodecLookup['NONE']          = 'No Encoding';
+			$QuicktimeAudioCodecLookup['Qclp']          = 'Qualcomm PureVoice';
+			$QuicktimeAudioCodecLookup['QDM2']          = 'QDesign Music 2';
+			$QuicktimeAudioCodecLookup['QDMC']          = 'QDesign Music 1';
+			$QuicktimeAudioCodecLookup['ratb']          = '8-bit Rate';
+			$QuicktimeAudioCodecLookup['ratw']          = '16-bit Rate';
+			$QuicktimeAudioCodecLookup['raw ']          = 'raw PCM';
+			$QuicktimeAudioCodecLookup['sour']          = 'Sound Source';
+			$QuicktimeAudioCodecLookup['sowt']          = 'signed/two\'s complement (Little Endian)';
+			$QuicktimeAudioCodecLookup['str1']          = 'Iomega MPEG layer II';
+			$QuicktimeAudioCodecLookup['str2']          = 'Iomega MPEG *layer II';
+			$QuicktimeAudioCodecLookup['str3']          = 'Iomega MPEG **layer II';
+			$QuicktimeAudioCodecLookup['str4']          = 'Iomega MPEG ***layer II';
+			$QuicktimeAudioCodecLookup['twos']          = 'signed/two\'s complement (Big Endian)';
+			$QuicktimeAudioCodecLookup['ulaw']          = 'mu-law 2:1';
+		}
+		return (isset($QuicktimeAudioCodecLookup[$codecid]) ? $QuicktimeAudioCodecLookup[$codecid] : '');
+	}
+
+	public function QuicktimeDCOMLookup($compressionid) {
+		static $QuicktimeDCOMLookup = array();
+		if (empty($QuicktimeDCOMLookup)) {
+			$QuicktimeDCOMLookup['zlib'] = 'ZLib Deflate';
+			$QuicktimeDCOMLookup['adec'] = 'Apple Compression';
+		}
+		return (isset($QuicktimeDCOMLookup[$compressionid]) ? $QuicktimeDCOMLookup[$compressionid] : '');
+	}
+
+	public function QuicktimeColorNameLookup($colordepthid) {
+		static $QuicktimeColorNameLookup = array();
+		if (empty($QuicktimeColorNameLookup)) {
+			$QuicktimeColorNameLookup[1]  = '2-color (monochrome)';
+			$QuicktimeColorNameLookup[2]  = '4-color';
+			$QuicktimeColorNameLookup[4]  = '16-color';
+			$QuicktimeColorNameLookup[8]  = '256-color';
+			$QuicktimeColorNameLookup[16] = 'thousands (16-bit color)';
+			$QuicktimeColorNameLookup[24] = 'millions (24-bit color)';
+			$QuicktimeColorNameLookup[32] = 'millions+ (32-bit color)';
+			$QuicktimeColorNameLookup[33] = 'black & white';
+			$QuicktimeColorNameLookup[34] = '4-gray';
+			$QuicktimeColorNameLookup[36] = '16-gray';
+			$QuicktimeColorNameLookup[40] = '256-gray';
+		}
+		return (isset($QuicktimeColorNameLookup[$colordepthid]) ? $QuicktimeColorNameLookup[$colordepthid] : 'invalid');
+	}
+
+	public function QuicktimeSTIKLookup($stik) {
+		static $QuicktimeSTIKLookup = array();
+		if (empty($QuicktimeSTIKLookup)) {
+			$QuicktimeSTIKLookup[0]  = 'Movie';
+			$QuicktimeSTIKLookup[1]  = 'Normal';
+			$QuicktimeSTIKLookup[2]  = 'Audiobook';
+			$QuicktimeSTIKLookup[5]  = 'Whacked Bookmark';
+			$QuicktimeSTIKLookup[6]  = 'Music Video';
+			$QuicktimeSTIKLookup[9]  = 'Short Film';
+			$QuicktimeSTIKLookup[10] = 'TV Show';
+			$QuicktimeSTIKLookup[11] = 'Booklet';
+			$QuicktimeSTIKLookup[14] = 'Ringtone';
+			$QuicktimeSTIKLookup[21] = 'Podcast';
+		}
+		return (isset($QuicktimeSTIKLookup[$stik]) ? $QuicktimeSTIKLookup[$stik] : 'invalid');
+	}
+
+	public function QuicktimeIODSaudioProfileName($audio_profile_id) {
+		static $QuicktimeIODSaudioProfileNameLookup = array();
+		if (empty($QuicktimeIODSaudioProfileNameLookup)) {
+			$QuicktimeIODSaudioProfileNameLookup = array(
+				0x00 => 'ISO Reserved (0x00)',
+				0x01 => 'Main Audio Profile @ Level 1',
+				0x02 => 'Main Audio Profile @ Level 2',
+				0x03 => 'Main Audio Profile @ Level 3',
+				0x04 => 'Main Audio Profile @ Level 4',
+				0x05 => 'Scalable Audio Profile @ Level 1',
+				0x06 => 'Scalable Audio Profile @ Level 2',
+				0x07 => 'Scalable Audio Profile @ Level 3',
+				0x08 => 'Scalable Audio Profile @ Level 4',
+				0x09 => 'Speech Audio Profile @ Level 1',
+				0x0A => 'Speech Audio Profile @ Level 2',
+				0x0B => 'Synthetic Audio Profile @ Level 1',
+				0x0C => 'Synthetic Audio Profile @ Level 2',
+				0x0D => 'Synthetic Audio Profile @ Level 3',
+				0x0E => 'High Quality Audio Profile @ Level 1',
+				0x0F => 'High Quality Audio Profile @ Level 2',
+				0x10 => 'High Quality Audio Profile @ Level 3',
+				0x11 => 'High Quality Audio Profile @ Level 4',
+				0x12 => 'High Quality Audio Profile @ Level 5',
+				0x13 => 'High Quality Audio Profile @ Level 6',
+				0x14 => 'High Quality Audio Profile @ Level 7',
+				0x15 => 'High Quality Audio Profile @ Level 8',
+				0x16 => 'Low Delay Audio Profile @ Level 1',
+				0x17 => 'Low Delay Audio Profile @ Level 2',
+				0x18 => 'Low Delay Audio Profile @ Level 3',
+				0x19 => 'Low Delay Audio Profile @ Level 4',
+				0x1A => 'Low Delay Audio Profile @ Level 5',
+				0x1B => 'Low Delay Audio Profile @ Level 6',
+				0x1C => 'Low Delay Audio Profile @ Level 7',
+				0x1D => 'Low Delay Audio Profile @ Level 8',
+				0x1E => 'Natural Audio Profile @ Level 1',
+				0x1F => 'Natural Audio Profile @ Level 2',
+				0x20 => 'Natural Audio Profile @ Level 3',
+				0x21 => 'Natural Audio Profile @ Level 4',
+				0x22 => 'Mobile Audio Internetworking Profile @ Level 1',
+				0x23 => 'Mobile Audio Internetworking Profile @ Level 2',
+				0x24 => 'Mobile Audio Internetworking Profile @ Level 3',
+				0x25 => 'Mobile Audio Internetworking Profile @ Level 4',
+				0x26 => 'Mobile Audio Internetworking Profile @ Level 5',
+				0x27 => 'Mobile Audio Internetworking Profile @ Level 6',
+				0x28 => 'AAC Profile @ Level 1',
+				0x29 => 'AAC Profile @ Level 2',
+				0x2A => 'AAC Profile @ Level 4',
+				0x2B => 'AAC Profile @ Level 5',
+				0x2C => 'High Efficiency AAC Profile @ Level 2',
+				0x2D => 'High Efficiency AAC Profile @ Level 3',
+				0x2E => 'High Efficiency AAC Profile @ Level 4',
+				0x2F => 'High Efficiency AAC Profile @ Level 5',
+				0xFE => 'Not part of MPEG-4 audio profiles',
+				0xFF => 'No audio capability required',
+			);
+		}
+		return (isset($QuicktimeIODSaudioProfileNameLookup[$audio_profile_id]) ? $QuicktimeIODSaudioProfileNameLookup[$audio_profile_id] : 'ISO Reserved / User Private');
+	}
+
+
+	public function QuicktimeIODSvideoProfileName($video_profile_id) {
+		static $QuicktimeIODSvideoProfileNameLookup = array();
+		if (empty($QuicktimeIODSvideoProfileNameLookup)) {
+			$QuicktimeIODSvideoProfileNameLookup = array(
+				0x00 => 'Reserved (0x00) Profile',
+				0x01 => 'Simple Profile @ Level 1',
+				0x02 => 'Simple Profile @ Level 2',
+				0x03 => 'Simple Profile @ Level 3',
+				0x08 => 'Simple Profile @ Level 0',
+				0x10 => 'Simple Scalable Profile @ Level 0',
+				0x11 => 'Simple Scalable Profile @ Level 1',
+				0x12 => 'Simple Scalable Profile @ Level 2',
+				0x15 => 'AVC/H264 Profile',
+				0x21 => 'Core Profile @ Level 1',
+				0x22 => 'Core Profile @ Level 2',
+				0x32 => 'Main Profile @ Level 2',
+				0x33 => 'Main Profile @ Level 3',
+				0x34 => 'Main Profile @ Level 4',
+				0x42 => 'N-bit Profile @ Level 2',
+				0x51 => 'Scalable Texture Profile @ Level 1',
+				0x61 => 'Simple Face Animation Profile @ Level 1',
+				0x62 => 'Simple Face Animation Profile @ Level 2',
+				0x63 => 'Simple FBA Profile @ Level 1',
+				0x64 => 'Simple FBA Profile @ Level 2',
+				0x71 => 'Basic Animated Texture Profile @ Level 1',
+				0x72 => 'Basic Animated Texture Profile @ Level 2',
+				0x81 => 'Hybrid Profile @ Level 1',
+				0x82 => 'Hybrid Profile @ Level 2',
+				0x91 => 'Advanced Real Time Simple Profile @ Level 1',
+				0x92 => 'Advanced Real Time Simple Profile @ Level 2',
+				0x93 => 'Advanced Real Time Simple Profile @ Level 3',
+				0x94 => 'Advanced Real Time Simple Profile @ Level 4',
+				0xA1 => 'Core Scalable Profile @ Level1',
+				0xA2 => 'Core Scalable Profile @ Level2',
+				0xA3 => 'Core Scalable Profile @ Level3',
+				0xB1 => 'Advanced Coding Efficiency Profile @ Level 1',
+				0xB2 => 'Advanced Coding Efficiency Profile @ Level 2',
+				0xB3 => 'Advanced Coding Efficiency Profile @ Level 3',
+				0xB4 => 'Advanced Coding Efficiency Profile @ Level 4',
+				0xC1 => 'Advanced Core Profile @ Level 1',
+				0xC2 => 'Advanced Core Profile @ Level 2',
+				0xD1 => 'Advanced Scalable Texture @ Level1',
+				0xD2 => 'Advanced Scalable Texture @ Level2',
+				0xE1 => 'Simple Studio Profile @ Level 1',
+				0xE2 => 'Simple Studio Profile @ Level 2',
+				0xE3 => 'Simple Studio Profile @ Level 3',
+				0xE4 => 'Simple Studio Profile @ Level 4',
+				0xE5 => 'Core Studio Profile @ Level 1',
+				0xE6 => 'Core Studio Profile @ Level 2',
+				0xE7 => 'Core Studio Profile @ Level 3',
+				0xE8 => 'Core Studio Profile @ Level 4',
+				0xF0 => 'Advanced Simple Profile @ Level 0',
+				0xF1 => 'Advanced Simple Profile @ Level 1',
+				0xF2 => 'Advanced Simple Profile @ Level 2',
+				0xF3 => 'Advanced Simple Profile @ Level 3',
+				0xF4 => 'Advanced Simple Profile @ Level 4',
+				0xF5 => 'Advanced Simple Profile @ Level 5',
+				0xF7 => 'Advanced Simple Profile @ Level 3b',
+				0xF8 => 'Fine Granularity Scalable Profile @ Level 0',
+				0xF9 => 'Fine Granularity Scalable Profile @ Level 1',
+				0xFA => 'Fine Granularity Scalable Profile @ Level 2',
+				0xFB => 'Fine Granularity Scalable Profile @ Level 3',
+				0xFC => 'Fine Granularity Scalable Profile @ Level 4',
+				0xFD => 'Fine Granularity Scalable Profile @ Level 5',
+				0xFE => 'Not part of MPEG-4 Visual profiles',
+				0xFF => 'No visual capability required',
+			);
+		}
+		return (isset($QuicktimeIODSvideoProfileNameLookup[$video_profile_id]) ? $QuicktimeIODSvideoProfileNameLookup[$video_profile_id] : 'ISO Reserved Profile');
+	}
+
+
+	public function QuicktimeContentRatingLookup($rtng) {
+		static $QuicktimeContentRatingLookup = array();
+		if (empty($QuicktimeContentRatingLookup)) {
+			$QuicktimeContentRatingLookup[0]  = 'None';
+			$QuicktimeContentRatingLookup[2]  = 'Clean';
+			$QuicktimeContentRatingLookup[4]  = 'Explicit';
+		}
+		return (isset($QuicktimeContentRatingLookup[$rtng]) ? $QuicktimeContentRatingLookup[$rtng] : 'invalid');
+	}
+
+	public function QuicktimeStoreAccountTypeLookup($akid) {
+		static $QuicktimeStoreAccountTypeLookup = array();
+		if (empty($QuicktimeStoreAccountTypeLookup)) {
+			$QuicktimeStoreAccountTypeLookup[0] = 'iTunes';
+			$QuicktimeStoreAccountTypeLookup[1] = 'AOL';
+		}
+		return (isset($QuicktimeStoreAccountTypeLookup[$akid]) ? $QuicktimeStoreAccountTypeLookup[$akid] : 'invalid');
+	}
+
+	public function QuicktimeStoreFrontCodeLookup($sfid) {
+		static $QuicktimeStoreFrontCodeLookup = array();
+		if (empty($QuicktimeStoreFrontCodeLookup)) {
+			$QuicktimeStoreFrontCodeLookup[143460] = 'Australia';
+			$QuicktimeStoreFrontCodeLookup[143445] = 'Austria';
+			$QuicktimeStoreFrontCodeLookup[143446] = 'Belgium';
+			$QuicktimeStoreFrontCodeLookup[143455] = 'Canada';
+			$QuicktimeStoreFrontCodeLookup[143458] = 'Denmark';
+			$QuicktimeStoreFrontCodeLookup[143447] = 'Finland';
+			$QuicktimeStoreFrontCodeLookup[143442] = 'France';
+			$QuicktimeStoreFrontCodeLookup[143443] = 'Germany';
+			$QuicktimeStoreFrontCodeLookup[143448] = 'Greece';
+			$QuicktimeStoreFrontCodeLookup[143449] = 'Ireland';
+			$QuicktimeStoreFrontCodeLookup[143450] = 'Italy';
+			$QuicktimeStoreFrontCodeLookup[143462] = 'Japan';
+			$QuicktimeStoreFrontCodeLookup[143451] = 'Luxembourg';
+			$QuicktimeStoreFrontCodeLookup[143452] = 'Netherlands';
+			$QuicktimeStoreFrontCodeLookup[143461] = 'New Zealand';
+			$QuicktimeStoreFrontCodeLookup[143457] = 'Norway';
+			$QuicktimeStoreFrontCodeLookup[143453] = 'Portugal';
+			$QuicktimeStoreFrontCodeLookup[143454] = 'Spain';
+			$QuicktimeStoreFrontCodeLookup[143456] = 'Sweden';
+			$QuicktimeStoreFrontCodeLookup[143459] = 'Switzerland';
+			$QuicktimeStoreFrontCodeLookup[143444] = 'United Kingdom';
+			$QuicktimeStoreFrontCodeLookup[143441] = 'United States';
+		}
+		return (isset($QuicktimeStoreFrontCodeLookup[$sfid]) ? $QuicktimeStoreFrontCodeLookup[$sfid] : 'invalid');
+	}
+
+	public function QuicktimeParseNikonNCTG($atom_data) {
+		// http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/Nikon.html#NCTG
+		// Nikon-specific QuickTime tags found in the NCDT atom of MOV videos from some Nikon cameras such as the Coolpix S8000 and D5100
+		// Data is stored as records of:
+		// * 4 bytes record type
+		// * 2 bytes size of data field type:
+		//     0x0001 = flag   (size field *= 1-byte)
+		//     0x0002 = char   (size field *= 1-byte)
+		//     0x0003 = DWORD+ (size field *= 2-byte), values are stored CDAB
+		//     0x0004 = QWORD+ (size field *= 4-byte), values are stored EFGHABCD
+		//     0x0005 = float  (size field *= 8-byte), values are stored aaaabbbb where value is aaaa/bbbb; possibly multiple sets of values appended together
+		//     0x0007 = bytes  (size field *= 1-byte), values are stored as ??????
+		//     0x0008 = ?????  (size field *= 2-byte), values are stored as ??????
+		// * 2 bytes data size field
+		// * ? bytes data (string data may be null-padded; datestamp fields are in the format "2011:05:25 20:24:15")
+		// all integers are stored BigEndian
+
+		$NCTGtagName = array(
+			0x00000001 => 'Make',
+			0x00000002 => 'Model',
+			0x00000003 => 'Software',
+			0x00000011 => 'CreateDate',
+			0x00000012 => 'DateTimeOriginal',
+			0x00000013 => 'FrameCount',
+			0x00000016 => 'FrameRate',
+			0x00000022 => 'FrameWidth',
+			0x00000023 => 'FrameHeight',
+			0x00000032 => 'AudioChannels',
+			0x00000033 => 'AudioBitsPerSample',
+			0x00000034 => 'AudioSampleRate',
+			0x02000001 => 'MakerNoteVersion',
+			0x02000005 => 'WhiteBalance',
+			0x0200000b => 'WhiteBalanceFineTune',
+			0x0200001e => 'ColorSpace',
+			0x02000023 => 'PictureControlData',
+			0x02000024 => 'WorldTime',
+			0x02000032 => 'UnknownInfo',
+			0x02000083 => 'LensType',
+			0x02000084 => 'Lens',
+		);
+
+		$offset = 0;
+		$datalength = strlen($atom_data);
+		$parsed = array();
+		while ($offset < $datalength) {
+//echo getid3_lib::PrintHexBytes(substr($atom_data, $offset, 4)).'<br>';
+			$record_type       = getid3_lib::BigEndian2Int(substr($atom_data, $offset, 4));  $offset += 4;
+			$data_size_type    = getid3_lib::BigEndian2Int(substr($atom_data, $offset, 2));  $offset += 2;
+			$data_size         = getid3_lib::BigEndian2Int(substr($atom_data, $offset, 2));  $offset += 2;
+			switch ($data_size_type) {
+				case 0x0001: // 0x0001 = flag   (size field *= 1-byte)
+					$data = getid3_lib::BigEndian2Int(substr($atom_data, $offset, $data_size * 1));
+					$offset += ($data_size * 1);
+					break;
+				case 0x0002: // 0x0002 = char   (size field *= 1-byte)
+					$data = substr($atom_data, $offset, $data_size * 1);
+					$offset += ($data_size * 1);
+					$data = rtrim($data, "\x00");
+					break;
+				case 0x0003: // 0x0003 = DWORD+ (size field *= 2-byte), values are stored CDAB
+					$data = '';
+					for ($i = $data_size - 1; $i >= 0; $i--) {
+						$data .= substr($atom_data, $offset + ($i * 2), 2);
+					}
+					$data = getid3_lib::BigEndian2Int($data);
+					$offset += ($data_size * 2);
+					break;
+				case 0x0004: // 0x0004 = QWORD+ (size field *= 4-byte), values are stored EFGHABCD
+					$data = '';
+					for ($i = $data_size - 1; $i >= 0; $i--) {
+						$data .= substr($atom_data, $offset + ($i * 4), 4);
+					}
+					$data = getid3_lib::BigEndian2Int($data);
+					$offset += ($data_size * 4);
+					break;
+				case 0x0005: // 0x0005 = float  (size field *= 8-byte), values are stored aaaabbbb where value is aaaa/bbbb; possibly multiple sets of values appended together
+					$data = array();
+					for ($i = 0; $i < $data_size; $i++) {
+						$numerator    = getid3_lib::BigEndian2Int(substr($atom_data, $offset + ($i * 8) + 0, 4));
+						$denomninator = getid3_lib::BigEndian2Int(substr($atom_data, $offset + ($i * 8) + 4, 4));
+						if ($denomninator == 0) {
+							$data[$i] = false;
+						} else {
+							$data[$i] = (double) $numerator / $denomninator;
+						}
+					}
+					$offset += (8 * $data_size);
+					if (count($data) == 1) {
+						$data = $data[0];
+					}
+					break;
+				case 0x0007: // 0x0007 = bytes  (size field *= 1-byte), values are stored as ??????
+					$data = substr($atom_data, $offset, $data_size * 1);
+					$offset += ($data_size * 1);
+					break;
+				case 0x0008: // 0x0008 = ?????  (size field *= 2-byte), values are stored as ??????
+					$data = substr($atom_data, $offset, $data_size * 2);
+					$offset += ($data_size * 2);
+					break;
+				default:
+echo 'QuicktimeParseNikonNCTG()::unknown $data_size_type: '.$data_size_type.'<br>';
+					break 2;
+			}
+
+			switch ($record_type) {
+				case 0x00000011: // CreateDate
+				case 0x00000012: // DateTimeOriginal
+					$data = strtotime($data);
+					break;
+				case 0x0200001e: // ColorSpace
+					switch ($data) {
+						case 1:
+							$data = 'sRGB';
+							break;
+						case 2:
+							$data = 'Adobe RGB';
+							break;
+					}
+					break;
+				case 0x02000023: // PictureControlData
+					$PictureControlAdjust = array(0=>'default', 1=>'quick', 2=>'full');
+					$FilterEffect = array(0x80=>'off', 0x81=>'yellow', 0x82=>'orange',    0x83=>'red', 0x84=>'green',  0xff=>'n/a');
+					$ToningEffect = array(0x80=>'b&w', 0x81=>'sepia',  0x82=>'cyanotype', 0x83=>'red', 0x84=>'yellow', 0x85=>'green', 0x86=>'blue-green', 0x87=>'blue', 0x88=>'purple-blue', 0x89=>'red-purple', 0xff=>'n/a');
+					$data = array(
+						'PictureControlVersion'     =>                           substr($data,  0,  4),
+						'PictureControlName'        =>                     rtrim(substr($data,  4, 20), "\x00"),
+						'PictureControlBase'        =>                     rtrim(substr($data, 24, 20), "\x00"),
+						//'?'                       =>                           substr($data, 44,  4),
+						'PictureControlAdjust'      => $PictureControlAdjust[ord(substr($data, 48,  1))],
+						'PictureControlQuickAdjust' =>                       ord(substr($data, 49,  1)),
+						'Sharpness'                 =>                       ord(substr($data, 50,  1)),
+						'Contrast'                  =>                       ord(substr($data, 51,  1)),
+						'Brightness'                =>                       ord(substr($data, 52,  1)),
+						'Saturation'                =>                       ord(substr($data, 53,  1)),
+						'HueAdjustment'             =>                       ord(substr($data, 54,  1)),
+						'FilterEffect'              =>         $FilterEffect[ord(substr($data, 55,  1))],
+						'ToningEffect'              =>         $ToningEffect[ord(substr($data, 56,  1))],
+						'ToningSaturation'          =>                       ord(substr($data, 57,  1)),
+					);
+					break;
+				case 0x02000024: // WorldTime
+					// http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/Nikon.html#WorldTime
+					// timezone is stored as offset from GMT in minutes
+					$timezone = getid3_lib::BigEndian2Int(substr($data, 0, 2));
+					if ($timezone & 0x8000) {
+						$timezone = 0 - (0x10000 - $timezone);
+					}
+					$timezone /= 60;
+
+					$dst = (bool) getid3_lib::BigEndian2Int(substr($data, 2, 1));
+					switch (getid3_lib::BigEndian2Int(substr($data, 3, 1))) {
+						case 2:
+							$datedisplayformat = 'D/M/Y'; break;
+						case 1:
+							$datedisplayformat = 'M/D/Y'; break;
+						case 0:
+						default:
+							$datedisplayformat = 'Y/M/D'; break;
+					}
+
+					$data = array('timezone'=>floatval($timezone), 'dst'=>$dst, 'display'=>$datedisplayformat);
+					break;
+				case 0x02000083: // LensType
+					$data = array(
+						//'_'  => $data,
+						'mf' => (bool) ($data & 0x01),
+						'd'  => (bool) ($data & 0x02),
+						'g'  => (bool) ($data & 0x04),
+						'vr' => (bool) ($data & 0x08),
+					);
+					break;
+			}
+			$tag_name = (isset($NCTGtagName[$record_type]) ? $NCTGtagName[$record_type] : '0x'.str_pad(dechex($record_type), 8, '0', STR_PAD_LEFT));
+			$parsed[$tag_name] = $data;
+		}
+		return $parsed;
+	}
+
+
+	public function CopyToAppropriateCommentsSection($keyname, $data, $boxname='') {
+		static $handyatomtranslatorarray = array();
+		if (empty($handyatomtranslatorarray)) {
+			// http://www.geocities.com/xhelmboyx/quicktime/formats/qtm-layout.txt
+			// http://www.geocities.com/xhelmboyx/quicktime/formats/mp4-layout.txt
+			// http://atomicparsley.sourceforge.net/mpeg-4files.html
+			// https://code.google.com/p/mp4v2/wiki/iTunesMetadata
+			$handyatomtranslatorarray["\xA9".'alb'] = 'album';               // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'ART'] = 'artist';
+			$handyatomtranslatorarray["\xA9".'art'] = 'artist';              // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'aut'] = 'author';
+			$handyatomtranslatorarray["\xA9".'cmt'] = 'comment';             // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'com'] = 'comment';
+			$handyatomtranslatorarray["\xA9".'cpy'] = 'copyright';
+			$handyatomtranslatorarray["\xA9".'day'] = 'creation_date';       // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'dir'] = 'director';
+			$handyatomtranslatorarray["\xA9".'ed1'] = 'edit1';
+			$handyatomtranslatorarray["\xA9".'ed2'] = 'edit2';
+			$handyatomtranslatorarray["\xA9".'ed3'] = 'edit3';
+			$handyatomtranslatorarray["\xA9".'ed4'] = 'edit4';
+			$handyatomtranslatorarray["\xA9".'ed5'] = 'edit5';
+			$handyatomtranslatorarray["\xA9".'ed6'] = 'edit6';
+			$handyatomtranslatorarray["\xA9".'ed7'] = 'edit7';
+			$handyatomtranslatorarray["\xA9".'ed8'] = 'edit8';
+			$handyatomtranslatorarray["\xA9".'ed9'] = 'edit9';
+			$handyatomtranslatorarray["\xA9".'enc'] = 'encoded_by';
+			$handyatomtranslatorarray["\xA9".'fmt'] = 'format';
+			$handyatomtranslatorarray["\xA9".'gen'] = 'genre';               // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'grp'] = 'grouping';            // iTunes 4.2
+			$handyatomtranslatorarray["\xA9".'hst'] = 'host_computer';
+			$handyatomtranslatorarray["\xA9".'inf'] = 'information';
+			$handyatomtranslatorarray["\xA9".'lyr'] = 'lyrics';              // iTunes 5.0
+			$handyatomtranslatorarray["\xA9".'mak'] = 'make';
+			$handyatomtranslatorarray["\xA9".'mod'] = 'model';
+			$handyatomtranslatorarray["\xA9".'nam'] = 'title';               // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'ope'] = 'composer';
+			$handyatomtranslatorarray["\xA9".'prd'] = 'producer';
+			$handyatomtranslatorarray["\xA9".'PRD'] = 'product';
+			$handyatomtranslatorarray["\xA9".'prf'] = 'performers';
+			$handyatomtranslatorarray["\xA9".'req'] = 'system_requirements';
+			$handyatomtranslatorarray["\xA9".'src'] = 'source_credit';
+			$handyatomtranslatorarray["\xA9".'swr'] = 'software';
+			$handyatomtranslatorarray["\xA9".'too'] = 'encoding_tool';       // iTunes 4.0
+			$handyatomtranslatorarray["\xA9".'trk'] = 'track';
+			$handyatomtranslatorarray["\xA9".'url'] = 'url';
+			$handyatomtranslatorarray["\xA9".'wrn'] = 'warning';
+			$handyatomtranslatorarray["\xA9".'wrt'] = 'composer';
+			$handyatomtranslatorarray['aART'] = 'album_artist';
+			$handyatomtranslatorarray['apID'] = 'purchase_account';
+			$handyatomtranslatorarray['catg'] = 'category';            // iTunes 4.9
+			$handyatomtranslatorarray['covr'] = 'picture';             // iTunes 4.0
+			$handyatomtranslatorarray['cpil'] = 'compilation';         // iTunes 4.0
+			$handyatomtranslatorarray['cprt'] = 'copyright';           // iTunes 4.0?
+			$handyatomtranslatorarray['desc'] = 'description';         // iTunes 5.0
+			$handyatomtranslatorarray['disk'] = 'disc_number';         // iTunes 4.0
+			$handyatomtranslatorarray['egid'] = 'episode_guid';        // iTunes 4.9
+			$handyatomtranslatorarray['gnre'] = 'genre';               // iTunes 4.0
+			$handyatomtranslatorarray['hdvd'] = 'hd_video';            // iTunes 4.0
+			$handyatomtranslatorarray['ldes'] = 'description_long';    //
+			$handyatomtranslatorarray['keyw'] = 'keyword';             // iTunes 4.9
+			$handyatomtranslatorarray['pcst'] = 'podcast';             // iTunes 4.9
+			$handyatomtranslatorarray['pgap'] = 'gapless_playback';    // iTunes 7.0
+			$handyatomtranslatorarray['purd'] = 'purchase_date';       // iTunes 6.0.2
+			$handyatomtranslatorarray['purl'] = 'podcast_url';         // iTunes 4.9
+			$handyatomtranslatorarray['rtng'] = 'rating';              // iTunes 4.0
+			$handyatomtranslatorarray['soaa'] = 'sort_album_artist';   //
+			$handyatomtranslatorarray['soal'] = 'sort_album';          //
+			$handyatomtranslatorarray['soar'] = 'sort_artist';         //
+			$handyatomtranslatorarray['soco'] = 'sort_composer';       //
+			$handyatomtranslatorarray['sonm'] = 'sort_title';          //
+			$handyatomtranslatorarray['sosn'] = 'sort_show';           //
+			$handyatomtranslatorarray['stik'] = 'stik';                // iTunes 4.9
+			$handyatomtranslatorarray['tmpo'] = 'bpm';                 // iTunes 4.0
+			$handyatomtranslatorarray['trkn'] = 'track_number';        // iTunes 4.0
+			$handyatomtranslatorarray['tven'] = 'tv_episode_id';       //
+			$handyatomtranslatorarray['tves'] = 'tv_episode';          // iTunes 6.0
+			$handyatomtranslatorarray['tvnn'] = 'tv_network_name';     // iTunes 6.0
+			$handyatomtranslatorarray['tvsh'] = 'tv_show_name';        // iTunes 6.0
+			$handyatomtranslatorarray['tvsn'] = 'tv_season';           // iTunes 6.0
+
+			// boxnames:
+			/*
+			$handyatomtranslatorarray['iTunSMPB']                    = 'iTunSMPB';
+			$handyatomtranslatorarray['iTunNORM']                    = 'iTunNORM';
+			$handyatomtranslatorarray['Encoding Params']             = 'Encoding Params';
+			$handyatomtranslatorarray['replaygain_track_gain']       = 'replaygain_track_gain';
+			$handyatomtranslatorarray['replaygain_track_peak']       = 'replaygain_track_peak';
+			$handyatomtranslatorarray['replaygain_track_minmax']     = 'replaygain_track_minmax';
+			$handyatomtranslatorarray['MusicIP PUID']                = 'MusicIP PUID';
+			$handyatomtranslatorarray['MusicBrainz Artist Id']       = 'MusicBrainz Artist Id';
+			$handyatomtranslatorarray['MusicBrainz Album Id']        = 'MusicBrainz Album Id';
+			$handyatomtranslatorarray['MusicBrainz Album Artist Id'] = 'MusicBrainz Album Artist Id';
+			$handyatomtranslatorarray['MusicBrainz Track Id']        = 'MusicBrainz Track Id';
+			$handyatomtranslatorarray['MusicBrainz Disc Id']         = 'MusicBrainz Disc Id';
+
+			// http://age.hobba.nl/audio/tag_frame_reference.html
+			$handyatomtranslatorarray['PLAY_COUNTER']                = 'play_counter'; // Foobar2000 - http://www.getid3.org/phpBB3/viewtopic.php?t=1355
+			$handyatomtranslatorarray['MEDIATYPE']                   = 'mediatype';    // Foobar2000 - http://www.getid3.org/phpBB3/viewtopic.php?t=1355
+			*/
+		}
+		$info = &$this->getid3->info;
+		$comment_key = '';
+		if ($boxname && ($boxname != $keyname)) {
+			$comment_key = (isset($handyatomtranslatorarray[$boxname]) ? $handyatomtranslatorarray[$boxname] : $boxname);
+		} elseif (isset($handyatomtranslatorarray[$keyname])) {
+			$comment_key = $handyatomtranslatorarray[$keyname];
+		}
+		if ($comment_key) {
+			if ($comment_key == 'picture') {
+				if (!is_array($data)) {
+					$image_mime = '';
+					if (preg_match('#^\x89\x50\x4E\x47\x0D\x0A\x1A\x0A#', $data)) {
+						$image_mime = 'image/png';
+					} elseif (preg_match('#^\xFF\xD8\xFF#', $data)) {
+						$image_mime = 'image/jpeg';
+					} elseif (preg_match('#^GIF#', $data)) {
+						$image_mime = 'image/gif';
+					} elseif (preg_match('#^BM#', $data)) {
+						$image_mime = 'image/bmp';
+					}
+					$data = array('data'=>$data, 'image_mime'=>$image_mime);
+				}
+			}
+			$gooddata = array($data);
+			if ($comment_key == 'genre') {
+				// some other taggers separate multiple genres with semicolon, e.g. "Heavy Metal;Thrash Metal;Metal"
+				$gooddata = explode(';', $data);
+			}
+			foreach ($gooddata as $data) {
+				$info['quicktime']['comments'][$comment_key][] = $data;
+			}
+		}
+		return true;
+	}
+
+    public function LociString($lstring, &$count) {
+            // Loci strings are UTF-8 or UTF-16 and null (x00/x0000) terminated. UTF-16 has a BOM
+            // Also need to return the number of bytes the string occupied so additional fields can be extracted
+            $len = strlen($lstring);
+            if ($len == 0) {
+                $count = 0;
+                return '';
+            }
+            if ($lstring[0] == "\x00") {
+                $count = 1;
+                return '';
+            }
+            //check for BOM
+            if ($len > 2 && (($lstring[0] == "\xFE" && $lstring[1] == "\xFF") || ($lstring[0] == "\xFF" && $lstring[1] == "\xFE"))) {
+                //UTF-16
+                if (preg_match('/(.*)\x00/', $lstring, $lmatches)){
+                     $count = strlen($lmatches[1]) * 2 + 2; //account for 2 byte characters and trailing \x0000
+                    return getid3_lib::iconv_fallback_utf16_utf8($lmatches[1]);
+                } else {
+                    return '';
+                }
+            } else {
+                //UTF-8
+                if (preg_match('/(.*)\x00/', $lstring, $lmatches)){
+                    $count = strlen($lmatches[1]) + 1; //account for trailing \x00
+                    return $lmatches[1];
+                }else {
+                    return '';
+                }
+
+            }
+        }
+
+	public function NoNullString($nullterminatedstring) {
+		// remove the single null terminator on null terminated strings
+		if (substr($nullterminatedstring, strlen($nullterminatedstring) - 1, 1) === "\x00") {
+			return substr($nullterminatedstring, 0, strlen($nullterminatedstring) - 1);
+		}
+		return $nullterminatedstring;
+	}
+
+	public function Pascal2String($pascalstring) {
+		// Pascal strings have 1 unsigned byte at the beginning saying how many chars (1-255) are in the string
+		return substr($pascalstring, 1);
+	}
+
+
+	/*
+	// helper functions for m4b audiobook chapters
+	// code by Steffen Hartmann 2015-Nov-08
+	*/
+	public function search_tag_by_key($info, $tag, $history, &$result) {
+		foreach ($info as $key => $value) {
+			$key_history = $history.'/'.$key;
+			if ($key === $tag) {
+				$result[] = array($key_history, $info);
+			} else {
+				if (is_array($value)) {
+					$this->search_tag_by_key($value, $tag, $key_history, $result);
+				}
+			}
+		}
+	}
+
+	public function search_tag_by_pair($info, $k, $v, $history, &$result) {
+		foreach ($info as $key => $value) {
+			$key_history = $history.'/'.$key;
+			if (($key === $k) && ($value === $v)) {
+				$result[] = array($key_history, $info);
+			} else {
+				if (is_array($value)) {
+					$this->search_tag_by_pair($value, $k, $v, $key_history, $result);
+				}
+			}
+		}
+	}
+
+	public function quicktime_time_to_sample_table($info) {
+		$res = array();
+		$this->search_tag_by_pair($info['quicktime']['moov'], 'name', 'stbl', 'quicktime/moov', $res);
+		foreach ($res as $value) {
+			$stbl_res = array();
+			$this->search_tag_by_pair($value[1], 'data_format', 'text', $value[0], $stbl_res);
+			if (count($stbl_res) > 0) {
+				$stts_res = array();
+				$this->search_tag_by_key($value[1], 'time_to_sample_table', $value[0], $stts_res);
+				if (count($stts_res) > 0) {
+					return $stts_res[0][1]['time_to_sample_table'];
+				}
+			}
+		}
+		return array();
+	}
+
+	function quicktime_bookmark_time_scale($info) {
+		$time_scale = '';
+		$ts_prefix_len = 0;
+		$res = array();
+		$this->search_tag_by_pair($info['quicktime']['moov'], 'name', 'stbl', 'quicktime/moov', $res);
+		foreach ($res as $value) {
+			$stbl_res = array();
+			$this->search_tag_by_pair($value[1], 'data_format', 'text', $value[0], $stbl_res);
+			if (count($stbl_res) > 0) {
+				$ts_res = array();
+				$this->search_tag_by_key($info['quicktime']['moov'], 'time_scale', 'quicktime/moov', $ts_res);
+				foreach ($ts_res as $value) {
+					$prefix = substr($value[0], 0, -12);
+					if ((substr($stbl_res[0][0], 0, strlen($prefix)) === $prefix) && ($ts_prefix_len < strlen($prefix))) {
+						$time_scale = $value[1]['time_scale'];
+						$ts_prefix_len = strlen($prefix);
+					}
+				}
+			}
+		}
+		return $time_scale;
+	}
+	/*
+	// END helper functions for m4b audiobook chapters
+	*/
+
+
+}
