@@ -254,4 +254,249 @@ class getid3_id3v2 extends getid3_handler
 				if (strlen($framedata) <= $this->ID3v2HeaderLength($id3v2_majorversion)) {
 					// insufficient room left in ID3v2 header for actual data - must be padding
 					$thisfile_id3v2['padding']['start']  = $framedataoffset;
-					$thisfile_id3v2['paddi
+					$thisfile_id3v2['padding']['length'] = strlen($framedata);
+					$thisfile_id3v2['padding']['valid']  = true;
+					for ($i = 0; $i < $thisfile_id3v2['padding']['length']; $i++) {
+						if ($framedata{$i} != "\x00") {
+							$thisfile_id3v2['padding']['valid'] = false;
+							$thisfile_id3v2['padding']['errorpos'] = $thisfile_id3v2['padding']['start'] + $i;
+							$this->warning('Invalid ID3v2 padding found at offset '.$thisfile_id3v2['padding']['errorpos'].' (the remaining '.($thisfile_id3v2['padding']['length'] - $i).' bytes are considered invalid)');
+							break;
+						}
+					}
+					break; // skip rest of ID3v2 header
+				}
+				if ($id3v2_majorversion == 2) {
+					// Frame ID  $xx xx xx (three characters)
+					// Size      $xx xx xx (24-bit integer)
+					// Flags     $xx xx
+
+					$frame_header = substr($framedata, 0, 6); // take next 6 bytes for header
+					$framedata    = substr($framedata, 6);    // and leave the rest in $framedata
+					$frame_name   = substr($frame_header, 0, 3);
+					$frame_size   = getid3_lib::BigEndian2Int(substr($frame_header, 3, 3), 0);
+					$frame_flags  = 0; // not used for anything in ID3v2.2, just set to avoid E_NOTICEs
+
+				} elseif ($id3v2_majorversion > 2) {
+
+					// Frame ID  $xx xx xx xx (four characters)
+					// Size      $xx xx xx xx (32-bit integer in v2.3, 28-bit synchsafe in v2.4+)
+					// Flags     $xx xx
+
+					$frame_header = substr($framedata, 0, 10); // take next 10 bytes for header
+					$framedata    = substr($framedata, 10);    // and leave the rest in $framedata
+
+					$frame_name = substr($frame_header, 0, 4);
+					if ($id3v2_majorversion == 3) {
+						$frame_size = getid3_lib::BigEndian2Int(substr($frame_header, 4, 4), 0); // 32-bit integer
+					} else { // ID3v2.4+
+						$frame_size = getid3_lib::BigEndian2Int(substr($frame_header, 4, 4), 1); // 32-bit synchsafe integer (28-bit value)
+					}
+
+					if ($frame_size < (strlen($framedata) + 4)) {
+						$nextFrameID = substr($framedata, $frame_size, 4);
+						if ($this->IsValidID3v2FrameName($nextFrameID, $id3v2_majorversion)) {
+							// next frame is OK
+						} elseif (($frame_name == "\x00".'MP3') || ($frame_name == "\x00\x00".'MP') || ($frame_name == ' MP3') || ($frame_name == 'MP3e')) {
+							// MP3ext known broken frames - "ok" for the purposes of this test
+						} elseif (($id3v2_majorversion == 4) && ($this->IsValidID3v2FrameName(substr($framedata, getid3_lib::BigEndian2Int(substr($frame_header, 4, 4), 0), 4), 3))) {
+							$this->warning('ID3v2 tag written as ID3v2.4, but with non-synchsafe integers (ID3v2.3 style). Older versions of (Helium2; iTunes) are known culprits of this. Tag has been parsed as ID3v2.3');
+							$id3v2_majorversion = 3;
+							$frame_size = getid3_lib::BigEndian2Int(substr($frame_header, 4, 4), 0); // 32-bit integer
+						}
+					}
+
+
+					$frame_flags = getid3_lib::BigEndian2Int(substr($frame_header, 8, 2));
+				}
+
+				if ((($id3v2_majorversion == 2) && ($frame_name == "\x00\x00\x00")) || ($frame_name == "\x00\x00\x00\x00")) {
+					// padding encountered
+
+					$thisfile_id3v2['padding']['start']  = $framedataoffset;
+					$thisfile_id3v2['padding']['length'] = strlen($frame_header) + strlen($framedata);
+					$thisfile_id3v2['padding']['valid']  = true;
+
+					$len = strlen($framedata);
+					for ($i = 0; $i < $len; $i++) {
+						if ($framedata{$i} != "\x00") {
+							$thisfile_id3v2['padding']['valid'] = false;
+							$thisfile_id3v2['padding']['errorpos'] = $thisfile_id3v2['padding']['start'] + $i;
+							$this->warning('Invalid ID3v2 padding found at offset '.$thisfile_id3v2['padding']['errorpos'].' (the remaining '.($thisfile_id3v2['padding']['length'] - $i).' bytes are considered invalid)');
+							break;
+						}
+					}
+					break; // skip rest of ID3v2 header
+				}
+
+				if ($iTunesBrokenFrameNameFixed = self::ID3v22iTunesBrokenFrameName($frame_name)) {
+					$this->warning('error parsing "'.$frame_name.'" ('.$framedataoffset.' bytes into the ID3v2.'.$id3v2_majorversion.' tag). (ERROR: IsValidID3v2FrameName("'.str_replace("\x00", ' ', $frame_name).'", '.$id3v2_majorversion.'))). [Note: this particular error has been known to happen with tags edited by iTunes (versions "X v2.0.3", "v3.0.1", "v7.0.0.70" are known-guilty, probably others too)]. Translated frame name from "'.str_replace("\x00", ' ', $frame_name).'" to "'.$iTunesBrokenFrameNameFixed.'" for parsing.');
+					$frame_name = $iTunesBrokenFrameNameFixed;
+				}
+				if (($frame_size <= strlen($framedata)) && ($this->IsValidID3v2FrameName($frame_name, $id3v2_majorversion))) {
+
+					unset($parsedFrame);
+					$parsedFrame['frame_name']      = $frame_name;
+					$parsedFrame['frame_flags_raw'] = $frame_flags;
+					$parsedFrame['data']            = substr($framedata, 0, $frame_size);
+					$parsedFrame['datalength']      = getid3_lib::CastAsInt($frame_size);
+					$parsedFrame['dataoffset']      = $framedataoffset;
+
+					$this->ParseID3v2Frame($parsedFrame);
+					$thisfile_id3v2[$frame_name][] = $parsedFrame;
+
+					$framedata = substr($framedata, $frame_size);
+
+				} else { // invalid frame length or FrameID
+
+					if ($frame_size <= strlen($framedata)) {
+
+						if ($this->IsValidID3v2FrameName(substr($framedata, $frame_size, 4), $id3v2_majorversion)) {
+
+							// next frame is valid, just skip the current frame
+							$framedata = substr($framedata, $frame_size);
+							$this->warning('Next ID3v2 frame is valid, skipping current frame.');
+
+						} else {
+
+							// next frame is invalid too, abort processing
+							//unset($framedata);
+							$framedata = null;
+							$this->error('Next ID3v2 frame is also invalid, aborting processing.');
+
+						}
+
+					} elseif ($frame_size == strlen($framedata)) {
+
+						// this is the last frame, just skip
+						$this->warning('This was the last ID3v2 frame.');
+
+					} else {
+
+						// next frame is invalid too, abort processing
+						//unset($framedata);
+						$framedata = null;
+						$this->warning('Invalid ID3v2 frame size, aborting.');
+
+					}
+					if (!$this->IsValidID3v2FrameName($frame_name, $id3v2_majorversion)) {
+
+						switch ($frame_name) {
+							case "\x00\x00".'MP':
+							case "\x00".'MP3':
+							case ' MP3':
+							case 'MP3e':
+							case "\x00".'MP':
+							case ' MP':
+							case 'MP3':
+								$this->warning('error parsing "'.$frame_name.'" ('.$framedataoffset.' bytes into the ID3v2.'.$id3v2_majorversion.' tag). (ERROR: !IsValidID3v2FrameName("'.str_replace("\x00", ' ', $frame_name).'", '.$id3v2_majorversion.'))). [Note: this particular error has been known to happen with tags edited by "MP3ext (www.mutschler.de/mp3ext/)"]');
+								break;
+
+							default:
+								$this->warning('error parsing "'.$frame_name.'" ('.$framedataoffset.' bytes into the ID3v2.'.$id3v2_majorversion.' tag). (ERROR: !IsValidID3v2FrameName("'.str_replace("\x00", ' ', $frame_name).'", '.$id3v2_majorversion.'))).');
+								break;
+						}
+
+					} elseif (!isset($framedata) || ($frame_size > strlen($framedata))) {
+
+						$this->error('error parsing "'.$frame_name.'" ('.$framedataoffset.' bytes into the ID3v2.'.$id3v2_majorversion.' tag). (ERROR: $frame_size ('.$frame_size.') > strlen($framedata) ('.(isset($framedata) ? strlen($framedata) : 'null').')).');
+
+					} else {
+
+						$this->error('error parsing "'.$frame_name.'" ('.$framedataoffset.' bytes into the ID3v2.'.$id3v2_majorversion.' tag).');
+
+					}
+
+				}
+				$framedataoffset += ($frame_size + $this->ID3v2HeaderLength($id3v2_majorversion));
+
+			}
+
+		}
+
+
+	//    Footer
+
+	//    The footer is a copy of the header, but with a different identifier.
+	//        ID3v2 identifier           "3DI"
+	//        ID3v2 version              $04 00
+	//        ID3v2 flags                %abcd0000
+	//        ID3v2 size             4 * %0xxxxxxx
+
+		if (isset($thisfile_id3v2_flags['isfooter']) && $thisfile_id3v2_flags['isfooter']) {
+			$footer = $this->fread(10);
+			if (substr($footer, 0, 3) == '3DI') {
+				$thisfile_id3v2['footer'] = true;
+				$thisfile_id3v2['majorversion_footer'] = ord($footer{3});
+				$thisfile_id3v2['minorversion_footer'] = ord($footer{4});
+			}
+			if ($thisfile_id3v2['majorversion_footer'] <= 4) {
+				$id3_flags = ord(substr($footer{5}));
+				$thisfile_id3v2_flags['unsynch_footer']  = (bool) ($id3_flags & 0x80);
+				$thisfile_id3v2_flags['extfoot_footer']  = (bool) ($id3_flags & 0x40);
+				$thisfile_id3v2_flags['experim_footer']  = (bool) ($id3_flags & 0x20);
+				$thisfile_id3v2_flags['isfooter_footer'] = (bool) ($id3_flags & 0x10);
+
+				$thisfile_id3v2['footerlength'] = getid3_lib::BigEndian2Int(substr($footer, 6, 4), 1);
+			}
+		} // end footer
+
+		if (isset($thisfile_id3v2['comments']['genre'])) {
+			$genres = array();
+			foreach ($thisfile_id3v2['comments']['genre'] as $key => $value) {
+				foreach ($this->ParseID3v2GenreString($value) as $genre) {
+					$genres[] = $genre;
+				}
+			}
+			$thisfile_id3v2['comments']['genre'] = array_unique($genres);
+			unset($key, $value, $genres, $genre);
+		}
+
+		if (isset($thisfile_id3v2['comments']['track'])) {
+			foreach ($thisfile_id3v2['comments']['track'] as $key => $value) {
+				if (strstr($value, '/')) {
+					list($thisfile_id3v2['comments']['tracknum'][$key], $thisfile_id3v2['comments']['totaltracks'][$key]) = explode('/', $thisfile_id3v2['comments']['track'][$key]);
+				}
+			}
+		}
+
+		if (!isset($thisfile_id3v2['comments']['year']) && !empty($thisfile_id3v2['comments']['recording_time'][0]) && preg_match('#^([0-9]{4})#', trim($thisfile_id3v2['comments']['recording_time'][0]), $matches)) {
+			$thisfile_id3v2['comments']['year'] = array($matches[1]);
+		}
+
+
+		if (!empty($thisfile_id3v2['TXXX'])) {
+			// MediaMonkey does this, maybe others: write a blank RGAD frame, but put replay-gain adjustment values in TXXX frames
+			foreach ($thisfile_id3v2['TXXX'] as $txxx_array) {
+				switch ($txxx_array['description']) {
+					case 'replaygain_track_gain':
+						if (empty($info['replay_gain']['track']['adjustment']) && !empty($txxx_array['data'])) {
+							$info['replay_gain']['track']['adjustment'] = floatval(trim(str_replace('dB', '', $txxx_array['data'])));
+						}
+						break;
+					case 'replaygain_track_peak':
+						if (empty($info['replay_gain']['track']['peak']) && !empty($txxx_array['data'])) {
+							$info['replay_gain']['track']['peak'] = floatval($txxx_array['data']);
+						}
+						break;
+					case 'replaygain_album_gain':
+						if (empty($info['replay_gain']['album']['adjustment']) && !empty($txxx_array['data'])) {
+							$info['replay_gain']['album']['adjustment'] = floatval(trim(str_replace('dB', '', $txxx_array['data'])));
+						}
+						break;
+				}
+			}
+		}
+
+
+		// Set avdataoffset
+		$info['avdataoffset'] = $thisfile_id3v2['headerlength'];
+		if (isset($thisfile_id3v2['footer'])) {
+			$info['avdataoffset'] += 10;
+		}
+
+		return true;
+	}
+
+
+	public function Pa
