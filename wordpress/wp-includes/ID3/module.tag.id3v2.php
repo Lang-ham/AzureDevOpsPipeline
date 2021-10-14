@@ -688,4 +688,214 @@ class getid3_id3v2 extends getid3_handler
 			$frame_offset = 0;
 			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
 			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
-				$this->warning('Invalid tex
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+			}
+
+			$parsedFrame['data'] = (string) substr($parsedFrame['data'], $frame_offset);
+
+			$parsedFrame['encodingid'] = $frame_textencoding;
+			$parsedFrame['encoding']   = $this->TextEncodingNameLookup($frame_textencoding);
+
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				// ID3v2.3 specs say that TPE1 (and others) can contain multiple artist values separated with /
+				// This of course breaks when an artist name contains slash character, e.g. "AC/DC"
+				// MP3tag (maybe others) implement alternative system where multiple artists are null-separated, which makes more sense
+				// getID3 will split null-separated artists into multiple artists and leave slash-separated ones to the user
+				switch ($parsedFrame['encoding']) {
+					case 'UTF-16':
+					case 'UTF-16BE':
+					case 'UTF-16LE':
+						$wordsize = 2;
+						break;
+					case 'ISO-8859-1':
+					case 'UTF-8':
+					default:
+						$wordsize = 1;
+						break;
+				}
+				$Txxx_elements = array();
+				$Txxx_elements_start_offset = 0;
+				for ($i = 0; $i < strlen($parsedFrame['data']); $i += $wordsize) {
+					if (substr($parsedFrame['data'], $i, $wordsize) == str_repeat("\x00", $wordsize)) {
+						$Txxx_elements[] = substr($parsedFrame['data'], $Txxx_elements_start_offset, $i - $Txxx_elements_start_offset);
+						$Txxx_elements_start_offset = $i + $wordsize;
+					}
+				}
+				$Txxx_elements[] = substr($parsedFrame['data'], $Txxx_elements_start_offset, $i - $Txxx_elements_start_offset);
+				foreach ($Txxx_elements as $Txxx_element) {
+					$string = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $Txxx_element);
+					if (!empty($string)) {
+						$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = $string;
+					}
+				}
+				unset($string, $wordsize, $i, $Txxx_elements, $Txxx_element, $Txxx_elements_start_offset);
+			}
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'WXXX')) || // 4.3.2 WXXX User defined URL link frame
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'WXX'))) {    // 4.3.2 WXX  User defined URL link frame
+			//   There may be more than one 'WXXX' frame in each tag,
+			//   but only one with the same description
+			// <Header for 'User defined URL link frame', ID: 'WXXX'>
+			// Text encoding     $xx
+			// Description       <text string according to encoding> $00 (00)
+			// URL               <text string>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$parsedFrame['data'] = substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator));
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			if ($frame_terminatorpos) {
+				// there are null bytes after the data - this is not according to spec
+				// only use data up to first null byte
+				$frame_urldata = (string) substr($parsedFrame['data'], 0, $frame_terminatorpos);
+			} else {
+				// no null bytes following data, just use all data
+				$frame_urldata = (string) $parsedFrame['data'];
+			}
+
+			$parsedFrame['encodingid']  = $frame_textencoding;
+			$parsedFrame['encoding']    = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['url']         = $frame_urldata;
+			$parsedFrame['description'] = $frame_description;
+			if (!empty($parsedFrame['framenameshort']) && $parsedFrame['url']) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['url']);
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ($parsedFrame['frame_name']{0} == 'W') { // 4.3. W??? URL link frames
+			//   There may only be one URL link frame of its kind in a tag,
+			//   except when stated otherwise in the frame description
+			// <Header for 'URL link frame', ID: 'W000' - 'WZZZ', excluding 'WXXX'
+			// described in 4.3.2.>
+			// URL              <text string>
+
+			$parsedFrame['url'] = trim($parsedFrame['data']);
+			if (!empty($parsedFrame['framenameshort']) && $parsedFrame['url']) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = $parsedFrame['url'];
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion == 3) && ($parsedFrame['frame_name'] == 'IPLS')) || // 4.4  IPLS Involved people list (ID3v2.3 only)
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'IPL'))) {     // 4.4  IPL  Involved people list (ID3v2.2 only)
+			// http://id3.org/id3v2.3.0#sec4.4
+			//   There may only be one 'IPL' frame in each tag
+			// <Header for 'User defined URL link frame', ID: 'IPL'>
+			// Text encoding     $xx
+			// People list strings    <textstrings>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+			}
+			$parsedFrame['encodingid'] = $frame_textencoding;
+			$parsedFrame['encoding']   = $this->TextEncodingNameLookup($parsedFrame['encodingid']);
+			$parsedFrame['data_raw']   = (string) substr($parsedFrame['data'], $frame_offset);
+
+			// http://www.getid3.org/phpBB3/viewtopic.php?t=1369
+			// "this tag typically contains null terminated strings, which are associated in pairs"
+			// "there are users that use the tag incorrectly"
+			$IPLS_parts = array();
+			if (strpos($parsedFrame['data_raw'], "\x00") !== false) {
+				$IPLS_parts_unsorted = array();
+				if (((strlen($parsedFrame['data_raw']) % 2) == 0) && ((substr($parsedFrame['data_raw'], 0, 2) == "\xFF\xFE") || (substr($parsedFrame['data_raw'], 0, 2) == "\xFE\xFF"))) {
+					// UTF-16, be careful looking for null bytes since most 2-byte characters may contain one; you need to find twin null bytes, and on even padding
+					$thisILPS  = '';
+					for ($i = 0; $i < strlen($parsedFrame['data_raw']); $i += 2) {
+						$twobytes = substr($parsedFrame['data_raw'], $i, 2);
+						if ($twobytes === "\x00\x00") {
+							$IPLS_parts_unsorted[] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $thisILPS);
+							$thisILPS  = '';
+						} else {
+							$thisILPS .= $twobytes;
+						}
+					}
+					if (strlen($thisILPS) > 2) { // 2-byte BOM
+						$IPLS_parts_unsorted[] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $thisILPS);
+					}
+				} else {
+					// ISO-8859-1 or UTF-8 or other single-byte-null character set
+					$IPLS_parts_unsorted = explode("\x00", $parsedFrame['data_raw']);
+				}
+				if (count($IPLS_parts_unsorted) == 1) {
+					// just a list of names, e.g. "Dino Baptiste, Jimmy Copley, John Gordon, Bernie Marsden, Sharon Watson"
+					foreach ($IPLS_parts_unsorted as $key => $value) {
+						$IPLS_parts_sorted = preg_split('#[;,\\r\\n\\t]#', $value);
+						$position = '';
+						foreach ($IPLS_parts_sorted as $person) {
+							$IPLS_parts[] = array('position'=>$position, 'person'=>$person);
+						}
+					}
+				} elseif ((count($IPLS_parts_unsorted) % 2) == 0) {
+					$position = '';
+					$person   = '';
+					foreach ($IPLS_parts_unsorted as $key => $value) {
+						if (($key % 2) == 0) {
+							$position = $value;
+						} else {
+							$person   = $value;
+							$IPLS_parts[] = array('position'=>$position, 'person'=>$person);
+							$position = '';
+							$person   = '';
+						}
+					}
+				} else {
+					foreach ($IPLS_parts_unsorted as $key => $value) {
+						$IPLS_parts[] = array($value);
+					}
+				}
+
+			} else {
+				$IPLS_parts = preg_split('#[;,\\r\\n\\t]#', $parsedFrame['data_raw']);
+			}
+			$parsedFrame['data'] = $IPLS_parts;
+
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = $parsedFrame['data'];
+			}
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'MCDI')) || // 4.4   MCDI Music CD identifier
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'MCI'))) {     // 4.5   MCI  Music CD identifier
+			//   There may only be one 'MCDI' frame in each tag
+			// <Header for 'Music CD identifier', ID: 'MCDI'>
+			// CD TOC                <binary data>
+
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = $parsedFrame['data'];
+			}
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'ETCO')) || // 4.5   ETCO Event timing codes
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'ETC'))) {     // 4.6   ETC  Event timing codes
+			//   There may only be one 'ETCO' frame in each tag
+			// <Header for 'Event timing codes', ID: 'ETCO'>
+			// Time stamp format    $xx
+			//   Where time stamp format is:
+			// $01  (32-bit value) MPEG frames from beginning of file
+			// $02  (32-bit value) milliseconds from beginning of file
+			//   Followed by a list of key events in the following format:
+			// Type of event   $xx
+			// Time stamp      $xx (xx ...)
+			//   The 'Time stamp' is set to zero if 
