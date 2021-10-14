@@ -499,4 +499,193 @@ class getid3_id3v2 extends getid3_handler
 	}
 
 
-	public function Pa
+	public function ParseID3v2GenreString($genrestring) {
+		// Parse genres into arrays of genreName and genreID
+		// ID3v2.2.x, ID3v2.3.x: '(21)' or '(4)Eurodisco' or '(51)(39)' or '(55)((I think...)'
+		// ID3v2.4.x: '21' $00 'Eurodisco' $00
+		$clean_genres = array();
+
+		// hack-fixes for some badly-written ID3v2.3 taggers, while trying not to break correctly-written tags
+		if (($this->getid3->info['id3v2']['majorversion'] == 3) && !preg_match('#[\x00]#', $genrestring)) {
+			// note: MusicBrainz Picard incorrectly stores plaintext genres separated by "/" when writing in ID3v2.3 mode, hack-fix here:
+			// replace / with NULL, then replace back the two ID3v1 genres that legitimately have "/" as part of the single genre name
+			if (preg_match('#/#', $genrestring)) {
+				$genrestring = str_replace('/', "\x00", $genrestring);
+				$genrestring = str_replace('Pop'."\x00".'Funk', 'Pop/Funk', $genrestring);
+				$genrestring = str_replace('Rock'."\x00".'Rock', 'Folk/Rock', $genrestring);
+			}
+
+			// some other taggers separate multiple genres with semicolon, e.g. "Heavy Metal;Thrash Metal;Metal"
+			if (preg_match('#;#', $genrestring)) {
+				$genrestring = str_replace(';', "\x00", $genrestring);
+			}
+		}
+
+
+		if (strpos($genrestring, "\x00") === false) {
+			$genrestring = preg_replace('#\(([0-9]{1,3})\)#', '$1'."\x00", $genrestring);
+		}
+
+		$genre_elements = explode("\x00", $genrestring);
+		foreach ($genre_elements as $element) {
+			$element = trim($element);
+			if ($element) {
+				if (preg_match('#^[0-9]{1,3}#', $element)) {
+					$clean_genres[] = getid3_id3v1::LookupGenreName($element);
+				} else {
+					$clean_genres[] = str_replace('((', '(', $element);
+				}
+			}
+		}
+		return $clean_genres;
+	}
+
+
+	public function ParseID3v2Frame(&$parsedFrame) {
+
+		// shortcuts
+		$info = &$this->getid3->info;
+		$id3v2_majorversion = $info['id3v2']['majorversion'];
+
+		$parsedFrame['framenamelong']  = $this->FrameNameLongLookup($parsedFrame['frame_name']);
+		if (empty($parsedFrame['framenamelong'])) {
+			unset($parsedFrame['framenamelong']);
+		}
+		$parsedFrame['framenameshort'] = $this->FrameNameShortLookup($parsedFrame['frame_name']);
+		if (empty($parsedFrame['framenameshort'])) {
+			unset($parsedFrame['framenameshort']);
+		}
+
+		if ($id3v2_majorversion >= 3) { // frame flags are not part of the ID3v2.2 standard
+			if ($id3v2_majorversion == 3) {
+				//    Frame Header Flags
+				//    %abc00000 %ijk00000
+				$parsedFrame['flags']['TagAlterPreservation']  = (bool) ($parsedFrame['frame_flags_raw'] & 0x8000); // a - Tag alter preservation
+				$parsedFrame['flags']['FileAlterPreservation'] = (bool) ($parsedFrame['frame_flags_raw'] & 0x4000); // b - File alter preservation
+				$parsedFrame['flags']['ReadOnly']              = (bool) ($parsedFrame['frame_flags_raw'] & 0x2000); // c - Read only
+				$parsedFrame['flags']['compression']           = (bool) ($parsedFrame['frame_flags_raw'] & 0x0080); // i - Compression
+				$parsedFrame['flags']['Encryption']            = (bool) ($parsedFrame['frame_flags_raw'] & 0x0040); // j - Encryption
+				$parsedFrame['flags']['GroupingIdentity']      = (bool) ($parsedFrame['frame_flags_raw'] & 0x0020); // k - Grouping identity
+
+			} elseif ($id3v2_majorversion == 4) {
+				//    Frame Header Flags
+				//    %0abc0000 %0h00kmnp
+				$parsedFrame['flags']['TagAlterPreservation']  = (bool) ($parsedFrame['frame_flags_raw'] & 0x4000); // a - Tag alter preservation
+				$parsedFrame['flags']['FileAlterPreservation'] = (bool) ($parsedFrame['frame_flags_raw'] & 0x2000); // b - File alter preservation
+				$parsedFrame['flags']['ReadOnly']              = (bool) ($parsedFrame['frame_flags_raw'] & 0x1000); // c - Read only
+				$parsedFrame['flags']['GroupingIdentity']      = (bool) ($parsedFrame['frame_flags_raw'] & 0x0040); // h - Grouping identity
+				$parsedFrame['flags']['compression']           = (bool) ($parsedFrame['frame_flags_raw'] & 0x0008); // k - Compression
+				$parsedFrame['flags']['Encryption']            = (bool) ($parsedFrame['frame_flags_raw'] & 0x0004); // m - Encryption
+				$parsedFrame['flags']['Unsynchronisation']     = (bool) ($parsedFrame['frame_flags_raw'] & 0x0002); // n - Unsynchronisation
+				$parsedFrame['flags']['DataLengthIndicator']   = (bool) ($parsedFrame['frame_flags_raw'] & 0x0001); // p - Data length indicator
+
+				// Frame-level de-unsynchronisation - ID3v2.4
+				if ($parsedFrame['flags']['Unsynchronisation']) {
+					$parsedFrame['data'] = $this->DeUnsynchronise($parsedFrame['data']);
+				}
+
+				if ($parsedFrame['flags']['DataLengthIndicator']) {
+					$parsedFrame['data_length_indicator'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 0, 4), 1);
+					$parsedFrame['data']                  =                           substr($parsedFrame['data'], 4);
+				}
+			}
+
+			//    Frame-level de-compression
+			if ($parsedFrame['flags']['compression']) {
+				$parsedFrame['decompressed_size'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 0, 4));
+				if (!function_exists('gzuncompress')) {
+					$this->warning('gzuncompress() support required to decompress ID3v2 frame "'.$parsedFrame['frame_name'].'"');
+				} else {
+					if ($decompresseddata = @gzuncompress(substr($parsedFrame['data'], 4))) {
+					//if ($decompresseddata = @gzuncompress($parsedFrame['data'])) {
+						$parsedFrame['data'] = $decompresseddata;
+						unset($decompresseddata);
+					} else {
+						$this->warning('gzuncompress() failed on compressed contents of ID3v2 frame "'.$parsedFrame['frame_name'].'"');
+					}
+				}
+			}
+		}
+
+		if (!empty($parsedFrame['flags']['DataLengthIndicator'])) {
+			if ($parsedFrame['data_length_indicator'] != strlen($parsedFrame['data'])) {
+				$this->warning('ID3v2 frame "'.$parsedFrame['frame_name'].'" should be '.$parsedFrame['data_length_indicator'].' bytes long according to DataLengthIndicator, but found '.strlen($parsedFrame['data']).' bytes of data');
+			}
+		}
+
+		if (isset($parsedFrame['datalength']) && ($parsedFrame['datalength'] == 0)) {
+
+			$warning = 'Frame "'.$parsedFrame['frame_name'].'" at offset '.$parsedFrame['dataoffset'].' has no data portion';
+			switch ($parsedFrame['frame_name']) {
+				case 'WCOM':
+					$warning .= ' (this is known to happen with files tagged by RioPort)';
+					break;
+
+				default:
+					break;
+			}
+			$this->warning($warning);
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'UFID')) || // 4.1   UFID Unique file identifier
+			(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'UFI'))) {  // 4.1   UFI  Unique file identifier
+			//   There may be more than one 'UFID' frame in a tag,
+			//   but only one with the same 'Owner identifier'.
+			// <Header for 'Unique file identifier', ID: 'UFID'>
+			// Owner identifier        <text string> $00
+			// Identifier              <up to 64 bytes binary data>
+			$exploded = explode("\x00", $parsedFrame['data'], 2);
+			$parsedFrame['ownerid'] = (isset($exploded[0]) ? $exploded[0] : '');
+			$parsedFrame['data']    = (isset($exploded[1]) ? $exploded[1] : '');
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'TXXX')) || // 4.2.2 TXXX User defined text information frame
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'TXX'))) {    // 4.2.2 TXX  User defined text information frame
+			//   There may be more than one 'TXXX' frame in each tag,
+			//   but only one with the same description.
+			// <Header for 'User defined text information frame', ID: 'TXXX'>
+			// Text encoding     $xx
+			// Description       <text string according to encoding> $00 (00)
+			// Value             <text string according to encoding>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$parsedFrame['encodingid']  = $frame_textencoding;
+			$parsedFrame['encoding']    = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['description'] = trim(getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $frame_description));
+			$parsedFrame['data'] = substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator));
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				$commentkey = ($parsedFrame['description'] ? $parsedFrame['description'] : (isset($info['id3v2']['comments'][$parsedFrame['framenameshort']]) ? count($info['id3v2']['comments'][$parsedFrame['framenameshort']]) : 0));
+				if (!isset($info['id3v2']['comments'][$parsedFrame['framenameshort']]) || !array_key_exists($commentkey, $info['id3v2']['comments'][$parsedFrame['framenameshort']])) {
+					$info['id3v2']['comments'][$parsedFrame['framenameshort']][$commentkey] = trim(getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']));
+				} else {
+					$info['id3v2']['comments'][$parsedFrame['framenameshort']][]            = trim(getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']));
+				}
+			}
+			//unset($parsedFrame['data']); do not unset, may be needed elsewhere, e.g. for replaygain
+
+
+		} elseif ($parsedFrame['frame_name']{0} == 'T') { // 4.2. T??[?] Text information frame
+			//   There may only be one text information frame of its kind in an tag.
+			// <Header for 'Text information frame', ID: 'T000' - 'TZZZ',
+			// excluding 'TXXX' described in 4.2.6.>
+			// Text encoding                $xx
+			// Information                  <text string(s) according to encoding>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid tex
