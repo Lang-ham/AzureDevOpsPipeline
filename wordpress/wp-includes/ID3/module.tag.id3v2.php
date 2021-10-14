@@ -898,4 +898,193 @@ class getid3_id3v2 extends getid3_handler
 			//   Followed by a list of key events in the following format:
 			// Type of event   $xx
 			// Time stamp      $xx (xx ...)
-			//   The 'Time stamp' is set to zero if 
+			//   The 'Time stamp' is set to zero if directly at the beginning of the sound
+			//   or after the previous event. All events MUST be sorted in chronological order.
+
+			$frame_offset = 0;
+			$parsedFrame['timestampformat'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+
+			while ($frame_offset < strlen($parsedFrame['data'])) {
+				$parsedFrame['typeid']    = substr($parsedFrame['data'], $frame_offset++, 1);
+				$parsedFrame['type']      = $this->ETCOEventLookup($parsedFrame['typeid']);
+				$parsedFrame['timestamp'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 4));
+				$frame_offset += 4;
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'MLLT')) || // 4.6   MLLT MPEG location lookup table
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'MLL'))) {     // 4.7   MLL MPEG location lookup table
+			//   There may only be one 'MLLT' frame in each tag
+			// <Header for 'Location lookup table', ID: 'MLLT'>
+			// MPEG frames between reference  $xx xx
+			// Bytes between reference        $xx xx xx
+			// Milliseconds between reference $xx xx xx
+			// Bits for bytes deviation       $xx
+			// Bits for milliseconds dev.     $xx
+			//   Then for every reference the following data is included;
+			// Deviation in bytes         %xxx....
+			// Deviation in milliseconds  %xxx....
+
+			$frame_offset = 0;
+			$parsedFrame['framesbetweenreferences'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 0, 2));
+			$parsedFrame['bytesbetweenreferences']  = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 2, 3));
+			$parsedFrame['msbetweenreferences']     = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 5, 3));
+			$parsedFrame['bitsforbytesdeviation']   = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 8, 1));
+			$parsedFrame['bitsformsdeviation']      = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], 9, 1));
+			$parsedFrame['data'] = substr($parsedFrame['data'], 10);
+			while ($frame_offset < strlen($parsedFrame['data'])) {
+				$deviationbitstream .= getid3_lib::BigEndian2Bin(substr($parsedFrame['data'], $frame_offset++, 1));
+			}
+			$reference_counter = 0;
+			while (strlen($deviationbitstream) > 0) {
+				$parsedFrame[$reference_counter]['bytedeviation'] = bindec(substr($deviationbitstream, 0, $parsedFrame['bitsforbytesdeviation']));
+				$parsedFrame[$reference_counter]['msdeviation']   = bindec(substr($deviationbitstream, $parsedFrame['bitsforbytesdeviation'], $parsedFrame['bitsformsdeviation']));
+				$deviationbitstream = substr($deviationbitstream, $parsedFrame['bitsforbytesdeviation'] + $parsedFrame['bitsformsdeviation']);
+				$reference_counter++;
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'SYTC')) || // 4.7   SYTC Synchronised tempo codes
+				  (($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'STC'))) {  // 4.8   STC  Synchronised tempo codes
+			//   There may only be one 'SYTC' frame in each tag
+			// <Header for 'Synchronised tempo codes', ID: 'SYTC'>
+			// Time stamp format   $xx
+			// Tempo data          <binary data>
+			//   Where time stamp format is:
+			// $01  (32-bit value) MPEG frames from beginning of file
+			// $02  (32-bit value) milliseconds from beginning of file
+
+			$frame_offset = 0;
+			$parsedFrame['timestampformat'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$timestamp_counter = 0;
+			while ($frame_offset < strlen($parsedFrame['data'])) {
+				$parsedFrame[$timestamp_counter]['tempo'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+				if ($parsedFrame[$timestamp_counter]['tempo'] == 255) {
+					$parsedFrame[$timestamp_counter]['tempo'] += ord(substr($parsedFrame['data'], $frame_offset++, 1));
+				}
+				$parsedFrame[$timestamp_counter]['timestamp'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 4));
+				$frame_offset += 4;
+				$timestamp_counter++;
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'USLT')) || // 4.8   USLT Unsynchronised lyric/text transcription
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'ULT'))) {     // 4.9   ULT  Unsynchronised lyric/text transcription
+			//   There may be more than one 'Unsynchronised lyrics/text transcription' frame
+			//   in each tag, but only one with the same language and content descriptor.
+			// <Header for 'Unsynchronised lyrics/text transcription', ID: 'USLT'>
+			// Text encoding        $xx
+			// Language             $xx xx xx
+			// Content descriptor   <text string according to encoding> $00 (00)
+			// Lyrics/text          <full text string according to encoding>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+			$frame_language = substr($parsedFrame['data'], $frame_offset, 3);
+			$frame_offset += 3;
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$parsedFrame['data'] = substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator));
+
+			$parsedFrame['encodingid']   = $frame_textencoding;
+			$parsedFrame['encoding']     = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['language']     = $frame_language;
+			$parsedFrame['languagename'] = $this->LanguageLookup($frame_language, false);
+			$parsedFrame['description']  = $frame_description;
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']);
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'SYLT')) || // 4.9   SYLT Synchronised lyric/text
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'SLT'))) {     // 4.10  SLT  Synchronised lyric/text
+			//   There may be more than one 'SYLT' frame in each tag,
+			//   but only one with the same language and content descriptor.
+			// <Header for 'Synchronised lyrics/text', ID: 'SYLT'>
+			// Text encoding        $xx
+			// Language             $xx xx xx
+			// Time stamp format    $xx
+			//   $01  (32-bit value) MPEG frames from beginning of file
+			//   $02  (32-bit value) milliseconds from beginning of file
+			// Content type         $xx
+			// Content descriptor   <text string according to encoding> $00 (00)
+			//   Terminated text to be synced (typically a syllable)
+			//   Sync identifier (terminator to above string)   $00 (00)
+			//   Time stamp                                     $xx (xx ...)
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+			$frame_language = substr($parsedFrame['data'], $frame_offset, 3);
+			$frame_offset += 3;
+			$parsedFrame['timestampformat'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['contenttypeid']   = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['contenttype']     = $this->SYTLContentTypeLookup($parsedFrame['contenttypeid']);
+			$parsedFrame['encodingid']      = $frame_textencoding;
+			$parsedFrame['encoding']        = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['language']        = $frame_language;
+			$parsedFrame['languagename']    = $this->LanguageLookup($frame_language, false);
+
+			$timestampindex = 0;
+			$frame_remainingdata = substr($parsedFrame['data'], $frame_offset);
+			while (strlen($frame_remainingdata)) {
+				$frame_offset = 0;
+				$frame_terminatorpos = strpos($frame_remainingdata, $frame_textencoding_terminator);
+				if ($frame_terminatorpos === false) {
+					$frame_remainingdata = '';
+				} else {
+					if (ord(substr($frame_remainingdata, $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+						$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+					}
+					$parsedFrame['lyrics'][$timestampindex]['data'] = substr($frame_remainingdata, $frame_offset, $frame_terminatorpos - $frame_offset);
+
+					$frame_remainingdata = substr($frame_remainingdata, $frame_terminatorpos + strlen($frame_textencoding_terminator));
+					if (($timestampindex == 0) && (ord($frame_remainingdata{0}) != 0)) {
+						// timestamp probably omitted for first data item
+					} else {
+						$parsedFrame['lyrics'][$timestampindex]['timestamp'] = getid3_lib::BigEndian2Int(substr($frame_remainingdata, 0, 4));
+						$frame_remainingdata = substr($frame_remainingdata, 4);
+					}
+					$timestampindex++;
+				}
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'COMM')) || // 4.10  COMM Comments
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'COM'))) {     // 4.11  COM  Comments
+			//   There may be more than one comment frame in each tag,
+			//   but only one with the same language and content descriptor.
+			// <Header for 'Comment', ID: 'COMM'>
+			// Text encoding          $xx
+			// Language               $xx xx xx
+			// Short content descrip. <text string according to encoding> $00 (00)
+			// The actual text        <full text string according to encoding>
+
+			if (strlen($parsedFrame['data']) < 5) {
+
+				$this->warning('Invalid data (too short) for "'.$parsedFrame['frame_name'].'" frame at offset '.$parsedFrame['dataoffset']);
+
+			} 
