@@ -1257,4 +1257,208 @@ class getid3_id3v2 extends getid3_handler
 			unset($parsedFrame['data']);
 
 
-		} elseif (($id3v2_majorversion >= 4) && ($par
+		} elseif (($id3v2_majorversion >= 4) && ($parsedFrame['frame_name'] == 'EQU2')) { // 4.12  EQU2 Equalisation (2) (ID3v2.4+ only)
+			//   There may be more than one 'EQU2' frame in each tag,
+			//   but only one with the same identification string
+			// <Header of 'Equalisation (2)', ID: 'EQU2'>
+			// Interpolation method  $xx
+			//   $00  Band
+			//   $01  Linear
+			// Identification        <text string> $00
+			//   The following is then repeated for every adjustment point
+			// Frequency          $xx xx
+			// Volume adjustment  $xx xx
+
+			$frame_offset = 0;
+			$frame_interpolationmethod = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_idstring = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_idstring) === 0) {
+				$frame_idstring = '';
+			}
+			$parsedFrame['description'] = $frame_idstring;
+			$frame_remainingdata = substr($parsedFrame['data'], $frame_terminatorpos + strlen("\x00"));
+			while (strlen($frame_remainingdata)) {
+				$frame_frequency = getid3_lib::BigEndian2Int(substr($frame_remainingdata, 0, 2)) / 2;
+				$parsedFrame['data'][$frame_frequency] = getid3_lib::BigEndian2Int(substr($frame_remainingdata, 2, 2), false, true);
+				$frame_remainingdata = substr($frame_remainingdata, 4);
+			}
+			$parsedFrame['interpolationmethod'] = $frame_interpolationmethod;
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion == 3) && ($parsedFrame['frame_name'] == 'EQUA')) || // 4.12  EQUA Equalisation (ID3v2.3 only)
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'EQU'))) {     // 4.13  EQU  Equalisation (ID3v2.2 only)
+			//   There may only be one 'EQUA' frame in each tag
+			// <Header for 'Relative volume adjustment', ID: 'EQU'>
+			// Adjustment bits    $xx
+			//   This is followed by 2 bytes + ('adjustment bits' rounded up to the
+			//   nearest byte) for every equalisation band in the following format,
+			//   giving a frequency range of 0 - 32767Hz:
+			// Increment/decrement   %x (MSB of the Frequency)
+			// Frequency             (lower 15 bits)
+			// Adjustment            $xx (xx ...)
+
+			$frame_offset = 0;
+			$parsedFrame['adjustmentbits'] = substr($parsedFrame['data'], $frame_offset++, 1);
+			$frame_adjustmentbytes = ceil($parsedFrame['adjustmentbits'] / 8);
+
+			$frame_remainingdata = (string) substr($parsedFrame['data'], $frame_offset);
+			while (strlen($frame_remainingdata) > 0) {
+				$frame_frequencystr = getid3_lib::BigEndian2Bin(substr($frame_remainingdata, 0, 2));
+				$frame_incdec    = (bool) substr($frame_frequencystr, 0, 1);
+				$frame_frequency = bindec(substr($frame_frequencystr, 1, 15));
+				$parsedFrame[$frame_frequency]['incdec'] = $frame_incdec;
+				$parsedFrame[$frame_frequency]['adjustment'] = getid3_lib::BigEndian2Int(substr($frame_remainingdata, 2, $frame_adjustmentbytes));
+				if ($parsedFrame[$frame_frequency]['incdec'] === false) {
+					$parsedFrame[$frame_frequency]['adjustment'] *= -1;
+				}
+				$frame_remainingdata = substr($frame_remainingdata, 2 + $frame_adjustmentbytes);
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'RVRB')) || // 4.13  RVRB Reverb
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'REV'))) {     // 4.14  REV  Reverb
+			//   There may only be one 'RVRB' frame in each tag.
+			// <Header for 'Reverb', ID: 'RVRB'>
+			// Reverb left (ms)                 $xx xx
+			// Reverb right (ms)                $xx xx
+			// Reverb bounces, left             $xx
+			// Reverb bounces, right            $xx
+			// Reverb feedback, left to left    $xx
+			// Reverb feedback, left to right   $xx
+			// Reverb feedback, right to right  $xx
+			// Reverb feedback, right to left   $xx
+			// Premix left to right             $xx
+			// Premix right to left             $xx
+
+			$frame_offset = 0;
+			$parsedFrame['left']  = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 2));
+			$frame_offset += 2;
+			$parsedFrame['right'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 2));
+			$frame_offset += 2;
+			$parsedFrame['bouncesL']      = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['bouncesR']      = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['feedbackLL']    = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['feedbackLR']    = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['feedbackRR']    = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['feedbackRL']    = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['premixLR']      = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['premixRL']      = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'APIC')) || // 4.14  APIC Attached picture
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'PIC'))) {     // 4.15  PIC  Attached picture
+			//   There may be several pictures attached to one file,
+			//   each in their individual 'APIC' frame, but only one
+			//   with the same content descriptor
+			// <Header for 'Attached picture', ID: 'APIC'>
+			// Text encoding      $xx
+			// ID3v2.3+ => MIME type          <text string> $00
+			// ID3v2.2  => Image format       $xx xx xx
+			// Picture type       $xx
+			// Description        <text string according to encoding> $00 (00)
+			// Picture data       <binary data>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+
+			if ($id3v2_majorversion == 2 && strlen($parsedFrame['data']) > $frame_offset) {
+				$frame_imagetype = substr($parsedFrame['data'], $frame_offset, 3);
+				if (strtolower($frame_imagetype) == 'ima') {
+					// complete hack for mp3Rage (www.chaoticsoftware.com) that puts ID3v2.3-formatted
+					// MIME type instead of 3-char ID3v2.2-format image type  (thanks xbhoffØpacbell*net)
+					$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+					$frame_mimetype = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+					if (ord($frame_mimetype) === 0) {
+						$frame_mimetype = '';
+					}
+					$frame_imagetype = strtoupper(str_replace('image/', '', strtolower($frame_mimetype)));
+					if ($frame_imagetype == 'JPEG') {
+						$frame_imagetype = 'JPG';
+					}
+					$frame_offset = $frame_terminatorpos + strlen("\x00");
+				} else {
+					$frame_offset += 3;
+				}
+			}
+			if ($id3v2_majorversion > 2 && strlen($parsedFrame['data']) > $frame_offset) {
+				$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+				$frame_mimetype = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+				if (ord($frame_mimetype) === 0) {
+					$frame_mimetype = '';
+				}
+				$frame_offset = $frame_terminatorpos + strlen("\x00");
+			}
+
+			$frame_picturetype = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+
+			if ($frame_offset >= $parsedFrame['datalength']) {
+				$this->warning('data portion of APIC frame is missing at offset '.($parsedFrame['dataoffset'] + 8 + $frame_offset));
+			} else {
+				$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+				if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+					$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+				}
+				$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+				if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+					// if description only contains a BOM or terminator then make it blank
+					$frame_description = '';
+				}
+				$parsedFrame['encodingid']       = $frame_textencoding;
+				$parsedFrame['encoding']         = $this->TextEncodingNameLookup($frame_textencoding);
+
+				if ($id3v2_majorversion == 2) {
+					$parsedFrame['imagetype']    = $frame_imagetype;
+				} else {
+					$parsedFrame['mime']         = $frame_mimetype;
+				}
+				$parsedFrame['picturetypeid']    = $frame_picturetype;
+				$parsedFrame['picturetype']      = $this->APICPictureTypeLookup($frame_picturetype);
+				$parsedFrame['description']      = $frame_description;
+				$parsedFrame['data']             = substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator));
+				$parsedFrame['datalength']       = strlen($parsedFrame['data']);
+
+				$parsedFrame['image_mime'] = '';
+				$imageinfo = array();
+				if ($imagechunkcheck = getid3_lib::GetDataImageSize($parsedFrame['data'], $imageinfo)) {
+					if (($imagechunkcheck[2] >= 1) && ($imagechunkcheck[2] <= 3)) {
+						$parsedFrame['image_mime']       = 'image/'.getid3_lib::ImageTypesLookup($imagechunkcheck[2]);
+						if ($imagechunkcheck[0]) {
+							$parsedFrame['image_width']  = $imagechunkcheck[0];
+						}
+						if ($imagechunkcheck[1]) {
+							$parsedFrame['image_height'] = $imagechunkcheck[1];
+						}
+					}
+				}
+
+				do {
+					if ($this->getid3->option_save_attachments === false) {
+						// skip entirely
+						unset($parsedFrame['data']);
+						break;
+					}
+					if ($this->getid3->option_save_attachments === true) {
+						// great
+/*
+					} elseif (is_int($this->getid3->option_save_attachments)) {
+						if ($this->getid3->option_save_attachments < $parsedFrame['data_length']) {
+							// too big, skip
+							$this->warning('attachment at '.$frame_offset.' is too large to process inline ('.number_format($parsedFrame['data_length']).' bytes)');
+							unset($parsedFrame['data']);
+							break;
+						}
+*/
+					} elseif (is_string($this->getid3->option_save_attachments)) {
+						$dir = rtrim(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $this->getid3->option_save_attachments), DIRECTORY_SEPARATOR);
+						if (!is_dir($dir) || !getID3::is_writable($dir)) {
+							// cannot write, skip
+							$this->warning('attachment at '.$frame_offset.' cannot be save
