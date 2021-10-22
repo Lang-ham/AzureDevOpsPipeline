@@ -1087,4 +1087,174 @@ class getid3_id3v2 extends getid3_handler
 
 				$this->warning('Invalid data (too short) for "'.$parsedFrame['frame_name'].'" frame at offset '.$parsedFrame['dataoffset']);
 
-			} 
+			} else {
+
+				$frame_offset = 0;
+				$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+				$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+				if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+					$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+					$frame_textencoding_terminator = "\x00";
+				}
+				$frame_language = substr($parsedFrame['data'], $frame_offset, 3);
+				$frame_offset += 3;
+				$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+				if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+					$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+				}
+				$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+				if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+					// if description only contains a BOM or terminator then make it blank
+					$frame_description = '';
+				}
+				$frame_text = (string) substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator));
+
+				$parsedFrame['encodingid']   = $frame_textencoding;
+				$parsedFrame['encoding']     = $this->TextEncodingNameLookup($frame_textencoding);
+
+				$parsedFrame['language']     = $frame_language;
+				$parsedFrame['languagename'] = $this->LanguageLookup($frame_language, false);
+				$parsedFrame['description']  = $frame_description;
+				$parsedFrame['data']         = $frame_text;
+				if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+					$commentkey = ($parsedFrame['description'] ? $parsedFrame['description'] : (!empty($info['id3v2']['comments'][$parsedFrame['framenameshort']]) ? count($info['id3v2']['comments'][$parsedFrame['framenameshort']]) : 0));
+					if (!isset($info['id3v2']['comments'][$parsedFrame['framenameshort']]) || !array_key_exists($commentkey, $info['id3v2']['comments'][$parsedFrame['framenameshort']])) {
+						$info['id3v2']['comments'][$parsedFrame['framenameshort']][$commentkey] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']);
+					} else {
+						$info['id3v2']['comments'][$parsedFrame['framenameshort']][]            = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']);
+					}
+				}
+
+			}
+
+		} elseif (($id3v2_majorversion >= 4) && ($parsedFrame['frame_name'] == 'RVA2')) { // 4.11  RVA2 Relative volume adjustment (2) (ID3v2.4+ only)
+			//   There may be more than one 'RVA2' frame in each tag,
+			//   but only one with the same identification string
+			// <Header for 'Relative volume adjustment (2)', ID: 'RVA2'>
+			// Identification          <text string> $00
+			//   The 'identification' string is used to identify the situation and/or
+			//   device where this adjustment should apply. The following is then
+			//   repeated for every channel:
+			// Type of channel         $xx
+			// Volume adjustment       $xx xx
+			// Bits representing peak  $xx
+			// Peak volume             $xx (xx ...)
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00");
+			$frame_idstring = substr($parsedFrame['data'], 0, $frame_terminatorpos);
+			if (ord($frame_idstring) === 0) {
+				$frame_idstring = '';
+			}
+			$frame_remainingdata = substr($parsedFrame['data'], $frame_terminatorpos + strlen("\x00"));
+			$parsedFrame['description'] = $frame_idstring;
+			$RVA2channelcounter = 0;
+			while (strlen($frame_remainingdata) >= 5) {
+				$frame_offset = 0;
+				$frame_channeltypeid = ord(substr($frame_remainingdata, $frame_offset++, 1));
+				$parsedFrame[$RVA2channelcounter]['channeltypeid']  = $frame_channeltypeid;
+				$parsedFrame[$RVA2channelcounter]['channeltype']    = $this->RVA2ChannelTypeLookup($frame_channeltypeid);
+				$parsedFrame[$RVA2channelcounter]['volumeadjust']   = getid3_lib::BigEndian2Int(substr($frame_remainingdata, $frame_offset, 2), false, true); // 16-bit signed
+				$frame_offset += 2;
+				$parsedFrame[$RVA2channelcounter]['bitspeakvolume'] = ord(substr($frame_remainingdata, $frame_offset++, 1));
+				if (($parsedFrame[$RVA2channelcounter]['bitspeakvolume'] < 1) || ($parsedFrame[$RVA2channelcounter]['bitspeakvolume'] > 4)) {
+					$this->warning('ID3v2::RVA2 frame['.$RVA2channelcounter.'] contains invalid '.$parsedFrame[$RVA2channelcounter]['bitspeakvolume'].'-byte bits-representing-peak value');
+					break;
+				}
+				$frame_bytespeakvolume = ceil($parsedFrame[$RVA2channelcounter]['bitspeakvolume'] / 8);
+				$parsedFrame[$RVA2channelcounter]['peakvolume']     = getid3_lib::BigEndian2Int(substr($frame_remainingdata, $frame_offset, $frame_bytespeakvolume));
+				$frame_remainingdata = substr($frame_remainingdata, $frame_offset + $frame_bytespeakvolume);
+				$RVA2channelcounter++;
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion == 3) && ($parsedFrame['frame_name'] == 'RVAD')) || // 4.12  RVAD Relative volume adjustment (ID3v2.3 only)
+				  (($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'RVA'))) {  // 4.12  RVA  Relative volume adjustment (ID3v2.2 only)
+			//   There may only be one 'RVA' frame in each tag
+			// <Header for 'Relative volume adjustment', ID: 'RVA'>
+			// ID3v2.2 => Increment/decrement     %000000ba
+			// ID3v2.3 => Increment/decrement     %00fedcba
+			// Bits used for volume descr.        $xx
+			// Relative volume change, right      $xx xx (xx ...) // a
+			// Relative volume change, left       $xx xx (xx ...) // b
+			// Peak volume right                  $xx xx (xx ...)
+			// Peak volume left                   $xx xx (xx ...)
+			//   ID3v2.3 only, optional (not present in ID3v2.2):
+			// Relative volume change, right back $xx xx (xx ...) // c
+			// Relative volume change, left back  $xx xx (xx ...) // d
+			// Peak volume right back             $xx xx (xx ...)
+			// Peak volume left back              $xx xx (xx ...)
+			//   ID3v2.3 only, optional (not present in ID3v2.2):
+			// Relative volume change, center     $xx xx (xx ...) // e
+			// Peak volume center                 $xx xx (xx ...)
+			//   ID3v2.3 only, optional (not present in ID3v2.2):
+			// Relative volume change, bass       $xx xx (xx ...) // f
+			// Peak volume bass                   $xx xx (xx ...)
+
+			$frame_offset = 0;
+			$frame_incrdecrflags = getid3_lib::BigEndian2Bin(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['incdec']['right'] = (bool) substr($frame_incrdecrflags, 6, 1);
+			$parsedFrame['incdec']['left']  = (bool) substr($frame_incrdecrflags, 7, 1);
+			$parsedFrame['bitsvolume'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_bytesvolume = ceil($parsedFrame['bitsvolume'] / 8);
+			$parsedFrame['volumechange']['right'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+			if ($parsedFrame['incdec']['right'] === false) {
+				$parsedFrame['volumechange']['right'] *= -1;
+			}
+			$frame_offset += $frame_bytesvolume;
+			$parsedFrame['volumechange']['left'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+			if ($parsedFrame['incdec']['left'] === false) {
+				$parsedFrame['volumechange']['left'] *= -1;
+			}
+			$frame_offset += $frame_bytesvolume;
+			$parsedFrame['peakvolume']['right'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+			$frame_offset += $frame_bytesvolume;
+			$parsedFrame['peakvolume']['left']  = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+			$frame_offset += $frame_bytesvolume;
+			if ($id3v2_majorversion == 3) {
+				$parsedFrame['data'] = substr($parsedFrame['data'], $frame_offset);
+				if (strlen($parsedFrame['data']) > 0) {
+					$parsedFrame['incdec']['rightrear'] = (bool) substr($frame_incrdecrflags, 4, 1);
+					$parsedFrame['incdec']['leftrear']  = (bool) substr($frame_incrdecrflags, 5, 1);
+					$parsedFrame['volumechange']['rightrear'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					if ($parsedFrame['incdec']['rightrear'] === false) {
+						$parsedFrame['volumechange']['rightrear'] *= -1;
+					}
+					$frame_offset += $frame_bytesvolume;
+					$parsedFrame['volumechange']['leftrear'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					if ($parsedFrame['incdec']['leftrear'] === false) {
+						$parsedFrame['volumechange']['leftrear'] *= -1;
+					}
+					$frame_offset += $frame_bytesvolume;
+					$parsedFrame['peakvolume']['rightrear'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					$frame_offset += $frame_bytesvolume;
+					$parsedFrame['peakvolume']['leftrear']  = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					$frame_offset += $frame_bytesvolume;
+				}
+				$parsedFrame['data'] = substr($parsedFrame['data'], $frame_offset);
+				if (strlen($parsedFrame['data']) > 0) {
+					$parsedFrame['incdec']['center'] = (bool) substr($frame_incrdecrflags, 3, 1);
+					$parsedFrame['volumechange']['center'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					if ($parsedFrame['incdec']['center'] === false) {
+						$parsedFrame['volumechange']['center'] *= -1;
+					}
+					$frame_offset += $frame_bytesvolume;
+					$parsedFrame['peakvolume']['center'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					$frame_offset += $frame_bytesvolume;
+				}
+				$parsedFrame['data'] = substr($parsedFrame['data'], $frame_offset);
+				if (strlen($parsedFrame['data']) > 0) {
+					$parsedFrame['incdec']['bass'] = (bool) substr($frame_incrdecrflags, 2, 1);
+					$parsedFrame['volumechange']['bass'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					if ($parsedFrame['incdec']['bass'] === false) {
+						$parsedFrame['volumechange']['bass'] *= -1;
+					}
+					$frame_offset += $frame_bytesvolume;
+					$parsedFrame['peakvolume']['bass'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, $frame_bytesvolume));
+					$frame_offset += $frame_bytesvolume;
+				}
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 4) && ($par
