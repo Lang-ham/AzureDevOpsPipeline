@@ -1461,4 +1461,209 @@ class getid3_id3v2 extends getid3_handler
 						$dir = rtrim(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $this->getid3->option_save_attachments), DIRECTORY_SEPARATOR);
 						if (!is_dir($dir) || !getID3::is_writable($dir)) {
 							// cannot write, skip
-							$this->warning('attachment at '.$frame_offset.' cannot be save
+							$this->warning('attachment at '.$frame_offset.' cannot be saved to "'.$dir.'" (not writable)');
+							unset($parsedFrame['data']);
+							break;
+						}
+					}
+					// if we get this far, must be OK
+					if (is_string($this->getid3->option_save_attachments)) {
+						$destination_filename = $dir.DIRECTORY_SEPARATOR.md5($info['filenamepath']).'_'.$frame_offset;
+						if (!file_exists($destination_filename) || getID3::is_writable($destination_filename)) {
+							file_put_contents($destination_filename, $parsedFrame['data']);
+						} else {
+							$this->warning('attachment at '.$frame_offset.' cannot be saved to "'.$destination_filename.'" (not writable)');
+						}
+						$parsedFrame['data_filename'] = $destination_filename;
+						unset($parsedFrame['data']);
+					} else {
+						if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+							if (!isset($info['id3v2']['comments']['picture'])) {
+								$info['id3v2']['comments']['picture'] = array();
+							}
+							$comments_picture_data = array();
+							foreach (array('data', 'image_mime', 'image_width', 'image_height', 'imagetype', 'picturetype', 'description', 'datalength') as $picture_key) {
+								if (isset($parsedFrame[$picture_key])) {
+									$comments_picture_data[$picture_key] = $parsedFrame[$picture_key];
+								}
+							}
+							$info['id3v2']['comments']['picture'][] = $comments_picture_data;
+							unset($comments_picture_data);
+						}
+					}
+				} while (false);
+			}
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'GEOB')) || // 4.15  GEOB General encapsulated object
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'GEO'))) {     // 4.16  GEO  General encapsulated object
+			//   There may be more than one 'GEOB' frame in each tag,
+			//   but only one with the same content descriptor
+			// <Header for 'General encapsulated object', ID: 'GEOB'>
+			// Text encoding          $xx
+			// MIME type              <text string> $00
+			// Filename               <text string according to encoding> $00 (00)
+			// Content description    <text string according to encoding> $00 (00)
+			// Encapsulated object    <binary data>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_mimetype = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_mimetype) === 0) {
+				$frame_mimetype = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_filename = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_filename) === 0) {
+				$frame_filename = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen($frame_textencoding_terminator);
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen($frame_textencoding_terminator);
+
+			$parsedFrame['objectdata']  = (string) substr($parsedFrame['data'], $frame_offset);
+			$parsedFrame['encodingid']  = $frame_textencoding;
+			$parsedFrame['encoding']    = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['mime']        = $frame_mimetype;
+			$parsedFrame['filename']    = $frame_filename;
+			$parsedFrame['description'] = $frame_description;
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'PCNT')) || // 4.16  PCNT Play counter
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'CNT'))) {     // 4.17  CNT  Play counter
+			//   There may only be one 'PCNT' frame in each tag.
+			//   When the counter reaches all one's, one byte is inserted in
+			//   front of the counter thus making the counter eight bits bigger
+			// <Header for 'Play counter', ID: 'PCNT'>
+			// Counter        $xx xx xx xx (xx ...)
+
+			$parsedFrame['data']          = getid3_lib::BigEndian2Int($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'POPM')) || // 4.17  POPM Popularimeter
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'POP'))) {    // 4.18  POP  Popularimeter
+			//   There may be more than one 'POPM' frame in each tag,
+			//   but only one with the same email address
+			// <Header for 'Popularimeter', ID: 'POPM'>
+			// Email to user   <text string> $00
+			// Rating          $xx
+			// Counter         $xx xx xx xx (xx ...)
+
+			$frame_offset = 0;
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_emailaddress = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_emailaddress) === 0) {
+				$frame_emailaddress = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+			$frame_rating = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['counter'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset));
+			$parsedFrame['email']   = $frame_emailaddress;
+			$parsedFrame['rating']  = $frame_rating;
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'RBUF')) || // 4.18  RBUF Recommended buffer size
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'BUF'))) {     // 4.19  BUF  Recommended buffer size
+			//   There may only be one 'RBUF' frame in each tag
+			// <Header for 'Recommended buffer size', ID: 'RBUF'>
+			// Buffer size               $xx xx xx
+			// Embedded info flag        %0000000x
+			// Offset to next tag        $xx xx xx xx
+
+			$frame_offset = 0;
+			$parsedFrame['buffersize'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 3));
+			$frame_offset += 3;
+
+			$frame_embeddedinfoflags = getid3_lib::BigEndian2Bin(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['flags']['embededinfo'] = (bool) substr($frame_embeddedinfoflags, 7, 1);
+			$parsedFrame['nexttagoffset'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 4));
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'CRM')) { // 4.20  Encrypted meta frame (ID3v2.2 only)
+			//   There may be more than one 'CRM' frame in a tag,
+			//   but only one with the same 'owner identifier'
+			// <Header for 'Encrypted meta frame', ID: 'CRM'>
+			// Owner identifier      <textstring> $00 (00)
+			// Content/explanation   <textstring> $00 (00)
+			// Encrypted datablock   <binary data>
+
+			$frame_offset = 0;
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_ownerid = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$parsedFrame['ownerid']     = $frame_ownerid;
+			$parsedFrame['data']        = (string) substr($parsedFrame['data'], $frame_offset);
+			$parsedFrame['description'] = $frame_description;
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'AENC')) || // 4.19  AENC Audio encryption
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'CRA'))) {     // 4.21  CRA  Audio encryption
+			//   There may be more than one 'AENC' frames in a tag,
+			//   but only one with the same 'Owner identifier'
+			// <Header for 'Audio encryption', ID: 'AENC'>
+			// Owner identifier   <text string> $00
+			// Preview start      $xx xx
+			// Preview length     $xx xx
+			// Encryption info    <binary data>
+
+			$frame_offset = 0;
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_ownerid = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_ownerid) === 0) {
+				$frame_ownerid = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+			$parsedFrame['ownerid'] = $frame_ownerid;
+			$parsedFrame['previewstart'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 2));
+			$frame_offset += 2;
+			$parsedFrame['previewlength'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 2));
+			$frame_offset += 2;
+			$parsedFrame['encryptioninfo'] = (string) substr($parsedFrame['data'], $frame_offset);
+			unset($parsedFrame['data']);
+
+
+		} elseif ((($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'LINK')) || // 4.20  LINK Linked information
+				(($id3v2_majorversion == 2) && ($parsedFrame['frame_name'] == 'LNK'))) {    // 4.22  LNK  Linked information
+			//   There may be more than one 'LINK' frame in a tag,
+			//   but only one with the same contents
+			// <Header for 'Linked information', ID: 'LINK'>
+			// ID3v2.3+ => Frame identifier   $xx xx xx xx
+			// ID3v2.2  => Frame identifier   $xx xx xx
+			// URL                            <text string> $00
+			// ID and additional data         <text string(s)>
+
+			$frame_offset = 0;
+		
