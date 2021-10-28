@@ -1666,4 +1666,209 @@ class getid3_id3v2 extends getid3_handler
 			// ID and additional data         <text string(s)>
 
 			$frame_offset = 0;
-		
+			if ($id3v2_majorversion == 2) {
+				$parsedFrame['frameid'] = substr($parsedFrame['data'], $frame_offset, 3);
+				$frame_offset += 3;
+			} else {
+				$parsedFrame['frameid'] = substr($parsedFrame['data'], $frame_offset, 4);
+				$frame_offset += 4;
+			}
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_url = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_url) === 0) {
+				$frame_url = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+			$parsedFrame['url'] = $frame_url;
+
+			$parsedFrame['additionaldata'] = (string) substr($parsedFrame['data'], $frame_offset);
+			if (!empty($parsedFrame['framenameshort']) && $parsedFrame['url']) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = getid3_lib::iconv_fallback_iso88591_utf8($parsedFrame['url']);
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'POSS')) { // 4.21  POSS Position synchronisation frame (ID3v2.3+ only)
+			//   There may only be one 'POSS' frame in each tag
+			// <Head for 'Position synchronisation', ID: 'POSS'>
+			// Time stamp format         $xx
+			// Position                  $xx (xx ...)
+
+			$frame_offset = 0;
+			$parsedFrame['timestampformat'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['position']        = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset));
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'USER')) { // 4.22  USER Terms of use (ID3v2.3+ only)
+			//   There may be more than one 'Terms of use' frame in a tag,
+			//   but only one with the same 'Language'
+			// <Header for 'Terms of use frame', ID: 'USER'>
+			// Text encoding        $xx
+			// Language             $xx xx xx
+			// The actual text      <text string according to encoding>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+			}
+			$frame_language = substr($parsedFrame['data'], $frame_offset, 3);
+			$frame_offset += 3;
+			$parsedFrame['language']     = $frame_language;
+			$parsedFrame['languagename'] = $this->LanguageLookup($frame_language, false);
+			$parsedFrame['encodingid']   = $frame_textencoding;
+			$parsedFrame['encoding']     = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['data']         = (string) substr($parsedFrame['data'], $frame_offset);
+			if (!empty($parsedFrame['framenameshort']) && !empty($parsedFrame['data'])) {
+				$info['id3v2']['comments'][$parsedFrame['framenameshort']][] = getid3_lib::iconv_fallback($parsedFrame['encoding'], $info['id3v2']['encoding'], $parsedFrame['data']);
+			}
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'OWNE')) { // 4.23  OWNE Ownership frame (ID3v2.3+ only)
+			//   There may only be one 'OWNE' frame in a tag
+			// <Header for 'Ownership frame', ID: 'OWNE'>
+			// Text encoding     $xx
+			// Price paid        <text string> $00
+			// Date of purch.    <text string>
+			// Seller            <text string according to encoding>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+			}
+			$parsedFrame['encodingid'] = $frame_textencoding;
+			$parsedFrame['encoding']   = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_pricepaid = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$parsedFrame['pricepaid']['currencyid'] = substr($frame_pricepaid, 0, 3);
+			$parsedFrame['pricepaid']['currency']   = $this->LookupCurrencyUnits($parsedFrame['pricepaid']['currencyid']);
+			$parsedFrame['pricepaid']['value']      = substr($frame_pricepaid, 3);
+
+			$parsedFrame['purchasedate'] = substr($parsedFrame['data'], $frame_offset, 8);
+			if ($this->IsValidDateStampString($parsedFrame['purchasedate'])) {
+				$parsedFrame['purchasedateunix'] = mktime (0, 0, 0, substr($parsedFrame['purchasedate'], 4, 2), substr($parsedFrame['purchasedate'], 6, 2), substr($parsedFrame['purchasedate'], 0, 4));
+			}
+			$frame_offset += 8;
+
+			$parsedFrame['seller'] = (string) substr($parsedFrame['data'], $frame_offset);
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'COMR')) { // 4.24  COMR Commercial frame (ID3v2.3+ only)
+			//   There may be more than one 'commercial frame' in a tag,
+			//   but no two may be identical
+			// <Header for 'Commercial frame', ID: 'COMR'>
+			// Text encoding      $xx
+			// Price string       <text string> $00
+			// Valid until        <text string>
+			// Contact URL        <text string> $00
+			// Received as        $xx
+			// Name of seller     <text string according to encoding> $00 (00)
+			// Description        <text string according to encoding> $00 (00)
+			// Picture MIME type  <string> $00
+			// Seller logo        <binary data>
+
+			$frame_offset = 0;
+			$frame_textencoding = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$frame_textencoding_terminator = $this->TextEncodingTerminatorLookup($frame_textencoding);
+			if ((($id3v2_majorversion <= 3) && ($frame_textencoding > 1)) || (($id3v2_majorversion == 4) && ($frame_textencoding > 3))) {
+				$this->warning('Invalid text encoding byte ('.$frame_textencoding.') in frame "'.$parsedFrame['frame_name'].'" - defaulting to ISO-8859-1 encoding');
+				$frame_textencoding_terminator = "\x00";
+			}
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_pricestring = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+			$frame_rawpricearray = explode('/', $frame_pricestring);
+			foreach ($frame_rawpricearray as $key => $val) {
+				$frame_currencyid = substr($val, 0, 3);
+				$parsedFrame['price'][$frame_currencyid]['currency'] = $this->LookupCurrencyUnits($frame_currencyid);
+				$parsedFrame['price'][$frame_currencyid]['value']    = substr($val, 3);
+			}
+
+			$frame_datestring = substr($parsedFrame['data'], $frame_offset, 8);
+			$frame_offset += 8;
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_contacturl = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$frame_receivedasid = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_sellername = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_sellername) === 0) {
+				$frame_sellername = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen($frame_textencoding_terminator);
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], $frame_textencoding_terminator, $frame_offset);
+			if (ord(substr($parsedFrame['data'], $frame_terminatorpos + strlen($frame_textencoding_terminator), 1)) === 0) {
+				$frame_terminatorpos++; // strpos() fooled because 2nd byte of Unicode chars are often 0x00
+			}
+			$frame_description = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (in_array($frame_description, array("\x00", "\x00\x00", "\xFF\xFE", "\xFE\xFF"))) {
+				// if description only contains a BOM or terminator then make it blank
+				$frame_description = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen($frame_textencoding_terminator);
+
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_mimetype = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$frame_sellerlogo = substr($parsedFrame['data'], $frame_offset);
+
+			$parsedFrame['encodingid']        = $frame_textencoding;
+			$parsedFrame['encoding']          = $this->TextEncodingNameLookup($frame_textencoding);
+
+			$parsedFrame['pricevaliduntil']   = $frame_datestring;
+			$parsedFrame['contacturl']        = $frame_contacturl;
+			$parsedFrame['receivedasid']      = $frame_receivedasid;
+			$parsedFrame['receivedas']        = $this->COMRReceivedAsLookup($frame_receivedasid);
+			$parsedFrame['sellername']        = $frame_sellername;
+			$parsedFrame['description']       = $frame_description;
+			$parsedFrame['mime']              = $frame_mimetype;
+			$parsedFrame['logo']              = $frame_sellerlogo;
+			unset($parsedFrame['data']);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'ENCR')) { // 4.25  ENCR Encryption method registration (ID3v2.3+ only)
+			//   There may be several 'ENCR' frames in a tag,
+			//   but only one containing the same symbol
+			//   and only one containing the same owner identifier
+			// <Header for 'Encryption method registration', ID: 'ENCR'>
+			// Owner identifier    <text string> $00
+			// Method symbol       $xx
+			// Encryption data     <binary data>
+
+			$frame_offset = 0;
+			$frame_terminatorpos = strpos($parsedFrame['data'], "\x00", $frame_offset);
+			$frame_ownerid = substr($parsedFrame['data'], $frame_offset, $frame_terminatorpos - $frame_offset);
+			if (ord($frame_ownerid) === 0) {
+				$frame_ownerid = '';
+			}
+			$frame_offset = $frame_terminatorpos + strlen("\x00");
+
+			$parsedFrame['ownerid']      = $frame_ownerid;
+			$parsedFrame['methodsymbol'] = ord(substr($parsedFrame['data'], $frame_offset++, 1));
+			$parsedFrame['data']         = (string) substr($parsedFrame['data'], $frame_offset);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'GRID')) { // 4.26  GRID Group identification registration (ID3v2.3+ only)
+
+			//   There may be several 'GRID' frames in a tag,
+			//   but only one containing the same symbol
+			//   and only one containing the same owner identifier
+			
