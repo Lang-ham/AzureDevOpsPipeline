@@ -2068,4 +2068,405 @@ class getid3_id3v2 extends getid3_handler
 					if (($subframe['name'] == 'TIT2') || ($subframe['name'] == 'TIT3')) {
 						if ($subframe['name'] == 'TIT2') {
 							$parsedFrame['chapter_name']        = $encoding_converted_text;
-						} elseif ($subframe['n
+						} elseif ($subframe['name'] == 'TIT3') {
+							$parsedFrame['chapter_description'] = $encoding_converted_text;
+						}
+						$parsedFrame['subframes'][] = $subframe;
+					} else {
+						$this->warning('ID3v2.CHAP subframe "'.$subframe['name'].'" not handled (only TIT2 and TIT3)');
+					}
+				}
+				unset($subframe_rawdata, $subframe, $encoding_converted_text);
+			}
+
+			$id3v2_chapter_entry = array();
+			foreach (array('id', 'time_begin', 'time_end', 'offset_begin', 'offset_end', 'chapter_name', 'chapter_description') as $id3v2_chapter_key) {
+				if (isset($parsedFrame[$id3v2_chapter_key])) {
+					$id3v2_chapter_entry[$id3v2_chapter_key] = $parsedFrame[$id3v2_chapter_key];
+				}
+			}
+			if (!isset($info['id3v2']['chapters'])) {
+				$info['id3v2']['chapters'] = array();
+			}
+			$info['id3v2']['chapters'][] = $id3v2_chapter_entry;
+			unset($id3v2_chapter_entry, $id3v2_chapter_key);
+
+
+		} elseif (($id3v2_majorversion >= 3) && ($parsedFrame['frame_name'] == 'CTOC')) { // CTOC Chapters Table Of Contents frame (ID3v2.3+ only)
+			// http://id3.org/id3v2-chapters-1.0
+			// <ID3v2.3 or ID3v2.4 frame header, ID: "CTOC">           (10 bytes)
+			// Element ID      <text string> $00
+			// CTOC flags        %xx
+			// Entry count       $xx
+			// Child Element ID  <string>$00   /* zero or more child CHAP or CTOC entries */
+            // <Optional embedded sub-frames>
+
+			$frame_offset = 0;
+			@list($parsedFrame['element_id']) = explode("\x00", $parsedFrame['data'], 2);
+			$frame_offset += strlen($parsedFrame['element_id']."\x00");
+			$ctoc_flags_raw = ord(substr($parsedFrame['data'], $frame_offset, 1));
+			$frame_offset += 1;
+			$parsedFrame['entry_count'] = ord(substr($parsedFrame['data'], $frame_offset, 1));
+			$frame_offset += 1;
+
+			$terminator_position = null;
+			for ($i = 0; $i < $parsedFrame['entry_count']; $i++) {
+				$terminator_position = strpos($parsedFrame['data'], "\x00", $frame_offset);
+				$parsedFrame['child_element_ids'][$i] = substr($parsedFrame['data'], $frame_offset, $terminator_position - $frame_offset);
+				$frame_offset = $terminator_position + 1;
+			}
+
+			$parsedFrame['ctoc_flags']['ordered']   = (bool) ($ctoc_flags_raw & 0x01);
+			$parsedFrame['ctoc_flags']['top_level'] = (bool) ($ctoc_flags_raw & 0x03);
+
+			unset($ctoc_flags_raw, $terminator_position);
+
+			if ($frame_offset < strlen($parsedFrame['data'])) {
+				$parsedFrame['subframes'] = array();
+				while ($frame_offset < strlen($parsedFrame['data'])) {
+					// <Optional embedded sub-frames>
+					$subframe = array();
+					$subframe['name']      =                           substr($parsedFrame['data'], $frame_offset, 4);
+					$frame_offset += 4;
+					$subframe['size']      = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 4));
+					$frame_offset += 4;
+					$subframe['flags_raw'] = getid3_lib::BigEndian2Int(substr($parsedFrame['data'], $frame_offset, 2));
+					$frame_offset += 2;
+					if ($subframe['size'] > (strlen($parsedFrame['data']) - $frame_offset)) {
+						$this->warning('CTOS subframe "'.$subframe['name'].'" at frame offset '.$frame_offset.' claims to be "'.$subframe['size'].'" bytes, which is more than the available data ('.(strlen($parsedFrame['data']) - $frame_offset).' bytes)');
+						break;
+					}
+					$subframe_rawdata = substr($parsedFrame['data'], $frame_offset, $subframe['size']);
+					$frame_offset += $subframe['size'];
+
+					$subframe['encodingid'] = ord(substr($subframe_rawdata, 0, 1));
+					$subframe['text']       =     substr($subframe_rawdata, 1);
+					$subframe['encoding']   = $this->TextEncodingNameLookup($subframe['encodingid']);
+					$encoding_converted_text = trim(getid3_lib::iconv_fallback($subframe['encoding'], $info['encoding'], $subframe['text']));;
+					switch (substr($encoding_converted_text, 0, 2)) {
+						case "\xFF\xFE":
+						case "\xFE\xFF":
+							switch (strtoupper($info['id3v2']['encoding'])) {
+								case 'ISO-8859-1':
+								case 'UTF-8':
+									$encoding_converted_text = substr($encoding_converted_text, 2);
+									// remove unwanted byte-order-marks
+									break;
+								default:
+									// ignore
+									break;
+							}
+							break;
+						default:
+							// do not remove BOM
+							break;
+					}
+
+					if (($subframe['name'] == 'TIT2') || ($subframe['name'] == 'TIT3')) {
+						if ($subframe['name'] == 'TIT2') {
+							$parsedFrame['toc_name']        = $encoding_converted_text;
+						} elseif ($subframe['name'] == 'TIT3') {
+							$parsedFrame['toc_description'] = $encoding_converted_text;
+						}
+						$parsedFrame['subframes'][] = $subframe;
+					} else {
+						$this->warning('ID3v2.CTOC subframe "'.$subframe['name'].'" not handled (only TIT2 and TIT3)');
+					}
+				}
+				unset($subframe_rawdata, $subframe, $encoding_converted_text);
+			}
+
+		}
+
+		return true;
+	}
+
+
+	public function DeUnsynchronise($data) {
+		return str_replace("\xFF\x00", "\xFF", $data);
+	}
+
+	public function LookupExtendedHeaderRestrictionsTagSizeLimits($index) {
+		static $LookupExtendedHeaderRestrictionsTagSizeLimits = array(
+			0x00 => 'No more than 128 frames and 1 MB total tag size',
+			0x01 => 'No more than 64 frames and 128 KB total tag size',
+			0x02 => 'No more than 32 frames and 40 KB total tag size',
+			0x03 => 'No more than 32 frames and 4 KB total tag size',
+		);
+		return (isset($LookupExtendedHeaderRestrictionsTagSizeLimits[$index]) ? $LookupExtendedHeaderRestrictionsTagSizeLimits[$index] : '');
+	}
+
+	public function LookupExtendedHeaderRestrictionsTextEncodings($index) {
+		static $LookupExtendedHeaderRestrictionsTextEncodings = array(
+			0x00 => 'No restrictions',
+			0x01 => 'Strings are only encoded with ISO-8859-1 or UTF-8',
+		);
+		return (isset($LookupExtendedHeaderRestrictionsTextEncodings[$index]) ? $LookupExtendedHeaderRestrictionsTextEncodings[$index] : '');
+	}
+
+	public function LookupExtendedHeaderRestrictionsTextFieldSize($index) {
+		static $LookupExtendedHeaderRestrictionsTextFieldSize = array(
+			0x00 => 'No restrictions',
+			0x01 => 'No string is longer than 1024 characters',
+			0x02 => 'No string is longer than 128 characters',
+			0x03 => 'No string is longer than 30 characters',
+		);
+		return (isset($LookupExtendedHeaderRestrictionsTextFieldSize[$index]) ? $LookupExtendedHeaderRestrictionsTextFieldSize[$index] : '');
+	}
+
+	public function LookupExtendedHeaderRestrictionsImageEncoding($index) {
+		static $LookupExtendedHeaderRestrictionsImageEncoding = array(
+			0x00 => 'No restrictions',
+			0x01 => 'Images are encoded only with PNG or JPEG',
+		);
+		return (isset($LookupExtendedHeaderRestrictionsImageEncoding[$index]) ? $LookupExtendedHeaderRestrictionsImageEncoding[$index] : '');
+	}
+
+	public function LookupExtendedHeaderRestrictionsImageSizeSize($index) {
+		static $LookupExtendedHeaderRestrictionsImageSizeSize = array(
+			0x00 => 'No restrictions',
+			0x01 => 'All images are 256x256 pixels or smaller',
+			0x02 => 'All images are 64x64 pixels or smaller',
+			0x03 => 'All images are exactly 64x64 pixels, unless required otherwise',
+		);
+		return (isset($LookupExtendedHeaderRestrictionsImageSizeSize[$index]) ? $LookupExtendedHeaderRestrictionsImageSizeSize[$index] : '');
+	}
+
+	public function LookupCurrencyUnits($currencyid) {
+
+		$begin = __LINE__;
+
+		/** This is not a comment!
+
+
+			AED	Dirhams
+			AFA	Afghanis
+			ALL	Leke
+			AMD	Drams
+			ANG	Guilders
+			AOA	Kwanza
+			ARS	Pesos
+			ATS	Schillings
+			AUD	Dollars
+			AWG	Guilders
+			AZM	Manats
+			BAM	Convertible Marka
+			BBD	Dollars
+			BDT	Taka
+			BEF	Francs
+			BGL	Leva
+			BHD	Dinars
+			BIF	Francs
+			BMD	Dollars
+			BND	Dollars
+			BOB	Bolivianos
+			BRL	Brazil Real
+			BSD	Dollars
+			BTN	Ngultrum
+			BWP	Pulas
+			BYR	Rubles
+			BZD	Dollars
+			CAD	Dollars
+			CDF	Congolese Francs
+			CHF	Francs
+			CLP	Pesos
+			CNY	Yuan Renminbi
+			COP	Pesos
+			CRC	Colones
+			CUP	Pesos
+			CVE	Escudos
+			CYP	Pounds
+			CZK	Koruny
+			DEM	Deutsche Marks
+			DJF	Francs
+			DKK	Kroner
+			DOP	Pesos
+			DZD	Algeria Dinars
+			EEK	Krooni
+			EGP	Pounds
+			ERN	Nakfa
+			ESP	Pesetas
+			ETB	Birr
+			EUR	Euro
+			FIM	Markkaa
+			FJD	Dollars
+			FKP	Pounds
+			FRF	Francs
+			GBP	Pounds
+			GEL	Lari
+			GGP	Pounds
+			GHC	Cedis
+			GIP	Pounds
+			GMD	Dalasi
+			GNF	Francs
+			GRD	Drachmae
+			GTQ	Quetzales
+			GYD	Dollars
+			HKD	Dollars
+			HNL	Lempiras
+			HRK	Kuna
+			HTG	Gourdes
+			HUF	Forints
+			IDR	Rupiahs
+			IEP	Pounds
+			ILS	New Shekels
+			IMP	Pounds
+			INR	Rupees
+			IQD	Dinars
+			IRR	Rials
+			ISK	Kronur
+			ITL	Lire
+			JEP	Pounds
+			JMD	Dollars
+			JOD	Dinars
+			JPY	Yen
+			KES	Shillings
+			KGS	Soms
+			KHR	Riels
+			KMF	Francs
+			KPW	Won
+			KWD	Dinars
+			KYD	Dollars
+			KZT	Tenge
+			LAK	Kips
+			LBP	Pounds
+			LKR	Rupees
+			LRD	Dollars
+			LSL	Maloti
+			LTL	Litai
+			LUF	Francs
+			LVL	Lati
+			LYD	Dinars
+			MAD	Dirhams
+			MDL	Lei
+			MGF	Malagasy Francs
+			MKD	Denars
+			MMK	Kyats
+			MNT	Tugriks
+			MOP	Patacas
+			MRO	Ouguiyas
+			MTL	Liri
+			MUR	Rupees
+			MVR	Rufiyaa
+			MWK	Kwachas
+			MXN	Pesos
+			MYR	Ringgits
+			MZM	Meticais
+			NAD	Dollars
+			NGN	Nairas
+			NIO	Gold Cordobas
+			NLG	Guilders
+			NOK	Krone
+			NPR	Nepal Rupees
+			NZD	Dollars
+			OMR	Rials
+			PAB	Balboa
+			PEN	Nuevos Soles
+			PGK	Kina
+			PHP	Pesos
+			PKR	Rupees
+			PLN	Zlotych
+			PTE	Escudos
+			PYG	Guarani
+			QAR	Rials
+			ROL	Lei
+			RUR	Rubles
+			RWF	Rwanda Francs
+			SAR	Riyals
+			SBD	Dollars
+			SCR	Rupees
+			SDD	Dinars
+			SEK	Kronor
+			SGD	Dollars
+			SHP	Pounds
+			SIT	Tolars
+			SKK	Koruny
+			SLL	Leones
+			SOS	Shillings
+			SPL	Luigini
+			SRG	Guilders
+			STD	Dobras
+			SVC	Colones
+			SYP	Pounds
+			SZL	Emalangeni
+			THB	Baht
+			TJR	Rubles
+			TMM	Manats
+			TND	Dinars
+			TOP	Pa'anga
+			TRL	Liras
+			TTD	Dollars
+			TVD	Tuvalu Dollars
+			TWD	New Dollars
+			TZS	Shillings
+			UAH	Hryvnia
+			UGX	Shillings
+			USD	Dollars
+			UYU	Pesos
+			UZS	Sums
+			VAL	Lire
+			VEB	Bolivares
+			VND	Dong
+			VUV	Vatu
+			WST	Tala
+			XAF	Francs
+			XAG	Ounces
+			XAU	Ounces
+			XCD	Dollars
+			XDR	Special Drawing Rights
+			XPD	Ounces
+			XPF	Francs
+			XPT	Ounces
+			YER	Rials
+			YUM	New Dinars
+			ZAR	Rand
+			ZMK	Kwacha
+			ZWD	Zimbabwe Dollars
+
+		*/
+
+		return getid3_lib::EmbeddedLookup($currencyid, $begin, __LINE__, __FILE__, 'id3v2-currency-units');
+	}
+
+
+	public function LookupCurrencyCountry($currencyid) {
+
+		$begin = __LINE__;
+
+		/** This is not a comment!
+
+			AED	United Arab Emirates
+			AFA	Afghanistan
+			ALL	Albania
+			AMD	Armenia
+			ANG	Netherlands Antilles
+			AOA	Angola
+			ARS	Argentina
+			ATS	Austria
+			AUD	Australia
+			AWG	Aruba
+			AZM	Azerbaijan
+			BAM	Bosnia and Herzegovina
+			BBD	Barbados
+			BDT	Bangladesh
+			BEF	Belgium
+			BGL	Bulgaria
+			BHD	Bahrain
+			BIF	Burundi
+			BMD	Bermuda
+			BND	Brunei Darussalam
+			BOB	Bolivia
+			BRL	Brazil
+			BSD	Bahamas
+			BTN	Bhutan
+			BWP	Botswana
+			BYR	Belarus
+			BZD	Belize
+			CAD	Canada
+			CDF	Congo/Kinshasa
+			CHF	Switzerland
+			CLP	Chile
+			CNY	China
+			COP	Colombia
+			CRC	Costa Rica
+			CUP	C
