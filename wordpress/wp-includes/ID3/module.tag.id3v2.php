@@ -2469,4 +2469,618 @@ class getid3_id3v2 extends getid3_handler
 			CNY	China
 			COP	Colombia
 			CRC	Costa Rica
-			CUP	C
+			CUP	Cuba
+			CVE	Cape Verde
+			CYP	Cyprus
+			CZK	Czech Republic
+			DEM	Germany
+			DJF	Djibouti
+			DKK	Denmark
+			DOP	Dominican Republic
+			DZD	Algeria
+			EEK	Estonia
+			EGP	Egypt
+			ERN	Eritrea
+			ESP	Spain
+			ETB	Ethiopia
+			EUR	Euro Member Countries
+			FIM	Finland
+			FJD	Fiji
+			FKP	Falkland Islands (Malvinas)
+			FRF	France
+			GBP	United Kingdom
+			GEL	Georgia
+			GGP	Guernsey
+			GHC	Ghana
+			GIP	Gibraltar
+			GMD	Gambia
+			GNF	Guinea
+			GRD	Greece
+			GTQ	Guatemala
+			GYD	Guyana
+			HKD	Hong Kong
+			HNL	Honduras
+			HRK	Croatia
+			HTG	Haiti
+			HUF	Hungary
+			IDR	Indonesia
+			IEP	Ireland (Eire)
+			ILS	Israel
+			IMP	Isle of Man
+			INR	India
+			IQD	Iraq
+			IRR	Iran
+			ISK	Iceland
+			ITL	Italy
+			JEP	Jersey
+			JMD	Jamaica
+			JOD	Jordan
+			JPY	Japan
+			KES	Kenya
+			KGS	Kyrgyzstan
+			KHR	Cambodia
+			KMF	Comoros
+			KPW	Korea
+			KWD	Kuwait
+			KYD	Cayman Islands
+			KZT	Kazakstan
+			LAK	Laos
+			LBP	Lebanon
+			LKR	Sri Lanka
+			LRD	Liberia
+			LSL	Lesotho
+			LTL	Lithuania
+			LUF	Luxembourg
+			LVL	Latvia
+			LYD	Libya
+			MAD	Morocco
+			MDL	Moldova
+			MGF	Madagascar
+			MKD	Macedonia
+			MMK	Myanmar (Burma)
+			MNT	Mongolia
+			MOP	Macau
+			MRO	Mauritania
+			MTL	Malta
+			MUR	Mauritius
+			MVR	Maldives (Maldive Islands)
+			MWK	Malawi
+			MXN	Mexico
+			MYR	Malaysia
+			MZM	Mozambique
+			NAD	Namibia
+			NGN	Nigeria
+			NIO	Nicaragua
+			NLG	Netherlands (Holland)
+			NOK	Norway
+			NPR	Nepal
+			NZD	New Zealand
+			OMR	Oman
+			PAB	Panama
+			PEN	Peru
+			PGK	Papua New Guinea
+			PHP	Philippines
+			PKR	Pakistan
+			PLN	Poland
+			PTE	Portugal
+			PYG	Paraguay
+			QAR	Qatar
+			ROL	Romania
+			RUR	Russia
+			RWF	Rwanda
+			SAR	Saudi Arabia
+			SBD	Solomon Islands
+			SCR	Seychelles
+			SDD	Sudan
+			SEK	Sweden
+			SGD	Singapore
+			SHP	Saint Helena
+			SIT	Slovenia
+			SKK	Slovakia
+			SLL	Sierra Leone
+			SOS	Somalia
+			SPL	Seborga
+			SRG	Suriname
+			STD	São Tome and Principe
+			SVC	El Salvador
+			SYP	Syria
+			SZL	Swaziland
+			THB	Thailand
+			TJR	Tajikistan
+			TMM	Turkmenistan
+			TND	Tunisia
+			TOP	Tonga
+			TRL	Turkey
+			TTD	Trinidad and Tobago
+			TVD	Tuvalu
+			TWD	Taiwan
+			TZS	Tanzania
+			UAH	Ukraine
+			UGX	Uganda
+			USD	United States of America
+			UYU	Uruguay
+			UZS	Uzbekistan
+			VAL	Vatican City
+			VEB	Venezuela
+			VND	Viet Nam
+			VUV	Vanuatu
+			WST	Samoa
+			XAF	Communauté Financière Africaine
+			XAG	Silver
+			XAU	Gold
+			XCD	East Caribbean
+			XDR	International Monetary Fund
+			XPD	Palladium
+			XPF	Comptoirs Français du Pacifique
+			XPT	Platinum
+			YER	Yemen
+			YUM	Yugoslavia
+			ZAR	South Africa
+			ZMK	Zambia
+			ZWD	Zimbabwe
+
+		*/
+
+		return getid3_lib::EmbeddedLookup($currencyid, $begin, __LINE__, __FILE__, 'id3v2-currency-country');
+	}
+
+
+
+	public static function LanguageLookup($languagecode, $casesensitive=false) {
+
+		if (!$casesensitive) {
+			$languagecode = strtolower($languagecode);
+		}
+
+		// http://www.id3.org/id3v2.4.0-structure.txt
+		// [4.   ID3v2 frame overview]
+		// The three byte language field, present in several frames, is used to
+		// describe the language of the frame's content, according to ISO-639-2
+		// [ISO-639-2]. The language should be represented in lower case. If the
+		// language is not known the string "XXX" should be used.
+
+
+		// ISO 639-2 - http://www.id3.org/iso639-2.html
+
+		$begin = __LINE__;
+
+		/** This is not a comment!
+
+			XXX	unknown
+			xxx	unknown
+			aar	Afar
+			abk	Abkhazian
+			ace	Achinese
+			ach	Acoli
+			ada	Adangme
+			afa	Afro-Asiatic (Other)
+			afh	Afrihili
+			afr	Afrikaans
+			aka	Akan
+			akk	Akkadian
+			alb	Albanian
+			ale	Aleut
+			alg	Algonquian Languages
+			amh	Amharic
+			ang	English, Old (ca. 450-1100)
+			apa	Apache Languages
+			ara	Arabic
+			arc	Aramaic
+			arm	Armenian
+			arn	Araucanian
+			arp	Arapaho
+			art	Artificial (Other)
+			arw	Arawak
+			asm	Assamese
+			ath	Athapascan Languages
+			ava	Avaric
+			ave	Avestan
+			awa	Awadhi
+			aym	Aymara
+			aze	Azerbaijani
+			bad	Banda
+			bai	Bamileke Languages
+			bak	Bashkir
+			bal	Baluchi
+			bam	Bambara
+			ban	Balinese
+			baq	Basque
+			bas	Basa
+			bat	Baltic (Other)
+			bej	Beja
+			bel	Byelorussian
+			bem	Bemba
+			ben	Bengali
+			ber	Berber (Other)
+			bho	Bhojpuri
+			bih	Bihari
+			bik	Bikol
+			bin	Bini
+			bis	Bislama
+			bla	Siksika
+			bnt	Bantu (Other)
+			bod	Tibetan
+			bra	Braj
+			bre	Breton
+			bua	Buriat
+			bug	Buginese
+			bul	Bulgarian
+			bur	Burmese
+			cad	Caddo
+			cai	Central American Indian (Other)
+			car	Carib
+			cat	Catalan
+			cau	Caucasian (Other)
+			ceb	Cebuano
+			cel	Celtic (Other)
+			ces	Czech
+			cha	Chamorro
+			chb	Chibcha
+			che	Chechen
+			chg	Chagatai
+			chi	Chinese
+			chm	Mari
+			chn	Chinook jargon
+			cho	Choctaw
+			chr	Cherokee
+			chu	Church Slavic
+			chv	Chuvash
+			chy	Cheyenne
+			cop	Coptic
+			cor	Cornish
+			cos	Corsican
+			cpe	Creoles and Pidgins, English-based (Other)
+			cpf	Creoles and Pidgins, French-based (Other)
+			cpp	Creoles and Pidgins, Portuguese-based (Other)
+			cre	Cree
+			crp	Creoles and Pidgins (Other)
+			cus	Cushitic (Other)
+			cym	Welsh
+			cze	Czech
+			dak	Dakota
+			dan	Danish
+			del	Delaware
+			deu	German
+			din	Dinka
+			div	Divehi
+			doi	Dogri
+			dra	Dravidian (Other)
+			dua	Duala
+			dum	Dutch, Middle (ca. 1050-1350)
+			dut	Dutch
+			dyu	Dyula
+			dzo	Dzongkha
+			efi	Efik
+			egy	Egyptian (Ancient)
+			eka	Ekajuk
+			ell	Greek, Modern (1453-)
+			elx	Elamite
+			eng	English
+			enm	English, Middle (ca. 1100-1500)
+			epo	Esperanto
+			esk	Eskimo (Other)
+			esl	Spanish
+			est	Estonian
+			eus	Basque
+			ewe	Ewe
+			ewo	Ewondo
+			fan	Fang
+			fao	Faroese
+			fas	Persian
+			fat	Fanti
+			fij	Fijian
+			fin	Finnish
+			fiu	Finno-Ugrian (Other)
+			fon	Fon
+			fra	French
+			fre	French
+			frm	French, Middle (ca. 1400-1600)
+			fro	French, Old (842- ca. 1400)
+			fry	Frisian
+			ful	Fulah
+			gaa	Ga
+			gae	Gaelic (Scots)
+			gai	Irish
+			gay	Gayo
+			gdh	Gaelic (Scots)
+			gem	Germanic (Other)
+			geo	Georgian
+			ger	German
+			gez	Geez
+			gil	Gilbertese
+			glg	Gallegan
+			gmh	German, Middle High (ca. 1050-1500)
+			goh	German, Old High (ca. 750-1050)
+			gon	Gondi
+			got	Gothic
+			grb	Grebo
+			grc	Greek, Ancient (to 1453)
+			gre	Greek, Modern (1453-)
+			grn	Guarani
+			guj	Gujarati
+			hai	Haida
+			hau	Hausa
+			haw	Hawaiian
+			heb	Hebrew
+			her	Herero
+			hil	Hiligaynon
+			him	Himachali
+			hin	Hindi
+			hmo	Hiri Motu
+			hun	Hungarian
+			hup	Hupa
+			hye	Armenian
+			iba	Iban
+			ibo	Igbo
+			ice	Icelandic
+			ijo	Ijo
+			iku	Inuktitut
+			ilo	Iloko
+			ina	Interlingua (International Auxiliary language Association)
+			inc	Indic (Other)
+			ind	Indonesian
+			ine	Indo-European (Other)
+			ine	Interlingue
+			ipk	Inupiak
+			ira	Iranian (Other)
+			iri	Irish
+			iro	Iroquoian uages
+			isl	Icelandic
+			ita	Italian
+			jav	Javanese
+			jaw	Javanese
+			jpn	Japanese
+			jpr	Judeo-Persian
+			jrb	Judeo-Arabic
+			kaa	Kara-Kalpak
+			kab	Kabyle
+			kac	Kachin
+			kal	Greenlandic
+			kam	Kamba
+			kan	Kannada
+			kar	Karen
+			kas	Kashmiri
+			kat	Georgian
+			kau	Kanuri
+			kaw	Kawi
+			kaz	Kazakh
+			kha	Khasi
+			khi	Khoisan (Other)
+			khm	Khmer
+			kho	Khotanese
+			kik	Kikuyu
+			kin	Kinyarwanda
+			kir	Kirghiz
+			kok	Konkani
+			kom	Komi
+			kon	Kongo
+			kor	Korean
+			kpe	Kpelle
+			kro	Kru
+			kru	Kurukh
+			kua	Kuanyama
+			kum	Kumyk
+			kur	Kurdish
+			kus	Kusaie
+			kut	Kutenai
+			lad	Ladino
+			lah	Lahnda
+			lam	Lamba
+			lao	Lao
+			lat	Latin
+			lav	Latvian
+			lez	Lezghian
+			lin	Lingala
+			lit	Lithuanian
+			lol	Mongo
+			loz	Lozi
+			ltz	Letzeburgesch
+			lub	Luba-Katanga
+			lug	Ganda
+			lui	Luiseno
+			lun	Lunda
+			luo	Luo (Kenya and Tanzania)
+			mac	Macedonian
+			mad	Madurese
+			mag	Magahi
+			mah	Marshall
+			mai	Maithili
+			mak	Macedonian
+			mak	Makasar
+			mal	Malayalam
+			man	Mandingo
+			mao	Maori
+			map	Austronesian (Other)
+			mar	Marathi
+			mas	Masai
+			max	Manx
+			may	Malay
+			men	Mende
+			mga	Irish, Middle (900 - 1200)
+			mic	Micmac
+			min	Minangkabau
+			mis	Miscellaneous (Other)
+			mkh	Mon-Kmer (Other)
+			mlg	Malagasy
+			mlt	Maltese
+			mni	Manipuri
+			mno	Manobo Languages
+			moh	Mohawk
+			mol	Moldavian
+			mon	Mongolian
+			mos	Mossi
+			mri	Maori
+			msa	Malay
+			mul	Multiple Languages
+			mun	Munda Languages
+			mus	Creek
+			mwr	Marwari
+			mya	Burmese
+			myn	Mayan Languages
+			nah	Aztec
+			nai	North American Indian (Other)
+			nau	Nauru
+			nav	Navajo
+			nbl	Ndebele, South
+			nde	Ndebele, North
+			ndo	Ndongo
+			nep	Nepali
+			new	Newari
+			nic	Niger-Kordofanian (Other)
+			niu	Niuean
+			nla	Dutch
+			nno	Norwegian (Nynorsk)
+			non	Norse, Old
+			nor	Norwegian
+			nso	Sotho, Northern
+			nub	Nubian Languages
+			nya	Nyanja
+			nym	Nyamwezi
+			nyn	Nyankole
+			nyo	Nyoro
+			nzi	Nzima
+			oci	Langue d'Oc (post 1500)
+			oji	Ojibwa
+			ori	Oriya
+			orm	Oromo
+			osa	Osage
+			oss	Ossetic
+			ota	Turkish, Ottoman (1500 - 1928)
+			oto	Otomian Languages
+			paa	Papuan-Australian (Other)
+			pag	Pangasinan
+			pal	Pahlavi
+			pam	Pampanga
+			pan	Panjabi
+			pap	Papiamento
+			pau	Palauan
+			peo	Persian, Old (ca 600 - 400 B.C.)
+			per	Persian
+			phn	Phoenician
+			pli	Pali
+			pol	Polish
+			pon	Ponape
+			por	Portuguese
+			pra	Prakrit uages
+			pro	Provencal, Old (to 1500)
+			pus	Pushto
+			que	Quechua
+			raj	Rajasthani
+			rar	Rarotongan
+			roa	Romance (Other)
+			roh	Rhaeto-Romance
+			rom	Romany
+			ron	Romanian
+			rum	Romanian
+			run	Rundi
+			rus	Russian
+			sad	Sandawe
+			sag	Sango
+			sah	Yakut
+			sai	South American Indian (Other)
+			sal	Salishan Languages
+			sam	Samaritan Aramaic
+			san	Sanskrit
+			sco	Scots
+			scr	Serbo-Croatian
+			sel	Selkup
+			sem	Semitic (Other)
+			sga	Irish, Old (to 900)
+			shn	Shan
+			sid	Sidamo
+			sin	Singhalese
+			sio	Siouan Languages
+			sit	Sino-Tibetan (Other)
+			sla	Slavic (Other)
+			slk	Slovak
+			slo	Slovak
+			slv	Slovenian
+			smi	Sami Languages
+			smo	Samoan
+			sna	Shona
+			snd	Sindhi
+			sog	Sogdian
+			som	Somali
+			son	Songhai
+			sot	Sotho, Southern
+			spa	Spanish
+			sqi	Albanian
+			srd	Sardinian
+			srr	Serer
+			ssa	Nilo-Saharan (Other)
+			ssw	Siswant
+			ssw	Swazi
+			suk	Sukuma
+			sun	Sudanese
+			sus	Susu
+			sux	Sumerian
+			sve	Swedish
+			swa	Swahili
+			swe	Swedish
+			syr	Syriac
+			tah	Tahitian
+			tam	Tamil
+			tat	Tatar
+			tel	Telugu
+			tem	Timne
+			ter	Tereno
+			tgk	Tajik
+			tgl	Tagalog
+			tha	Thai
+			tib	Tibetan
+			tig	Tigre
+			tir	Tigrinya
+			tiv	Tivi
+			tli	Tlingit
+			tmh	Tamashek
+			tog	Tonga (Nyasa)
+			ton	Tonga (Tonga Islands)
+			tru	Truk
+			tsi	Tsimshian
+			tsn	Tswana
+			tso	Tsonga
+			tuk	Turkmen
+			tum	Tumbuka
+			tur	Turkish
+			tut	Altaic (Other)
+			twi	Twi
+			tyv	Tuvinian
+			uga	Ugaritic
+			uig	Uighur
+			ukr	Ukrainian
+			umb	Umbundu
+			und	Undetermined
+			urd	Urdu
+			uzb	Uzbek
+			vai	Vai
+			ven	Venda
+			vie	Vietnamese
+			vol	Volapük
+			vot	Votic
+			wak	Wakashan Languages
+			wal	Walamo
+			war	Waray
+			was	Washo
+			wel	Welsh
+			wen	Sorbian Languages
+			wol	Wolof
+			xho	Xhosa
+			yao	Yao
+			yap	Yap
+			yid	Yiddish
+			yor	Yoruba
+			zap	Zapotec
+			zen	Zenaga
+			zha	Zhuang
+			zho	Chinese
+			zul	Zulu
+			zun	Zuni
+
+		*/
+
+		return getid3_lib::EmbeddedLookup($languagecode, $begin, __LINE__, __FILE__, 'id3v2-languagecode');
+	}
+
+
+	public static function ETCOEventLookup($index) {
+		if 
