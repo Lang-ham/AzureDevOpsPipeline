@@ -3468,4 +3468,274 @@ class getid3_id3v2 extends getid3_handler
 			TIM	time
 			TIME	time
 			TIPL	involved_people_list
-			TIT1	content_group_descrip
+			TIT1	content_group_description
+			TIT2	title
+			TIT3	subtitle
+			TKE	initial_key
+			TKEY	initial_key
+			TLA	language
+			TLAN	language
+			TLE	length
+			TLEN	length
+			TMCL	musician_credits_list
+			TMED	media_type
+			TMOO	mood
+			TMT	media_type
+			TOA	original_artist
+			TOAL	original_album
+			TOF	original_filename
+			TOFN	original_filename
+			TOL	original_lyricist
+			TOLY	original_lyricist
+			TOPE	original_artist
+			TOR	original_year
+			TORY	original_year
+			TOT	original_album
+			TOWN	file_owner
+			TP1	artist
+			TP2	band
+			TP3	conductor
+			TP4	remixer
+			TPA	part_of_a_set
+			TPB	publisher
+			TPE1	artist
+			TPE2	band
+			TPE3	conductor
+			TPE4	remixer
+			TPOS	part_of_a_set
+			TPRO	produced_notice
+			TPUB	publisher
+			TRC	isrc
+			TRCK	track_number
+			TRD	recording_dates
+			TRDA	recording_dates
+			TRK	track_number
+			TRSN	internet_radio_station_name
+			TRSO	internet_radio_station_owner
+			TS2	album_artist_sort_order
+			TSA	album_sort_order
+			TSC	composer_sort_order
+			TSI	size
+			TSIZ	size
+			TSO2	album_artist_sort_order
+			TSOA	album_sort_order
+			TSOC	composer_sort_order
+			TSOP	performer_sort_order
+			TSOT	title_sort_order
+			TSP	performer_sort_order
+			TSRC	isrc
+			TSS	encoder_settings
+			TSSE	encoder_settings
+			TSST	set_subtitle
+			TST	title_sort_order
+			TT1	content_group_description
+			TT2	title
+			TT3	subtitle
+			TXT	lyricist
+			TXX	text
+			TXXX	text
+			TYE	year
+			TYER	year
+			UFI	unique_file_identifier
+			UFID	unique_file_identifier
+			ULT	unsychronised_lyric
+			USER	terms_of_use
+			USLT	unsynchronised_lyric
+			WAF	url_file
+			WAR	url_artist
+			WAS	url_source
+			WCM	commercial_information
+			WCOM	commercial_information
+			WCOP	copyright
+			WCP	copyright
+			WOAF	url_file
+			WOAR	url_artist
+			WOAS	url_source
+			WORS	url_station
+			WPAY	url_payment
+			WPB	url_publisher
+			WPUB	url_publisher
+			WXX	url_user
+			WXXX	url_user
+			TFEA	featured_artist
+			TSTU	recording_studio
+			rgad	replay_gain_adjustment
+
+		*/
+
+		return getid3_lib::EmbeddedLookup($framename, $begin, __LINE__, __FILE__, 'id3v2-framename_short');
+	}
+
+	public static function TextEncodingTerminatorLookup($encoding) {
+		// http://www.id3.org/id3v2.4.0-structure.txt
+		// Frames that allow different types of text encoding contains a text encoding description byte. Possible encodings:
+		static $TextEncodingTerminatorLookup = array(
+			0   => "\x00",     // $00  ISO-8859-1. Terminated with $00.
+			1   => "\x00\x00", // $01  UTF-16 encoded Unicode with BOM. All strings in the same frame SHALL have the same byteorder. Terminated with $00 00.
+			2   => "\x00\x00", // $02  UTF-16BE encoded Unicode without BOM. Terminated with $00 00.
+			3   => "\x00",     // $03  UTF-8 encoded Unicode. Terminated with $00.
+			255 => "\x00\x00"
+		);
+		return (isset($TextEncodingTerminatorLookup[$encoding]) ? $TextEncodingTerminatorLookup[$encoding] : "\x00");
+	}
+
+	public static function TextEncodingNameLookup($encoding) {
+		// http://www.id3.org/id3v2.4.0-structure.txt
+		// Frames that allow different types of text encoding contains a text encoding description byte. Possible encodings:
+		static $TextEncodingNameLookup = array(
+			0   => 'ISO-8859-1', // $00  ISO-8859-1. Terminated with $00.
+			1   => 'UTF-16',     // $01  UTF-16 encoded Unicode with BOM. All strings in the same frame SHALL have the same byteorder. Terminated with $00 00.
+			2   => 'UTF-16BE',   // $02  UTF-16BE encoded Unicode without BOM. Terminated with $00 00.
+			3   => 'UTF-8',      // $03  UTF-8 encoded Unicode. Terminated with $00.
+			255 => 'UTF-16BE'
+		);
+		return (isset($TextEncodingNameLookup[$encoding]) ? $TextEncodingNameLookup[$encoding] : 'ISO-8859-1');
+	}
+
+	public static function IsValidID3v2FrameName($framename, $id3v2majorversion) {
+		switch ($id3v2majorversion) {
+			case 2:
+				return preg_match('#[A-Z][A-Z0-9]{2}#', $framename);
+				break;
+
+			case 3:
+			case 4:
+				return preg_match('#[A-Z][A-Z0-9]{3}#', $framename);
+				break;
+		}
+		return false;
+	}
+
+	public static function IsANumber($numberstring, $allowdecimal=false, $allownegative=false) {
+		for ($i = 0; $i < strlen($numberstring); $i++) {
+			if ((chr($numberstring{$i}) < chr('0')) || (chr($numberstring{$i}) > chr('9'))) {
+				if (($numberstring{$i} == '.') && $allowdecimal) {
+					// allowed
+				} elseif (($numberstring{$i} == '-') && $allownegative && ($i == 0)) {
+					// allowed
+				} else {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	public static function IsValidDateStampString($datestamp) {
+		if (strlen($datestamp) != 8) {
+			return false;
+		}
+		if (!self::IsANumber($datestamp, false)) {
+			return false;
+		}
+		$year  = substr($datestamp, 0, 4);
+		$month = substr($datestamp, 4, 2);
+		$day   = substr($datestamp, 6, 2);
+		if (($year == 0) || ($month == 0) || ($day == 0)) {
+			return false;
+		}
+		if ($month > 12) {
+			return false;
+		}
+		if ($day > 31) {
+			return false;
+		}
+		if (($day > 30) && (($month == 4) || ($month == 6) || ($month == 9) || ($month == 11))) {
+			return false;
+		}
+		if (($day > 29) && ($month == 2)) {
+			return false;
+		}
+		return true;
+	}
+
+	public static function ID3v2HeaderLength($majorversion) {
+		return (($majorversion == 2) ? 6 : 10);
+	}
+
+	public static function ID3v22iTunesBrokenFrameName($frame_name) {
+		// iTunes (multiple versions) has been known to write ID3v2.3 style frames
+		// but use ID3v2.2 frame names, right-padded using either [space] or [null]
+		// to make them fit in the 4-byte frame name space of the ID3v2.3 frame.
+		// This function will detect and translate the corrupt frame name into ID3v2.3 standard.
+		static $ID3v22_iTunes_BrokenFrames = array(
+			'BUF' => 'RBUF', // Recommended buffer size
+			'CNT' => 'PCNT', // Play counter
+			'COM' => 'COMM', // Comments
+			'CRA' => 'AENC', // Audio encryption
+			'EQU' => 'EQUA', // Equalisation
+			'ETC' => 'ETCO', // Event timing codes
+			'GEO' => 'GEOB', // General encapsulated object
+			'IPL' => 'IPLS', // Involved people list
+			'LNK' => 'LINK', // Linked information
+			'MCI' => 'MCDI', // Music CD identifier
+			'MLL' => 'MLLT', // MPEG location lookup table
+			'PIC' => 'APIC', // Attached picture
+			'POP' => 'POPM', // Popularimeter
+			'REV' => 'RVRB', // Reverb
+			'RVA' => 'RVAD', // Relative volume adjustment
+			'SLT' => 'SYLT', // Synchronised lyric/text
+			'STC' => 'SYTC', // Synchronised tempo codes
+			'TAL' => 'TALB', // Album/Movie/Show title
+			'TBP' => 'TBPM', // BPM (beats per minute)
+			'TCM' => 'TCOM', // Composer
+			'TCO' => 'TCON', // Content type
+			'TCP' => 'TCMP', // Part of a compilation
+			'TCR' => 'TCOP', // Copyright message
+			'TDA' => 'TDAT', // Date
+			'TDY' => 'TDLY', // Playlist delay
+			'TEN' => 'TENC', // Encoded by
+			'TFT' => 'TFLT', // File type
+			'TIM' => 'TIME', // Time
+			'TKE' => 'TKEY', // Initial key
+			'TLA' => 'TLAN', // Language(s)
+			'TLE' => 'TLEN', // Length
+			'TMT' => 'TMED', // Media type
+			'TOA' => 'TOPE', // Original artist(s)/performer(s)
+			'TOF' => 'TOFN', // Original filename
+			'TOL' => 'TOLY', // Original lyricist(s)/text writer(s)
+			'TOR' => 'TORY', // Original release year
+			'TOT' => 'TOAL', // Original album/movie/show title
+			'TP1' => 'TPE1', // Lead performer(s)/Soloist(s)
+			'TP2' => 'TPE2', // Band/orchestra/accompaniment
+			'TP3' => 'TPE3', // Conductor/performer refinement
+			'TP4' => 'TPE4', // Interpreted, remixed, or otherwise modified by
+			'TPA' => 'TPOS', // Part of a set
+			'TPB' => 'TPUB', // Publisher
+			'TRC' => 'TSRC', // ISRC (international standard recording code)
+			'TRD' => 'TRDA', // Recording dates
+			'TRK' => 'TRCK', // Track number/Position in set
+			'TS2' => 'TSO2', // Album-Artist sort order
+			'TSA' => 'TSOA', // Album sort order
+			'TSC' => 'TSOC', // Composer sort order
+			'TSI' => 'TSIZ', // Size
+			'TSP' => 'TSOP', // Performer sort order
+			'TSS' => 'TSSE', // Software/Hardware and settings used for encoding
+			'TST' => 'TSOT', // Title sort order
+			'TT1' => 'TIT1', // Content group description
+			'TT2' => 'TIT2', // Title/songname/content description
+			'TT3' => 'TIT3', // Subtitle/Description refinement
+			'TXT' => 'TEXT', // Lyricist/Text writer
+			'TXX' => 'TXXX', // User defined text information frame
+			'TYE' => 'TYER', // Year
+			'UFI' => 'UFID', // Unique file identifier
+			'ULT' => 'USLT', // Unsynchronised lyric/text transcription
+			'WAF' => 'WOAF', // Official audio file webpage
+			'WAR' => 'WOAR', // Official artist/performer webpage
+			'WAS' => 'WOAS', // Official audio source webpage
+			'WCM' => 'WCOM', // Commercial information
+			'WCP' => 'WCOP', // Copyright/Legal information
+			'WPB' => 'WPUB', // Publishers official webpage
+			'WXX' => 'WXXX', // User defined URL link frame
+		);
+		if (strlen($frame_name) == 4) {
+			if ((substr($frame_name, 3, 1) == ' ') || (substr($frame_name, 3, 1) == "\x00")) {
+				if (isset($ID3v22_iTunes_BrokenFrames[substr($frame_name, 0, 3)])) {
+					return $ID3v22_iTunes_BrokenFrames[substr($frame_name, 0, 3)];
+				}
+			}
+		}
+		return false;
+	}
+
+}
