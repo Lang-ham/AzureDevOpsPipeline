@@ -25,4 +25,20 @@ class IXR_ClientMulticall extends IXR_Client
 		self::__construct( $server, $path, $port );
 	}
 
-    function a
+    function addCall()
+    {
+        $args = func_get_args();
+        $methodName = array_shift($args);
+        $struct = array(
+            'methodName' => $methodName,
+            'params' => $args
+        );
+        $this->calls[] = $struct;
+    }
+
+    function query()
+    {
+        // Prepare multicall, then call the parent::query() method
+        return parent::query('system.multicall', $this->calls);
+    }
+}
