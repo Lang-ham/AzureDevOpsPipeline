@@ -1005,4 +1005,80 @@ class Requests_IRI {
 		}
 
 		return $string;
-	
+	}
+
+	/**
+	 * Get the complete IRI
+	 *
+	 * @return string
+	 */
+	protected function get_iri() {
+		if (!$this->is_valid()) {
+			return false;
+		}
+
+		$iri = '';
+		if ($this->scheme !== null) {
+			$iri .= $this->scheme . ':';
+		}
+		if (($iauthority = $this->get_iauthority()) !== null) {
+			$iri .= '//' . $iauthority;
+		}
+		$iri .= $this->ipath;
+		if ($this->iquery !== null) {
+			$iri .= '?' . $this->iquery;
+		}
+		if ($this->ifragment !== null) {
+			$iri .= '#' . $this->ifragment;
+		}
+
+		return $iri;
+	}
+
+	/**
+	 * Get the complete URI
+	 *
+	 * @return string
+	 */
+	protected function get_uri() {
+		return $this->to_uri($this->get_iri());
+	}
+
+	/**
+	 * Get the complete iauthority
+	 *
+	 * @return string
+	 */
+	protected function get_iauthority() {
+		if ($this->iuserinfo === null && $this->ihost === null && $this->port === null) {
+			return null;
+		}
+
+		$iauthority = '';
+		if ($this->iuserinfo !== null) {
+			$iauthority .= $this->iuserinfo . '@';
+		}
+		if ($this->ihost !== null) {
+			$iauthority .= $this->ihost;
+		}
+		if ($this->port !== null) {
+			$iauthority .= ':' . $this->port;
+		}
+		return $iauthority;
+	}
+
+	/**
+	 * Get the complete authority
+	 *
+	 * @return string
+	 */
+	protected function get_authority() {
+		$iauthority = $this->get_iauthority();
+		if (is_string($iauthority)) {
+			return $this->to_uri($iauthority);
+		}
+		else {
+			return $iauthority;
+		}
+	}
+}
