@@ -407,4 +407,38 @@ class Requests_Transport_fsockopen implements Requests_Transport {
 
 		// If we don't have SSL options, then we couldn't make the connection at
 		// all
-		if (empty($meta) || empty($meta['s
+		if (empty($meta) || empty($meta['ssl']) || empty($meta['ssl']['peer_certificate'])) {
+			throw new Requests_Exception(rtrim($this->connect_error), 'ssl.connect_error');
+		}
+
+		$cert = openssl_x509_parse($meta['ssl']['peer_certificate']);
+
+		return Requests_SSL::verify_certificate($host, $cert);
+	}
+
+	/**
+	 * Whether this transport is valid
+	 *
+	 * @codeCoverageIgnore
+	 * @return boolean True if the transport is valid, false otherwise.
+	 */
+	public static function test($capabilities = array()) {
+		if (!function_exists('fsockopen')) {
+			return false;
+		}
+
+		// If needed, check that streams support SSL
+		if (isset($capabilities['ssl']) && $capabilities['ssl']) {
+			if (!extension_loaded('openssl') || !function_exists('openssl_x509_parse')) {
+				return false;
+			}
+
+			// Currently broken, thanks to https://github.com/facebook/hhvm/issues/2156
+			if (defined('HHVM_VERSION')) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+}
