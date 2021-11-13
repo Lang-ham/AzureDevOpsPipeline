@@ -277,3 +277,56 @@ class SimplePie_Content_Type_Sniffer
 				default:
 					return 'text/html';
 			}
+
+			if (substr($this->file->body, $pos, 3) === '!--')
+			{
+				$pos += 3;
+				if ($pos < $len && ($pos = strpos($this->file->body, '-->', $pos)) !== false)
+				{
+					$pos += 3;
+				}
+				else
+				{
+					return 'text/html';
+				}
+			}
+			elseif (substr($this->file->body, $pos, 1) === '!')
+			{
+				if ($pos < $len && ($pos = strpos($this->file->body, '>', $pos)) !== false)
+				{
+					$pos++;
+				}
+				else
+				{
+					return 'text/html';
+				}
+			}
+			elseif (substr($this->file->body, $pos, 1) === '?')
+			{
+				if ($pos < $len && ($pos = strpos($this->file->body, '?>', $pos)) !== false)
+				{
+					$pos += 2;
+				}
+				else
+				{
+					return 'text/html';
+				}
+			}
+			elseif (substr($this->file->body, $pos, 3) === 'rss'
+				|| substr($this->file->body, $pos, 7) === 'rdf:RDF')
+			{
+				return 'application/rss+xml';
+			}
+			elseif (substr($this->file->body, $pos, 4) === 'feed')
+			{
+				return 'application/atom+xml';
+			}
+			else
+			{
+				return 'text/html';
+			}
+		}
+
+		return 'text/html';
+	}
+}
