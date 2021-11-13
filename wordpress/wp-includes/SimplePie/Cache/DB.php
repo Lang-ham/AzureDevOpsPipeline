@@ -107,4 +107,31 @@ abstract class SimplePie_Cache_DB implements SimplePie_Cache_Base
 					unset($channel['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['entry']);
 				}
 				if (isset($channel['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['entry']))
-		
+				{
+					unset($channel['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['entry']);
+				}
+				if (isset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_10]['item']))
+				{
+					unset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_10]['item']);
+				}
+				if (isset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_090]['item']))
+				{
+					unset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_090]['item']);
+				}
+				if (isset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_20]['item']))
+				{
+					unset($channel['child'][SIMPLEPIE_NAMESPACE_RSS_20]['item']);
+				}
+			}
+			if (isset($data->data['items']))
+			{
+				unset($data->data['items']);
+			}
+			if (isset($data->data['ordered_items']))
+			{
+				unset($data->data['ordered_items']);
+			}
+		}
+		return array(serialize($data->data), $items_by_id);
+	}
+}
