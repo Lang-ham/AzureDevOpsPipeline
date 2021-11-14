@@ -603,4 +603,494 @@ class SimplePie_IRI
 	protected function remove_iunreserved_percent_encoded($match)
 	{
 		// As we just have valid percent encoded sequences we can just explode
-		/
+		// and ignore the first member of the returned array (an empty string).
+		$bytes = explode('%', $match[0]);
+
+		// Initialize the new string (this is what will be returned) and that
+		// there are no bytes remaining in the current sequence (unsurprising
+		// at the first byte!).
+		$string = '';
+		$remaining = 0;
+
+		// Loop over each and every byte, and set $value to its value
+		for ($i = 1, $len = count($bytes); $i < $len; $i++)
+		{
+			$value = hexdec($bytes[$i]);
+
+			// If we're the first byte of sequence:
+			if (!$remaining)
+			{
+				// Start position
+				$start = $i;
+
+				// By default we are valid
+				$valid = true;
+
+				// One byte sequence:
+				if ($value <= 0x7F)
+				{
+					$character = $value;
+					$length = 1;
+				}
+				// Two byte sequence:
+				elseif (($value & 0xE0) === 0xC0)
+				{
+					$character = ($value & 0x1F) << 6;
+					$length = 2;
+					$remaining = 1;
+				}
+				// Three byte sequence:
+				elseif (($value & 0xF0) === 0xE0)
+				{
+					$character = ($value & 0x0F) << 12;
+					$length = 3;
+					$remaining = 2;
+				}
+				// Four byte sequence:
+				elseif (($value & 0xF8) === 0xF0)
+				{
+					$character = ($value & 0x07) << 18;
+					$length = 4;
+					$remaining = 3;
+				}
+				// Invalid byte:
+				else
+				{
+					$valid = false;
+					$remaining = 0;
+				}
+			}
+			// Continuation byte:
+			else
+			{
+				// Check that the byte is valid, then add it to the character:
+				if (($value & 0xC0) === 0x80)
+				{
+					$remaining--;
+					$character |= ($value & 0x3F) << ($remaining * 6);
+				}
+				// If it is invalid, count the sequence as invalid and reprocess the current byte as the start of a sequence:
+				else
+				{
+					$valid = false;
+					$remaining = 0;
+					$i--;
+				}
+			}
+
+			// If we've reached the end of the current byte sequence, append it to Unicode::$data
+			if (!$remaining)
+			{
+				// Percent encode anything invalid or not in iunreserved
+				if (
+					// Invalid sequences
+					!$valid
+					// Non-shortest form sequences are invalid
+					|| $length > 1 && $character <= 0x7F
+					|| $length > 2 && $character <= 0x7FF
+					|| $length > 3 && $character <= 0xFFFF
+					// Outside of range of iunreserved codepoints
+					|| $character < 0x2D
+					|| $character > 0xEFFFD
+					// Noncharacters
+					|| ($character & 0xFFFE) === 0xFFFE
+					|| $character >= 0xFDD0 && $character <= 0xFDEF
+					// Everything else not in iunreserved (this is all BMP)
+					|| $character === 0x2F
+					|| $character > 0x39 && $character < 0x41
+					|| $character > 0x5A && $character < 0x61
+					|| $character > 0x7A && $character < 0x7E
+					|| $character > 0x7E && $character < 0xA0
+					|| $character > 0xD7FF && $character < 0xF900
+				)
+				{
+					for ($j = $start; $j <= $i; $j++)
+					{
+						$string .= '%' . strtoupper($bytes[$j]);
+					}
+				}
+				else
+				{
+					for ($j = $start; $j <= $i; $j++)
+					{
+						$string .= chr(hexdec($bytes[$j]));
+					}
+				}
+			}
+		}
+
+		// If we have any bytes left over they are invalid (i.e., we are
+		// mid-way through a multi-byte sequence)
+		if ($remaining)
+		{
+			for ($j = $start; $j < $len; $j++)
+			{
+				$string .= '%' . strtoupper($bytes[$j]);
+			}
+		}
+
+		return $string;
+	}
+
+	protected function scheme_normalization()
+	{
+		if (isset($this->normalization[$this->scheme]['iuserinfo']) && $this->iuserinfo === $this->normalization[$this->scheme]['iuserinfo'])
+		{
+			$this->iuserinfo = null;
+		}
+		if (isset($this->normalization[$this->scheme]['ihost']) && $this->ihost === $this->normalization[$this->scheme]['ihost'])
+		{
+			$this->ihost = null;
+		}
+		if (isset($this->normalization[$this->scheme]['port']) && $this->port === $this->normalization[$this->scheme]['port'])
+		{
+			$this->port = null;
+		}
+		if (isset($this->normalization[$this->scheme]['ipath']) && $this->ipath === $this->normalization[$this->scheme]['ipath'])
+		{
+			$this->ipath = '';
+		}
+		if (isset($this->normalization[$this->scheme]['iquery']) && $this->iquery === $this->normalization[$this->scheme]['iquery'])
+		{
+			$this->iquery = null;
+		}
+		if (isset($this->normalization[$this->scheme]['ifragment']) && $this->ifragment === $this->normalization[$this->scheme]['ifragment'])
+		{
+			$this->ifragment = null;
+		}
+	}
+
+	/**
+	 * Check if the object represents a valid IRI. This needs to be done on each
+	 * call as some things change depending on another part of the IRI.
+	 *
+	 * @return bool
+	 */
+	public function is_valid()
+	{
+		$isauthority = $this->iuserinfo !== null || $this->ihost !== null || $this->port !== null;
+		if ($this->ipath !== '' &&
+			(
+				$isauthority && (
+					$this->ipath[0] !== '/' ||
+					substr($this->ipath, 0, 2) === '//'
+				) ||
+				(
+					$this->scheme === null &&
+					!$isauthority &&
+					strpos($this->ipath, ':') !== false &&
+					(strpos($this->ipath, '/') === false ? true : strpos($this->ipath, ':') < strpos($this->ipath, '/'))
+				)
+			)
+		)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Set the entire IRI. Returns true on success, false on failure (if there
+	 * are any invalid characters).
+	 *
+	 * @param string $iri
+	 * @return bool
+	 */
+	public function set_iri($iri)
+	{
+		static $cache;
+		if (!$cache)
+		{
+			$cache = array();
+		}
+
+		if ($iri === null)
+		{
+			return true;
+		}
+		elseif (isset($cache[$iri]))
+		{
+			list($this->scheme,
+				 $this->iuserinfo,
+				 $this->ihost,
+				 $this->port,
+				 $this->ipath,
+				 $this->iquery,
+				 $this->ifragment,
+				 $return) = $cache[$iri];
+			return $return;
+		}
+		else
+		{
+			$parsed = $this->parse_iri((string) $iri);
+			if (!$parsed)
+			{
+				return false;
+			}
+
+			$return = $this->set_scheme($parsed['scheme'])
+				&& $this->set_authority($parsed['authority'])
+				&& $this->set_path($parsed['path'])
+				&& $this->set_query($parsed['query'])
+				&& $this->set_fragment($parsed['fragment']);
+
+			$cache[$iri] = array($this->scheme,
+								 $this->iuserinfo,
+								 $this->ihost,
+								 $this->port,
+								 $this->ipath,
+								 $this->iquery,
+								 $this->ifragment,
+								 $return);
+			return $return;
+		}
+	}
+
+	/**
+	 * Set the scheme. Returns true on success, false on failure (if there are
+	 * any invalid characters).
+	 *
+	 * @param string $scheme
+	 * @return bool
+	 */
+	public function set_scheme($scheme)
+	{
+		if ($scheme === null)
+		{
+			$this->scheme = null;
+		}
+		elseif (!preg_match('/^[A-Za-z][0-9A-Za-z+\-.]*$/', $scheme))
+		{
+			$this->scheme = null;
+			return false;
+		}
+		else
+		{
+			$this->scheme = strtolower($scheme);
+		}
+		return true;
+	}
+
+	/**
+	 * Set the authority. Returns true on success, false on failure (if there are
+	 * any invalid characters).
+	 *
+	 * @param string $authority
+	 * @return bool
+	 */
+	public function set_authority($authority)
+	{
+		static $cache;
+		if (!$cache)
+			$cache = array();
+
+		if ($authority === null)
+		{
+			$this->iuserinfo = null;
+			$this->ihost = null;
+			$this->port = null;
+			return true;
+		}
+		elseif (isset($cache[$authority]))
+		{
+			list($this->iuserinfo,
+				 $this->ihost,
+				 $this->port,
+				 $return) = $cache[$authority];
+
+			return $return;
+		}
+		else
+		{
+			$remaining = $authority;
+			if (($iuserinfo_end = strrpos($remaining, '@')) !== false)
+			{
+				$iuserinfo = substr($remaining, 0, $iuserinfo_end);
+				$remaining = substr($remaining, $iuserinfo_end + 1);
+			}
+			else
+			{
+				$iuserinfo = null;
+			}
+			if (($port_start = strpos($remaining, ':', strpos($remaining, ']'))) !== false)
+			{
+				if (($port = substr($remaining, $port_start + 1)) === false)
+				{
+					$port = null;
+				}
+				$remaining = substr($remaining, 0, $port_start);
+			}
+			else
+			{
+				$port = null;
+			}
+
+			$return = $this->set_userinfo($iuserinfo) &&
+					  $this->set_host($remaining) &&
+					  $this->set_port($port);
+
+			$cache[$authority] = array($this->iuserinfo,
+									   $this->ihost,
+									   $this->port,
+									   $return);
+
+			return $return;
+		}
+	}
+
+	/**
+	 * Set the iuserinfo.
+	 *
+	 * @param string $iuserinfo
+	 * @return bool
+	 */
+	public function set_userinfo($iuserinfo)
+	{
+		if ($iuserinfo === null)
+		{
+			$this->iuserinfo = null;
+		}
+		else
+		{
+			$this->iuserinfo = $this->replace_invalid_with_pct_encoding($iuserinfo, '!$&\'()*+,;=:');
+			$this->scheme_normalization();
+		}
+
+		return true;
+	}
+
+	/**
+	 * Set the ihost. Returns true on success, false on failure (if there are
+	 * any invalid characters).
+	 *
+	 * @param string $ihost
+	 * @return bool
+	 */
+	public function set_host($ihost)
+	{
+		if ($ihost === null)
+		{
+			$this->ihost = null;
+			return true;
+		}
+		elseif (substr($ihost, 0, 1) === '[' && substr($ihost, -1) === ']')
+		{
+			if (SimplePie_Net_IPv6::check_ipv6(substr($ihost, 1, -1)))
+			{
+				$this->ihost = '[' . SimplePie_Net_IPv6::compress(substr($ihost, 1, -1)) . ']';
+			}
+			else
+			{
+				$this->ihost = null;
+				return false;
+			}
+		}
+		else
+		{
+			$ihost = $this->replace_invalid_with_pct_encoding($ihost, '!$&\'()*+,;=');
+
+			// Lowercase, but ignore pct-encoded sections (as they should
+			// remain uppercase). This must be done after the previous step
+			// as that can add unescaped characters.
+			$position = 0;
+			$strlen = strlen($ihost);
+			while (($position += strcspn($ihost, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ%', $position)) < $strlen)
+			{
+				if ($ihost[$position] === '%')
+				{
+					$position += 3;
+				}
+				else
+				{
+					$ihost[$position] = strtolower($ihost[$position]);
+					$position++;
+				}
+			}
+
+			$this->ihost = $ihost;
+		}
+
+		$this->scheme_normalization();
+
+		return true;
+	}
+
+	/**
+	 * Set the port. Returns true on success, false on failure (if there are
+	 * any invalid characters).
+	 *
+	 * @param string $port
+	 * @return bool
+	 */
+	public function set_port($port)
+	{
+		if ($port === null)
+		{
+			$this->port = null;
+			return true;
+		}
+		elseif (strspn($port, '0123456789') === strlen($port))
+		{
+			$this->port = (int) $port;
+			$this->scheme_normalization();
+			return true;
+		}
+		else
+		{
+			$this->port = null;
+			return false;
+		}
+	}
+
+	/**
+	 * Set the ipath.
+	 *
+	 * @param string $ipath
+	 * @return bool
+	 */
+	public function set_path($ipath)
+	{
+		static $cache;
+		if (!$cache)
+		{
+			$cache = array();
+		}
+
+		$ipath = (string) $ipath;
+
+		if (isset($cache[$ipath]))
+		{
+			$this->ipath = $cache[$ipath][(int) ($this->scheme !== null)];
+		}
+		else
+		{
+			$valid = $this->replace_invalid_with_pct_encoding($ipath, '!$&\'()*+,;=@:/');
+			$removed = $this->remove_dot_segments($valid);
+
+			$cache[$ipath] = array($valid, $removed);
+			$this->ipath =  ($this->scheme !== null) ? $removed : $valid;
+		}
+
+		$this->scheme_normalization();
+		return true;
+	}
+
+	/**
+	 * Set the iquery.
+	 *
+	 * @param string $iquery
+	 * @return bool
+	 */
+	public function set_query($iquery)
+	{
+		if ($iquery === null)
+		{
+			$this->iquery = null;
+		}
+		else
+		{
+			$this->iquery = $this->replace_invalid_with_pct_encoding($iquery, '!$&\'()*+,;=:@/?', true);
+			$this->scheme_normalization();
+		}
+		ret
