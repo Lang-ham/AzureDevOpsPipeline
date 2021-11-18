@@ -1093,4 +1093,146 @@ class SimplePie_IRI
 			$this->iquery = $this->replace_invalid_with_pct_encoding($iquery, '!$&\'()*+,;=:@/?', true);
 			$this->scheme_normalization();
 		}
-		ret
+		return true;
+	}
+
+	/**
+	 * Set the ifragment.
+	 *
+	 * @param string $ifragment
+	 * @return bool
+	 */
+	public function set_fragment($ifragment)
+	{
+		if ($ifragment === null)
+		{
+			$this->ifragment = null;
+		}
+		else
+		{
+			$this->ifragment = $this->replace_invalid_with_pct_encoding($ifragment, '!$&\'()*+,;=:@/?');
+			$this->scheme_normalization();
+		}
+		return true;
+	}
+
+	/**
+	 * Convert an IRI to a URI (or parts thereof)
+	 *
+	 * @return string
+	 */
+	public function to_uri($string)
+	{
+		static $non_ascii;
+		if (!$non_ascii)
+		{
+			$non_ascii = implode('', range("\x80", "\xFF"));
+		}
+
+		$position = 0;
+		$strlen = strlen($string);
+		while (($position += strcspn($string, $non_ascii, $position)) < $strlen)
+		{
+			$string = substr_replace($string, sprintf('%%%02X', ord($string[$position])), $position, 1);
+			$position += 3;
+			$strlen += 2;
+		}
+
+		return $string;
+	}
+
+	/**
+	 * Get the complete IRI
+	 *
+	 * @return string
+	 */
+	public function get_iri()
+	{
+		if (!$this->is_valid())
+		{
+			return false;
+		}
+
+		$iri = '';
+		if ($this->scheme !== null)
+		{
+			$iri .= $this->scheme . ':';
+		}
+		if (($iauthority = $this->get_iauthority()) !== null)
+		{
+			$iri .= '//' . $iauthority;
+		}
+		if ($this->ipath !== '')
+		{
+			$iri .= $this->ipath;
+		}
+		elseif (!empty($this->normalization[$this->scheme]['ipath']) && $iauthority !== null && $iauthority !== '')
+		{
+			$iri .= $this->normalization[$this->scheme]['ipath'];
+		}
+		if ($this->iquery !== null)
+		{
+			$iri .= '?' . $this->iquery;
+		}
+		if ($this->ifragment !== null)
+		{
+			$iri .= '#' . $this->ifragment;
+		}
+
+		return $iri;
+	}
+
+	/**
+	 * Get the complete URI
+	 *
+	 * @return string
+	 */
+	public function get_uri()
+	{
+		return $this->to_uri($this->get_iri());
+	}
+
+	/**
+	 * Get the complete iauthority
+	 *
+	 * @return string
+	 */
+	protected function get_iauthority()
+	{
+		if ($this->iuserinfo !== null || $this->ihost !== null || $this->port !== null)
+		{
+			$iauthority = '';
+			if ($this->iuserinfo !== null)
+			{
+				$iauthority .= $this->iuserinfo . '@';
+			}
+			if ($this->ihost !== null)
+			{
+				$iauthority .= $this->ihost;
+			}
+			if ($this->port !== null)
+			{
+				$iauthority .= ':' . $this->port;
+			}
+			return $iauthority;
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the complete authority
+	 *
+	 * @return string
+	 */
+	protected function get_authority()
+	{
+		$iauthority = $this->get_iauthority();
+		if (is_string($iauthority))
+			return $this->to_uri($iauthority);
+		else
+			return $iauthority;
+	}
+}
