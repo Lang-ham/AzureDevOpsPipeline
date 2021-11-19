@@ -1651,3 +1651,476 @@ class SimplePie_Misc
 				return 'windows-949';
 
 			case 'windows1250':
+				return 'windows-1250';
+
+			case 'windows1251':
+				return 'windows-1251';
+
+			case 'cp819':
+			case 'csisolatin1':
+			case 'ibm819':
+			case 'iso88591':
+			case 'iso885911987':
+			case 'isoir100':
+			case 'l1':
+			case 'latin1':
+			case 'windows1252':
+				return 'windows-1252';
+
+			case 'windows1253':
+				return 'windows-1253';
+
+			case 'csisolatin5':
+			case 'iso88599':
+			case 'iso885991989':
+			case 'isoir148':
+			case 'l5':
+			case 'latin5':
+			case 'windows1254':
+				return 'windows-1254';
+
+			case 'windows1255':
+				return 'windows-1255';
+
+			case 'windows1256':
+				return 'windows-1256';
+
+			case 'windows1257':
+				return 'windows-1257';
+
+			case 'windows1258':
+				return 'windows-1258';
+
+			default:
+				return $charset;
+		}
+	}
+
+	public static function get_curl_version()
+	{
+		if (is_array($curl = curl_version()))
+		{
+			$curl = $curl['version'];
+		}
+		elseif (substr($curl, 0, 5) === 'curl/')
+		{
+			$curl = substr($curl, 5, strcspn($curl, "\x09\x0A\x0B\x0C\x0D", 5));
+		}
+		elseif (substr($curl, 0, 8) === 'libcurl/')
+		{
+			$curl = substr($curl, 8, strcspn($curl, "\x09\x0A\x0B\x0C\x0D", 8));
+		}
+		else
+		{
+			$curl = 0;
+		}
+		return $curl;
+	}
+
+	/**
+	 * Strip HTML comments
+	 *
+	 * @param string $data Data to strip comments from
+	 * @return string Comment stripped string
+	 */
+	public static function strip_comments($data)
+	{
+		$output = '';
+		while (($start = strpos($data, '<!--')) !== false)
+		{
+			$output .= substr($data, 0, $start);
+			if (($end = strpos($data, '-->', $start)) !== false)
+			{
+				$data = substr_replace($data, '', 0, $end + 3);
+			}
+			else
+			{
+				$data = '';
+			}
+		}
+		return $output . $data;
+	}
+
+	public static function parse_date($dt)
+	{
+		$parser = SimplePie_Parse_Date::get();
+		return $parser->parse($dt);
+	}
+
+	/**
+	 * Decode HTML entities
+	 *
+	 * @deprecated Use DOMDocument instead
+	 * @param string $data Input data
+	 * @return string Output data
+	 */
+	public static function entities_decode($data)
+	{
+		$decoder = new SimplePie_Decode_HTML_Entities($data);
+		return $decoder->parse();
+	}
+
+	/**
+	 * Remove RFC822 comments
+	 *
+	 * @param string $data Data to strip comments from
+	 * @return string Comment stripped string
+	 */
+	public static function uncomment_rfc822($string)
+	{
+		$string = (string) $string;
+		$position = 0;
+		$length = strlen($string);
+		$depth = 0;
+
+		$output = '';
+
+		while ($position < $length && ($pos = strpos($string, '(', $position)) !== false)
+		{
+			$output .= substr($string, $position, $pos - $position);
+			$position = $pos + 1;
+			if ($string[$pos - 1] !== '\\')
+			{
+				$depth++;
+				while ($depth && $position < $length)
+				{
+					$position += strcspn($string, '()', $position);
+					if ($string[$position - 1] === '\\')
+					{
+						$position++;
+						continue;
+					}
+					elseif (isset($string[$position]))
+					{
+						switch ($string[$position])
+						{
+							case '(':
+								$depth++;
+								break;
+
+							case ')':
+								$depth--;
+								break;
+						}
+						$position++;
+					}
+					else
+					{
+						break;
+					}
+				}
+			}
+			else
+			{
+				$output .= '(';
+			}
+		}
+		$output .= substr($string, $position);
+
+		return $output;
+	}
+
+	public static function parse_mime($mime)
+	{
+		if (($pos = strpos($mime, ';')) === false)
+		{
+			return trim($mime);
+		}
+		else
+		{
+			return trim(substr($mime, 0, $pos));
+		}
+	}
+
+	public static function atom_03_construct_type($attribs)
+	{
+		if (isset($attribs['']['mode']) && strtolower(trim($attribs['']['mode']) === 'base64'))
+		{
+			$mode = SIMPLEPIE_CONSTRUCT_BASE64;
+		}
+		else
+		{
+			$mode = SIMPLEPIE_CONSTRUCT_NONE;
+		}
+		if (isset($attribs['']['type']))
+		{
+			switch (strtolower(trim($attribs['']['type'])))
+			{
+				case 'text':
+				case 'text/plain':
+					return SIMPLEPIE_CONSTRUCT_TEXT | $mode;
+
+				case 'html':
+				case 'text/html':
+					return SIMPLEPIE_CONSTRUCT_HTML | $mode;
+
+				case 'xhtml':
+				case 'application/xhtml+xml':
+					return SIMPLEPIE_CONSTRUCT_XHTML | $mode;
+
+				default:
+					return SIMPLEPIE_CONSTRUCT_NONE | $mode;
+			}
+		}
+		else
+		{
+			return SIMPLEPIE_CONSTRUCT_TEXT | $mode;
+		}
+	}
+
+	public static function atom_10_construct_type($attribs)
+	{
+		if (isset($attribs['']['type']))
+		{
+			switch (strtolower(trim($attribs['']['type'])))
+			{
+				case 'text':
+					return SIMPLEPIE_CONSTRUCT_TEXT;
+
+				case 'html':
+					return SIMPLEPIE_CONSTRUCT_HTML;
+
+				case 'xhtml':
+					return SIMPLEPIE_CONSTRUCT_XHTML;
+
+				default:
+					return SIMPLEPIE_CONSTRUCT_NONE;
+			}
+		}
+		return SIMPLEPIE_CONSTRUCT_TEXT;
+	}
+
+	public static function atom_10_content_construct_type($attribs)
+	{
+		if (isset($attribs['']['type']))
+		{
+			$type = strtolower(trim($attribs['']['type']));
+			switch ($type)
+			{
+				case 'text':
+					return SIMPLEPIE_CONSTRUCT_TEXT;
+
+				case 'html':
+					return SIMPLEPIE_CONSTRUCT_HTML;
+
+				case 'xhtml':
+					return SIMPLEPIE_CONSTRUCT_XHTML;
+			}
+			if (in_array(substr($type, -4), array('+xml', '/xml')) || substr($type, 0, 5) === 'text/')
+			{
+				return SIMPLEPIE_CONSTRUCT_NONE;
+			}
+			else
+			{
+				return SIMPLEPIE_CONSTRUCT_BASE64;
+			}
+		}
+		else
+		{
+			return SIMPLEPIE_CONSTRUCT_TEXT;
+		}
+	}
+
+	public static function is_isegment_nz_nc($string)
+	{
+		return (bool) preg_match('/^([A-Za-z0-9\-._~\x{A0}-\x{D7FF}\x{F900}-\x{FDCF}\x{FDF0}-\x{FFEF}\x{10000}-\x{1FFFD}\x{20000}-\x{2FFFD}\x{30000}-\x{3FFFD}\x{40000}-\x{4FFFD}\x{50000}-\x{5FFFD}\x{60000}-\x{6FFFD}\x{70000}-\x{7FFFD}\x{80000}-\x{8FFFD}\x{90000}-\x{9FFFD}\x{A0000}-\x{AFFFD}\x{B0000}-\x{BFFFD}\x{C0000}-\x{CFFFD}\x{D0000}-\x{DFFFD}\x{E1000}-\x{EFFFD}!$&\'()*+,;=@]|(%[0-9ABCDEF]{2}))+$/u', $string);
+	}
+
+	public static function space_seperated_tokens($string)
+	{
+		$space_characters = "\x20\x09\x0A\x0B\x0C\x0D";
+		$string_length = strlen($string);
+
+		$position = strspn($string, $space_characters);
+		$tokens = array();
+
+		while ($position < $string_length)
+		{
+			$len = strcspn($string, $space_characters, $position);
+			$tokens[] = substr($string, $position, $len);
+			$position += $len;
+			$position += strspn($string, $space_characters, $position);
+		}
+
+		return $tokens;
+	}
+
+	/**
+	 * Converts a unicode codepoint to a UTF-8 character
+	 *
+	 * @static
+	 * @param int $codepoint Unicode codepoint
+	 * @return string UTF-8 character
+	 */
+	public static function codepoint_to_utf8($codepoint)
+	{
+		$codepoint = (int) $codepoint;
+		if ($codepoint < 0)
+		{
+			return false;
+		}
+		else if ($codepoint <= 0x7f)
+		{
+			return chr($codepoint);
+		}
+		else if ($codepoint <= 0x7ff)
+		{
+			return chr(0xc0 | ($codepoint >> 6)) . chr(0x80 | ($codepoint & 0x3f));
+		}
+		else if ($codepoint <= 0xffff)
+		{
+			return chr(0xe0 | ($codepoint >> 12)) . chr(0x80 | (($codepoint >> 6) & 0x3f)) . chr(0x80 | ($codepoint & 0x3f));
+		}
+		else if ($codepoint <= 0x10ffff)
+		{
+			return chr(0xf0 | ($codepoint >> 18)) . chr(0x80 | (($codepoint >> 12) & 0x3f)) . chr(0x80 | (($codepoint >> 6) & 0x3f)) . chr(0x80 | ($codepoint & 0x3f));
+		}
+		else
+		{
+			// U+FFFD REPLACEMENT CHARACTER
+			return "\xEF\xBF\xBD";
+		}
+	}
+
+	/**
+	 * Similar to parse_str()
+	 *
+	 * Returns an associative array of name/value pairs, where the value is an
+	 * array of values that have used the same name
+	 *
+	 * @static
+	 * @param string $str The input string.
+	 * @return array
+	 */
+	public static function parse_str($str)
+	{
+		$return = array();
+		$str = explode('&', $str);
+
+		foreach ($str as $section)
+		{
+			if (strpos($section, '=') !== false)
+			{
+				list($name, $value) = explode('=', $section, 2);
+				$return[urldecode($name)][] = urldecode($value);
+			}
+			else
+			{
+				$return[urldecode($section)][] = null;
+			}
+		}
+
+		return $return;
+	}
+
+	/**
+	 * Detect XML encoding, as per XML 1.0 Appendix F.1
+	 *
+	 * @todo Add support for EBCDIC
+	 * @param string $data XML data
+	 * @param SimplePie_Registry $registry Class registry
+	 * @return array Possible encodings
+	 */
+	public static function xml_encoding($data, $registry)
+	{
+		// UTF-32 Big Endian BOM
+		if (substr($data, 0, 4) === "\x00\x00\xFE\xFF")
+		{
+			$encoding[] = 'UTF-32BE';
+		}
+		// UTF-32 Little Endian BOM
+		elseif (substr($data, 0, 4) === "\xFF\xFE\x00\x00")
+		{
+			$encoding[] = 'UTF-32LE';
+		}
+		// UTF-16 Big Endian BOM
+		elseif (substr($data, 0, 2) === "\xFE\xFF")
+		{
+			$encoding[] = 'UTF-16BE';
+		}
+		// UTF-16 Little Endian BOM
+		elseif (substr($data, 0, 2) === "\xFF\xFE")
+		{
+			$encoding[] = 'UTF-16LE';
+		}
+		// UTF-8 BOM
+		elseif (substr($data, 0, 3) === "\xEF\xBB\xBF")
+		{
+			$encoding[] = 'UTF-8';
+		}
+		// UTF-32 Big Endian Without BOM
+		elseif (substr($data, 0, 20) === "\x00\x00\x00\x3C\x00\x00\x00\x3F\x00\x00\x00\x78\x00\x00\x00\x6D\x00\x00\x00\x6C")
+		{
+			if ($pos = strpos($data, "\x00\x00\x00\x3F\x00\x00\x00\x3E"))
+			{
+				$parser = $registry->create('XML_Declaration_Parser', array(SimplePie_Misc::change_encoding(substr($data, 20, $pos - 20), 'UTF-32BE', 'UTF-8')));
+				if ($parser->parse())
+				{
+					$encoding[] = $parser->encoding;
+				}
+			}
+			$encoding[] = 'UTF-32BE';
+		}
+		// UTF-32 Little Endian Without BOM
+		elseif (substr($data, 0, 20) === "\x3C\x00\x00\x00\x3F\x00\x00\x00\x78\x00\x00\x00\x6D\x00\x00\x00\x6C\x00\x00\x00")
+		{
+			if ($pos = strpos($data, "\x3F\x00\x00\x00\x3E\x00\x00\x00"))
+			{
+				$parser = $registry->create('XML_Declaration_Parser', array(SimplePie_Misc::change_encoding(substr($data, 20, $pos - 20), 'UTF-32LE', 'UTF-8')));
+				if ($parser->parse())
+				{
+					$encoding[] = $parser->encoding;
+				}
+			}
+			$encoding[] = 'UTF-32LE';
+		}
+		// UTF-16 Big Endian Without BOM
+		elseif (substr($data, 0, 10) === "\x00\x3C\x00\x3F\x00\x78\x00\x6D\x00\x6C")
+		{
+			if ($pos = strpos($data, "\x00\x3F\x00\x3E"))
+			{
+				$parser = $registry->create('XML_Declaration_Parser', array(SimplePie_Misc::change_encoding(substr($data, 20, $pos - 10), 'UTF-16BE', 'UTF-8')));
+				if ($parser->parse())
+				{
+					$encoding[] = $parser->encoding;
+				}
+			}
+			$encoding[] = 'UTF-16BE';
+		}
+		// UTF-16 Little Endian Without BOM
+		elseif (substr($data, 0, 10) === "\x3C\x00\x3F\x00\x78\x00\x6D\x00\x6C\x00")
+		{
+			if ($pos = strpos($data, "\x3F\x00\x3E\x00"))
+			{
+				$parser = $registry->create('XML_Declaration_Parser', array(SimplePie_Misc::change_encoding(substr($data, 20, $pos - 10), 'UTF-16LE', 'UTF-8')));
+				if ($parser->parse())
+				{
+					$encoding[] = $parser->encoding;
+				}
+			}
+			$encoding[] = 'UTF-16LE';
+		}
+		// US-ASCII (or superset)
+		elseif (substr($data, 0, 5) === "\x3C\x3F\x78\x6D\x6C")
+		{
+			if ($pos = strpos($data, "\x3F\x3E"))
+			{
+				$parser = $registry->create('XML_Declaration_Parser', array(substr($data, 5, $pos - 5)));
+				if ($parser->parse())
+				{
+					$encoding[] = $parser->encoding;
+				}
+			}
+			$encoding[] = 'UTF-8';
+		}
+		// Fallback to UTF-8
+		else
+		{
+			$encoding[] = 'UTF-8';
+		}
+		return $encoding;
+	}
+
+	public static function output_javascript()
+	{
+		
