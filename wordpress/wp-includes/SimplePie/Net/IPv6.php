@@ -239,4 +239,38 @@ class SimplePie_Net_IPv6
 					$ipv6_part = '0';
 
 				// Check the value is valid
-				$value = hexdec($ipv6
+				$value = hexdec($ipv6_part);
+				if (dechex($value) !== strtolower($ipv6_part) || $value < 0 || $value > 0xFFFF)
+					return false;
+			}
+			if (count($ipv4) === 4)
+			{
+				foreach ($ipv4 as $ipv4_part)
+				{
+					$value = (int) $ipv4_part;
+					if ((string) $value !== $ipv4_part || $value < 0 || $value > 0xFF)
+						return false;
+				}
+			}
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	/**
+	 * Checks if the given IP is a valid IPv6 address
+	 *
+	 * @codeCoverageIgnore
+	 * @deprecated Use {@see SimplePie_Net_IPv6::check_ipv6()} instead
+	 * @see check_ipv6
+	 * @param string $ip An IPv6 address
+	 * @return bool true if $ip is a valid IPv6 address
+	 */
+	public static function checkIPv6($ip)
+	{
+		return self::check_ipv6($ip);
+	}
+}
