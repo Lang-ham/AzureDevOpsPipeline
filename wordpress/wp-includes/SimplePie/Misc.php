@@ -2123,4 +2123,125 @@ class SimplePie_Misc
 
 	public static function output_javascript()
 	{
-		
+		if (function_exists('ob_gzhandler'))
+		{
+			ob_start('ob_gzhandler');
+		}
+		header('Content-type: text/javascript; charset: UTF-8');
+		header('Cache-Control: must-revalidate');
+		header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 604800) . ' GMT'); // 7 days
+		?>
+function embed_quicktime(type, bgcolor, width, height, link, placeholder, loop) {
+	if (placeholder != '') {
+		document.writeln('<embed type="'+type+'" style="cursor:hand; cursor:pointer;" href="'+link+'" src="'+placeholder+'" width="'+width+'" height="'+height+'" autoplay="false" target="myself" controller="false" loop="'+loop+'" scale="aspect" bgcolor="'+bgcolor+'" pluginspage="http://www.apple.com/quicktime/download/"></embed>');
+	}
+	else {
+		document.writeln('<embed type="'+type+'" style="cursor:hand; cursor:pointer;" src="'+link+'" width="'+width+'" height="'+height+'" autoplay="false" target="myself" controller="true" loop="'+loop+'" scale="aspect" bgcolor="'+bgcolor+'" pluginspage="http://www.apple.com/quicktime/download/"></embed>');
+	}
+}
+
+function embed_flash(bgcolor, width, height, link, loop, type) {
+	document.writeln('<embed src="'+link+'" pluginspage="http://www.macromedia.com/go/getflashplayer" type="'+type+'" quality="high" width="'+width+'" height="'+height+'" bgcolor="'+bgcolor+'" loop="'+loop+'"></embed>');
+}
+
+function embed_flv(width, height, link, placeholder, loop, player) {
+	document.writeln('<embed src="'+player+'" pluginspage="http://www.macromedia.com/go/getflashplayer" type="application/x-shockwave-flash" quality="high" width="'+width+'" height="'+height+'" wmode="transparent" flashvars="file='+link+'&autostart=false&repeat='+loop+'&showdigits=true&showfsbutton=false"></embed>');
+}
+
+function embed_wmedia(width, height, link) {
+	document.writeln('<embed type="application/x-mplayer2" src="'+link+'" autosize="1" width="'+width+'" height="'+height+'" showcontrols="1" showstatusbar="0" showdisplay="0" autostart="0"></embed>');
+}
+		<?php
+	}
+
+	/**
+	 * Get the SimplePie build timestamp
+	 *
+	 * Uses the git index if it exists, otherwise uses the modification time
+	 * of the newest file.
+	 */
+	public static function get_build()
+	{
+		$root = dirname(dirname(__FILE__));
+		if (file_exists($root . '/.git/index'))
+		{
+			return filemtime($root . '/.git/index');
+		}
+		elseif (file_exists($root . '/SimplePie'))
+		{
+			$time = 0;
+			foreach (glob($root . '/SimplePie/*.php') as $file)
+			{
+				if (($mtime = filemtime($file)) > $time)
+				{
+					$time = $mtime;
+				}
+			}
+			return $time;
+		}
+		elseif (file_exists(dirname(__FILE__) . '/Core.php'))
+		{
+			return filemtime(dirname(__FILE__) . '/Core.php');
+		}
+		else
+		{
+			return filemtime(__FILE__);
+		}
+	}
+
+	/**
+	 * Format debugging information
+	 */
+	public static function debug(&$sp)
+	{
+		$info = 'SimplePie ' . SIMPLEPIE_VERSION . ' Build ' . SIMPLEPIE_BUILD . "\n";
+		$info .= 'PHP ' . PHP_VERSION . "\n";
+		if ($sp->error() !== null)
+		{
+			$info .= 'Error occurred: ' . $sp->error() . "\n";
+		}
+		else
+		{
+			$info .= "No error found.\n";
+		}
+		$info .= "Extensions:\n";
+		$extensions = array('pcre', 'curl', 'zlib', 'mbstring', 'iconv', 'xmlreader', 'xml');
+		foreach ($extensions as $ext)
+		{
+			if (extension_loaded($ext))
+			{
+				$info .= "    $ext loaded\n";
+				switch ($ext)
+				{
+					case 'pcre':
+						$info .= '      Version ' . PCRE_VERSION . "\n";
+						break;
+					case 'curl':
+						$version = curl_version();
+						$info .= '      Version ' . $version['version'] . "\n";
+						break;
+					case 'mbstring':
+						$info .= '      Overloading: ' . mb_get_info('func_overload') . "\n";
+						break;
+					case 'iconv':
+						$info .= '      Version ' . ICONV_VERSION . "\n";
+						break;
+					case 'xml':
+						$info .= '      Version ' . LIBXML_DOTTED_VERSION . "\n";
+						break;
+				}
+			}
+			else
+			{
+				$info .= "    $ext not loaded\n";
+			}
+		}
+		return $info;
+	}
+
+	public static function silence_errors($num, $str)
+	{
+		// No-op
+	}
+}
+
