@@ -428,4 +428,11 @@ class Text_Diff_Engine_native {
                 $changed[--$i] = 0;
                 assert($j > 0);
                 while ($other_changed[--$j]) {
- 
+                    continue;
+                }
+                assert($j >= 0 && !$other_changed[$j]);
+            }
+        }
+    }
+
+}
