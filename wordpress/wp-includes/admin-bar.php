@@ -275,3 +275,379 @@ function wp_admin_bar_my_account_menu( $wp_admin_bar ) {
 		$wp_admin_bar->add_menu( array(
 			'parent' => 'user-actions',
 			'id'     => 'edit-profile',
+			'title'  => __( 'Edit My Profile' ),
+			'href'   => $profile_url,
+		) );
+	}
+
+	$wp_admin_bar->add_menu( array(
+		'parent' => 'user-actions',
+		'id'     => 'logout',
+		'title'  => __( 'Log Out' ),
+		'href'   => wp_logout_url(),
+	) );
+}
+
+/**
+ * Add the "Site Name" menu.
+ *
+ * @since 3.3.0
+ *
+ * @param WP_Admin_Bar $wp_admin_bar
+ */
+function wp_admin_bar_site_menu( $wp_admin_bar ) {
+	// Don't show for logged out users.
+	if ( ! is_user_logged_in() )
+		return;
+
+	// Show only when the user is a member of this site, or they're a super admin.
+	if ( ! is_user_member_of_blog() && ! current_user_can( 'manage_network' ) ) {
+		return;
+	}
+
+	$blogname = get_bloginfo('name');
+
+	if ( ! $blogname ) {
+		$blogname = preg_replace( '#^(https?://)?(www.)?#', '', get_home_url() );
+	}
+
+	if ( is_network_admin() ) {
+		/* translators: %s: site name */
+		$blogname = sprintf( __( 'Network Admin: %s' ), esc_html( get_network()->site_name ) );
+	} elseif ( is_user_admin() ) {
+		/* translators: %s: site name */
+		$blogname = sprintf( __( 'User Dashboard: %s' ), esc_html( get_network()->site_name ) );
+	}
+
+	$title = wp_html_excerpt( $blogname, 40, '&hellip;' );
+
+	$wp_admin_bar->add_menu( array(
+		'id'    => 'site-name',
+		'title' => $title,
+		'href'  => ( is_admin() || ! current_user_can( 'read' ) ) ? home_url( '/' ) : admin_url(),
+	) );
+
+	// Create submenu items.
+
+	if ( is_admin() ) {
+		// Add an option to visit the site.
+		$wp_admin_bar->add_menu( array(
+			'parent' => 'site-name',
+			'id'     => 'view-site',
+			'title'  => __( 'Visit Site' ),
+			'href'   => home_url( '/' ),
+		) );
+
+		if ( is_blog_admin() && is_multisite() && current_user_can( 'manage_sites' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'site-name',
+				'id'     => 'edit-site',
+				'title'  => __( 'Edit Site' ),
+				'href'   => network_admin_url( 'site-info.php?id=' . get_current_blog_id() ),
+			) );
+		}
+
+	} else if ( current_user_can( 'read' ) ) {
+		// We're on the front end, link to the Dashboard.
+		$wp_admin_bar->add_menu( array(
+			'parent' => 'site-name',
+			'id'     => 'dashboard',
+			'title'  => __( 'Dashboard' ),
+			'href'   => admin_url(),
+		) );
+
+		// Add the appearance submenu items.
+		wp_admin_bar_appearance_menu( $wp_admin_bar );
+	}
+}
+
+/**
+ * Adds the "Customize" link to the Toolbar.
+ *
+ * @since 4.3.0
+ *
+ * @param WP_Admin_Bar $wp_admin_bar WP_Admin_Bar instance.
+ * @global WP_Customize_Manager $wp_customize
+ */
+function wp_admin_bar_customize_menu( $wp_admin_bar ) {
+	global $wp_customize;
+
+	// Don't show for users who can't access the customizer or when in the admin.
+	if ( ! current_user_can( 'customize' ) || is_admin() ) {
+		return;
+	}
+
+	// Don't show if the user cannot edit a given customize_changeset post currently being previewed.
+	if ( is_customize_preview() && $wp_customize->changeset_post_id() && ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->edit_post, $wp_customize->changeset_post_id() ) ) {
+		return;
+	}
+
+	$current_url = ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+	if ( is_customize_preview() && $wp_customize->changeset_uuid() ) {
+		$current_url = remove_query_arg( 'customize_changeset_uuid', $current_url );
+	}
+
+	$customize_url = add_query_arg( 'url', urlencode( $current_url ), wp_customize_url() );
+	if ( is_customize_preview() ) {
+		$customize_url = add_query_arg( array( 'changeset_uuid' => $wp_customize->changeset_uuid() ), $customize_url );
+	}
+
+	$wp_admin_bar->add_menu( array(
+		'id'     => 'customize',
+		'title'  => __( 'Customize' ),
+		'href'   => $customize_url,
+		'meta'   => array(
+			'class' => 'hide-if-no-customize',
+		),
+	) );
+	add_action( 'wp_before_admin_bar_render', 'wp_customize_support_script' );
+}
+
+/**
+ * Add the "My Sites/[Site Name]" menu and all submenus.
+ *
+ * @since 3.1.0
+ *
+ * @param WP_Admin_Bar $wp_admin_bar
+ */
+function wp_admin_bar_my_sites_menu( $wp_admin_bar ) {
+	// Don't show for logged out users or single site mode.
+	if ( ! is_user_logged_in() || ! is_multisite() )
+		return;
+
+	// Show only when the user has at least one site, or they're a super admin.
+	if ( count( $wp_admin_bar->user->blogs ) < 1 && ! current_user_can( 'manage_network' ) ) {
+		return;
+	}
+
+	if ( $wp_admin_bar->user->active_blog ) {
+		$my_sites_url = get_admin_url( $wp_admin_bar->user->active_blog->blog_id, 'my-sites.php' );
+	} else {
+		$my_sites_url = admin_url( 'my-sites.php' );
+	}
+
+	$wp_admin_bar->add_menu( array(
+		'id'    => 'my-sites',
+		'title' => __( 'My Sites' ),
+		'href'  => $my_sites_url,
+	) );
+
+	if ( current_user_can( 'manage_network' ) ) {
+		$wp_admin_bar->add_group( array(
+			'parent' => 'my-sites',
+			'id'     => 'my-sites-super-admin',
+		) );
+
+		$wp_admin_bar->add_menu( array(
+			'parent' => 'my-sites-super-admin',
+			'id'     => 'network-admin',
+			'title'  => __('Network Admin'),
+			'href'   => network_admin_url(),
+		) );
+
+		$wp_admin_bar->add_menu( array(
+			'parent' => 'network-admin',
+			'id'     => 'network-admin-d',
+			'title'  => __( 'Dashboard' ),
+			'href'   => network_admin_url(),
+		) );
+
+		if ( current_user_can( 'manage_sites' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'network-admin',
+				'id'     => 'network-admin-s',
+				'title'  => __( 'Sites' ),
+				'href'   => network_admin_url( 'sites.php' ),
+			) );
+		}
+
+		if ( current_user_can( 'manage_network_users' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'network-admin',
+				'id'     => 'network-admin-u',
+				'title'  => __( 'Users' ),
+				'href'   => network_admin_url( 'users.php' ),
+			) );
+		}
+
+		if ( current_user_can( 'manage_network_themes' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'network-admin',
+				'id'     => 'network-admin-t',
+				'title'  => __( 'Themes' ),
+				'href'   => network_admin_url( 'themes.php' ),
+			) );
+		}
+
+		if ( current_user_can( 'manage_network_plugins' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'network-admin',
+				'id'     => 'network-admin-p',
+				'title'  => __( 'Plugins' ),
+				'href'   => network_admin_url( 'plugins.php' ),
+			) );
+		}
+
+		if ( current_user_can( 'manage_network_options' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => 'network-admin',
+				'id'     => 'network-admin-o',
+				'title'  => __( 'Settings' ),
+				'href'   => network_admin_url( 'settings.php' ),
+			) );
+		}
+	}
+
+	// Add site links
+	$wp_admin_bar->add_group( array(
+		'parent' => 'my-sites',
+		'id'     => 'my-sites-list',
+		'meta'   => array(
+			'class' => current_user_can( 'manage_network' ) ? 'ab-sub-secondary' : '',
+		),
+	) );
+
+	foreach ( (array) $wp_admin_bar->user->blogs as $blog ) {
+		switch_to_blog( $blog->userblog_id );
+
+		$blavatar = '<div class="blavatar"></div>';
+
+		$blogname = $blog->blogname;
+
+		if ( ! $blogname ) {
+			$blogname = preg_replace( '#^(https?://)?(www.)?#', '', get_home_url() );
+		}
+
+		$menu_id  = 'blog-' . $blog->userblog_id;
+
+		if ( current_user_can( 'read' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent'    => 'my-sites-list',
+				'id'        => $menu_id,
+				'title'     => $blavatar . $blogname,
+				'href'      => admin_url(),
+			) );
+
+			$wp_admin_bar->add_menu( array(
+				'parent' => $menu_id,
+				'id'     => $menu_id . '-d',
+				'title'  => __( 'Dashboard' ),
+				'href'   => admin_url(),
+			) );
+		} else {
+			$wp_admin_bar->add_menu( array(
+				'parent'    => 'my-sites-list',
+				'id'        => $menu_id,
+				'title'     => $blavatar . $blogname,
+				'href'      => home_url(),
+			) );
+		}
+
+		if ( current_user_can( get_post_type_object( 'post' )->cap->create_posts ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => $menu_id,
+				'id'     => $menu_id . '-n',
+				'title'  => __( 'New Post' ),
+				'href'   => admin_url( 'post-new.php' ),
+			) );
+		}
+
+		if ( current_user_can( 'edit_posts' ) ) {
+			$wp_admin_bar->add_menu( array(
+				'parent' => $menu_id,
+				'id'     => $menu_id . '-c',
+				'title'  => __( 'Manage Comments' ),
+				'href'   => admin_url( 'edit-comments.php' ),
+			) );
+		}
+
+		$wp_admin_bar->add_menu( array(
+			'parent' => $menu_id,
+			'id'     => $menu_id . '-v',
+			'title'  => __( 'Visit Site' ),
+			'href'   => home_url( '/' ),
+		) );
+
+		restore_current_blog();
+	}
+}
+
+/**
+ * Provide a shortlink.
+ *
+ * @since 3.1.0
+ *
+ * @param WP_Admin_Bar $wp_admin_bar
+ */
+function wp_admin_bar_shortlink_menu( $wp_admin_bar ) {
+	$short = wp_get_shortlink( 0, 'query' );
+	$id = 'get-shortlink';
+
+	if ( empty( $short ) )
+		return;
+
+	$html = '<input class="shortlink-input" type="text" readonly="readonly" value="' . esc_attr( $short ) . '" />';
+
+	$wp_admin_bar->add_menu( array(
+		'id' => $id,
+		'title' => __( 'Shortlink' ),
+		'href' => $short,
+		'meta' => array( 'html' => $html ),
+	) );
+}
+
+/**
+ * Provide an edit link for posts and terms.
+ *
+ * @since 3.1.0
+ *
+ * @global WP_Term  $tag
+ * @global WP_Query $wp_the_query
+ *
+ * @param WP_Admin_Bar $wp_admin_bar
+ */
+function wp_admin_bar_edit_menu( $wp_admin_bar ) {
+	global $tag, $wp_the_query, $user_id;
+
+	if ( is_admin() ) {
+		$current_screen = get_current_screen();
+		$post = get_post();
+
+		if ( 'post' == $current_screen->base
+			&& 'add' != $current_screen->action
+			&& ( $post_type_object = get_post_type_object( $post->post_type ) )
+			&& current_user_can( 'read_post', $post->ID )
+			&& ( $post_type_object->public )
+			&& ( $post_type_object->show_in_admin_bar ) )
+		{
+			if ( 'draft' == $post->post_status ) {
+				$preview_link = get_preview_post_link( $post );
+				$wp_admin_bar->add_menu( array(
+					'id' => 'preview',
+					'title' => $post_type_object->labels->view_item,
+					'href' => esc_url( $preview_link ),
+					'meta' => array( 'target' => 'wp-preview-' . $post->ID ),
+				) );
+			} else {
+				$wp_admin_bar->add_menu( array(
+					'id' => 'view',
+					'title' => $post_type_object->labels->view_item,
+					'href' => get_permalink( $post->ID )
+				) );
+			}
+		} elseif ( 'edit' == $current_screen->base
+ 			&& ( $post_type_object = get_post_type_object( $current_screen->post_type ) )
+ 			&& ( $post_type_object->public )
+ 			&& ( $post_type_object->show_in_admin_bar )
+ 			&& ( get_post_type_archive_link( $post_type_object->name ) )
+			&& ! ( 'post' === $post_type_object->name && 'posts' === get_option( 'show_on_front' ) ) )
+ 		{
+ 			$wp_admin_bar->add_node( array(
+ 				'id' => 'archive',
+ 				'title' => $post_type_object->labels->view_items,
+ 				'href' => get_post_type_archive_link( $current_screen->post_type )
+ 			) );
+		} elseif ( 'term' == $current_screen->base
+			&& isset( $tag ) && is_object( $tag ) && ! is_wp_error( $tag )
+			&& ( $tax = get_taxonomy( $tag->taxonomy ) )
+			&
