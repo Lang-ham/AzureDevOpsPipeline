@@ -447,4 +447,245 @@ function wp_dropdown_categories( $args = '' ) {
  * Display or retrieve the HTML list of categories.
  *
  * @since 2.1.0
- * @since 4.4.0 Introduced
+ * @since 4.4.0 Introduced the `hide_title_if_empty` and `separator` arguments. The `current_category` argument was modified to
+ *              optionally accept an array of values.
+ *
+ * @param string|array $args {
+ *     Array of optional arguments.
+ *
+ *     @type int          $child_of              Term ID to retrieve child terms of. See get_terms(). Default 0.
+ *     @type int|array    $current_category      ID of category, or array of IDs of categories, that should get the
+ *                                               'current-cat' class. Default 0.
+ *     @type int          $depth                 Category depth. Used for tab indentation. Default 0.
+ *     @type bool|int     $echo                  True to echo markup, false to return it. Default 1.
+ *     @type array|string $exclude               Array or comma/space-separated string of term IDs to exclude.
+ *                                               If `$hierarchical` is true, descendants of `$exclude` terms will also
+ *                                               be excluded; see `$exclude_tree`. See get_terms().
+ *                                               Default empty string.
+ *     @type array|string $exclude_tree          Array or comma/space-separated string of term IDs to exclude, along
+ *                                               with their descendants. See get_terms(). Default empty string.
+ *     @type string       $feed                  Text to use for the feed link. Default 'Feed for all posts filed
+ *                                               under [cat name]'.
+ *     @type string       $feed_image            URL of an image to use for the feed link. Default empty string.
+ *     @type string       $feed_type             Feed type. Used to build feed link. See get_term_feed_link().
+ *                                               Default empty string (default feed).
+ *     @type bool|int     $hide_empty            Whether to hide categories that don't have any posts attached to them.
+ *                                               Default 1.
+ *     @type bool         $hide_title_if_empty   Whether to hide the `$title_li` element if there are no terms in
+ *                                               the list. Default false (title will always be shown).
+ *     @type bool         $hierarchical          Whether to include terms that have non-empty descendants.
+ *                                               See get_terms(). Default true.
+ *     @type string       $order                 Which direction to order categories. Accepts 'ASC' or 'DESC'.
+ *                                               Default 'ASC'.
+ *     @type string       $orderby               The column to use for ordering categories. Default 'name'.
+ *     @type string       $separator             Separator between links. Default '<br />'.
+ *     @type bool|int     $show_count            Whether to show how many posts are in the category. Default 0.
+ *     @type string       $show_option_all       Text to display for showing all categories. Default empty string.
+ *     @type string       $show_option_none      Text to display for the 'no categories' option.
+ *                                               Default 'No categories'.
+ *     @type string       $style                 The style used to display the categories list. If 'list', categories
+ *                                               will be output as an unordered list. If left empty or another value,
+ *                                               categories will be output separated by `<br>` tags. Default 'list'.
+ *     @type string       $taxonomy              Taxonomy name. Default 'category'.
+ *     @type string       $title_li              Text to use for the list title `<li>` element. Pass an empty string
+ *                                               to disable. Default 'Categories'.
+ *     @type bool|int     $use_desc_for_title    Whether to use the category description as the title attribute.
+ *                                               Default 1.
+ * }
+ * @return false|string HTML content only if 'echo' argument is 0.
+ */
+function wp_list_categories( $args = '' ) {
+	$defaults = array(
+		'child_of'            => 0,
+		'current_category'    => 0,
+		'depth'               => 0,
+		'echo'                => 1,
+		'exclude'             => '',
+		'exclude_tree'        => '',
+		'feed'                => '',
+		'feed_image'          => '',
+		'feed_type'           => '',
+		'hide_empty'          => 1,
+		'hide_title_if_empty' => false,
+		'hierarchical'        => true,
+		'order'               => 'ASC',
+		'orderby'             => 'name',
+		'separator'           => '<br />',
+		'show_count'          => 0,
+		'show_option_all'     => '',
+		'show_option_none'    => __( 'No categories' ),
+		'style'               => 'list',
+		'taxonomy'            => 'category',
+		'title_li'            => __( 'Categories' ),
+		'use_desc_for_title'  => 1,
+	);
+
+	$r = wp_parse_args( $args, $defaults );
+
+	if ( !isset( $r['pad_counts'] ) && $r['show_count'] && $r['hierarchical'] )
+		$r['pad_counts'] = true;
+
+	// Descendants of exclusions should be excluded too.
+	if ( true == $r['hierarchical'] ) {
+		$exclude_tree = array();
+
+		if ( $r['exclude_tree'] ) {
+			$exclude_tree = array_merge( $exclude_tree, wp_parse_id_list( $r['exclude_tree'] ) );
+		}
+
+		if ( $r['exclude'] ) {
+			$exclude_tree = array_merge( $exclude_tree, wp_parse_id_list( $r['exclude'] ) );
+		}
+
+		$r['exclude_tree'] = $exclude_tree;
+		$r['exclude'] = '';
+	}
+
+	if ( ! isset( $r['class'] ) )
+		$r['class'] = ( 'category' == $r['taxonomy'] ) ? 'categories' : $r['taxonomy'];
+
+	if ( ! taxonomy_exists( $r['taxonomy'] ) ) {
+		return false;
+	}
+
+	$show_option_all = $r['show_option_all'];
+	$show_option_none = $r['show_option_none'];
+
+	$categories = get_categories( $r );
+
+	$output = '';
+	if ( $r['title_li'] && 'list' == $r['style'] && ( ! empty( $categories ) || ! $r['hide_title_if_empty'] ) ) {
+		$output = '<li class="' . esc_attr( $r['class'] ) . '">' . $r['title_li'] . '<ul>';
+	}
+	if ( empty( $categories ) ) {
+		if ( ! empty( $show_option_none ) ) {
+			if ( 'list' == $r['style'] ) {
+				$output .= '<li class="cat-item-none">' . $show_option_none . '</li>';
+			} else {
+				$output .= $show_option_none;
+			}
+		}
+	} else {
+		if ( ! empty( $show_option_all ) ) {
+
+			$posts_page = '';
+
+			// For taxonomies that belong only to custom post types, point to a valid archive.
+			$taxonomy_object = get_taxonomy( $r['taxonomy'] );
+			if ( ! in_array( 'post', $taxonomy_object->object_type ) && ! in_array( 'page', $taxonomy_object->object_type ) ) {
+				foreach ( $taxonomy_object->object_type as $object_type ) {
+					$_object_type = get_post_type_object( $object_type );
+
+					// Grab the first one.
+					if ( ! empty( $_object_type->has_archive ) ) {
+						$posts_page = get_post_type_archive_link( $object_type );
+						break;
+					}
+				}
+			}
+
+			// Fallback for the 'All' link is the posts page.
+			if ( ! $posts_page ) {
+				if ( 'page' == get_option( 'show_on_front' ) && get_option( 'page_for_posts' ) ) {
+					$posts_page = get_permalink( get_option( 'page_for_posts' ) );
+				} else {
+					$posts_page = home_url( '/' );
+				}
+			}
+
+			$posts_page = esc_url( $posts_page );
+			if ( 'list' == $r['style'] ) {
+				$output .= "<li class='cat-item-all'><a href='$posts_page'>$show_option_all</a></li>";
+			} else {
+				$output .= "<a href='$posts_page'>$show_option_all</a>";
+			}
+		}
+
+		if ( empty( $r['current_category'] ) && ( is_category() || is_tax() || is_tag() ) ) {
+			$current_term_object = get_queried_object();
+			if ( $current_term_object && $r['taxonomy'] === $current_term_object->taxonomy ) {
+				$r['current_category'] = get_queried_object_id();
+			}
+		}
+
+		if ( $r['hierarchical'] ) {
+			$depth = $r['depth'];
+		} else {
+			$depth = -1; // Flat.
+		}
+		$output .= walk_category_tree( $categories, $depth, $r );
+	}
+
+	if ( $r['title_li'] && 'list' == $r['style'] && ( ! empty( $categories ) || ! $r['hide_title_if_empty'] ) ) {
+		$output .= '</ul></li>';
+	}
+
+	/**
+	 * Filters the HTML output of a taxonomy list.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param string $output HTML output.
+	 * @param array  $args   An array of taxonomy-listing arguments.
+	 */
+	$html = apply_filters( 'wp_list_categories', $output, $args );
+
+	if ( $r['echo'] ) {
+		echo $html;
+	} else {
+		return $html;
+	}
+}
+
+/**
+ * Display tag cloud.
+ *
+ * The text size is set by the 'smallest' and 'largest' arguments, which will
+ * use the 'unit' argument value for the CSS text size unit. The 'format'
+ * argument can be 'flat' (default), 'list', or 'array'. The flat value for the
+ * 'format' argument will separate tags with spaces. The list value for the
+ * 'format' argument will format the tags in a UL HTML list. The array value for
+ * the 'format' argument will return in PHP array type format.
+ *
+ * The 'orderby' argument will accept 'name' or 'count' and defaults to 'name'.
+ * The 'order' is the direction to sort, defaults to 'ASC' and can be 'DESC'.
+ *
+ * The 'number' argument is how many tags to return. By default, the limit will
+ * be to return the top 45 tags in the tag cloud list.
+ *
+ * The 'topic_count_text' argument is a nooped plural from _n_noop() to generate the
+ * text for the tag link count.
+ *
+ * The 'topic_count_text_callback' argument is a function, which given the count
+ * of the posts with that tag returns a text for the tag link count.
+ *
+ * The 'post_type' argument is used only when 'link' is set to 'edit'. It determines the post_type
+ * passed to edit.php for the popular tags edit links.
+ *
+ * The 'exclude' and 'include' arguments are used for the get_tags() function. Only one
+ * should be used, because only one will be used and the other ignored, if they are both set.
+ *
+ * @since 2.3.0
+ * @since 4.8.0 Added the `show_count` argument.
+ *
+ * @param array|string|null $args Optional. Override default arguments.
+ * @return void|array Generated tag cloud, only if no failures and 'array' is set for the 'format' argument.
+ *                    Otherwise, this function outputs the tag cloud.
+ */
+function wp_tag_cloud( $args = '' ) {
+	$defaults = array(
+		'smallest' => 8, 'largest' => 22, 'unit' => 'pt', 'number' => 45,
+		'format' => 'flat', 'separator' => "\n", 'orderby' => 'name', 'order' => 'ASC',
+		'exclude' => '', 'include' => '', 'link' => 'view', 'taxonomy' => 'post_tag', 'post_type' => '', 'echo' => true,
+		'show_count' => 0,
+	);
+	$args = wp_parse_args( $args, $defaults );
+
+	$tags = get_terms( $args['taxonomy'], array_merge( $args, array( 'orderby' => 'count', 'order' => 'DESC' ) ) ); // Always query top tags
+
+	if ( empty( $tags ) || is_wp_error( $tags ) )
+		return;
+
+	foreach ( $tags as $key => $tag ) {
+		if ( 'edit' == $args['link'] )
+			$link = get_edit_term_link( $tag->term_id, 
