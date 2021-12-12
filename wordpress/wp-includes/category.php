@@ -250,4 +250,111 @@ function sanitize_category( $category, $context = 'display' ) {
  * @return mixed Same type as $value after $value has been sanitized.
  */
 function sanitize_category_field( $field, $value, $cat_id, $context ) {
-	return sanitize_term_field( $field, $value, 
+	return sanitize_term_field( $field, $value, $cat_id, 'category', $context );
+}
+
+/* Tags */
+
+/**
+ * Retrieves all post tags.
+ *
+ * @since 2.3.0
+ * @see get_terms() For list of arguments to pass.
+ *
+ * @param string|array $args Tag arguments to use when retrieving tags.
+ * @return array List of tags.
+ */
+function get_tags( $args = '' ) {
+	$tags = get_terms( 'post_tag', $args );
+
+	if ( empty( $tags ) ) {
+		$return = array();
+		return $return;
+	}
+
+	/**
+	 * Filters the array of term objects returned for the 'post_tag' taxonomy.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param array $tags Array of 'post_tag' term objects.
+	 * @param array $args An array of arguments. @see get_terms()
+	 */
+	$tags = apply_filters( 'get_tags', $tags, $args );
+	return $tags;
+}
+
+/**
+ * Retrieve post tag by tag ID or tag object.
+ *
+ * If you pass the $tag parameter an object, which is assumed to be the tag row
+ * object retrieved the database. It will cache the tag data.
+ *
+ * If you pass $tag an integer of the tag ID, then that tag will
+ * be retrieved from the database, if it isn't already cached, and pass it back.
+ *
+ * If you look at get_term(), then both types will be passed through several
+ * filters and finally sanitized based on the $filter parameter value.
+ *
+ * @since 2.3.0
+ *
+ * @param int|WP_Term|object $tag    A tag ID or object.
+ * @param string             $output Optional. The required return type. One of OBJECT, ARRAY_A, or ARRAY_N, which correspond to
+ *                                   a WP_Term object, an associative array, or a numeric array, respectively. Default OBJECT.
+ * @param string             $filter Optional. Default is raw or no WordPress defined filter will applied.
+ * @return WP_Term|array|WP_Error|null Tag data in type defined by $output parameter. WP_Error if $tag is empty, null if it does not exist.
+ */
+function get_tag( $tag, $output = OBJECT, $filter = 'raw' ) {
+	return get_term( $tag, 'post_tag', $output, $filter );
+}
+
+/* Cache */
+
+/**
+ * Remove the category cache data based on ID.
+ *
+ * @since 2.1.0
+ *
+ * @param int $id Category ID
+ */
+function clean_category_cache( $id ) {
+	clean_term_cache( $id, 'category' );
+}
+
+/**
+ * Update category structure to old pre 2.3 from new taxonomy structure.
+ *
+ * This function was added for the taxonomy support to update the new category
+ * structure with the old category one. This will maintain compatibility with
+ * plugins and themes which depend on the old key or property names.
+ *
+ * The parameter should only be passed a variable and not create the array or
+ * object inline to the parameter. The reason for this is that parameter is
+ * passed by reference and PHP will fail unless it has the variable.
+ *
+ * There is no return value, because everything is updated on the variable you
+ * pass to it. This is one of the features with using pass by reference in PHP.
+ *
+ * @since 2.3.0
+ * @since 4.4.0 The `$category` parameter now also accepts a WP_Term object.
+ * @access private
+ *
+ * @param array|object|WP_Term $category Category Row object or array
+ */
+function _make_cat_compat( &$category ) {
+	if ( is_object( $category ) && ! is_wp_error( $category ) ) {
+		$category->cat_ID = $category->term_id;
+		$category->category_count = $category->count;
+		$category->category_description = $category->description;
+		$category->cat_name = $category->name;
+		$category->category_nicename = $category->slug;
+		$category->category_parent = $category->parent;
+	} elseif ( is_array( $category ) && isset( $category['term_id'] ) ) {
+		$category['cat_ID'] = &$category['term_id'];
+		$category['category_count'] = &$category['count'];
+		$category['category_description'] = &$category['description'];
+		$category['cat_name'] = &$category['name'];
+		$category['category_nicename'] = &$category['slug'];
+		$category['category_parent'] = &$category['parent'];
+	}
+}
