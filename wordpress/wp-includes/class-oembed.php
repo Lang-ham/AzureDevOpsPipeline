@@ -513,3 +513,217 @@ class WP_oEmbed {
 		$provider = add_query_arg( 'maxheight', (int) $args['height'], $provider );
 		$provider = add_query_arg( 'url', urlencode($url), $provider );
 		$provider = add_query_arg( 'dnt', 1, $provider );
+
+		/**
+		 * Filters the oEmbed URL to be fetched.
+		 *
+		 * @since 2.9.0
+		 * @since 4.9.0 The `dnt` (Do Not Track) query parameter was added to all oEmbed provider URLs.
+		 *
+		 * @param string $provider URL of the oEmbed provider.
+		 * @param string $url      URL of the content to be embedded.
+		 * @param array  $args     Optional arguments, usually passed from a shortcode.
+		 */
+		$provider = apply_filters( 'oembed_fetch_url', $provider, $url, $args );
+
+		foreach ( array( 'json', 'xml' ) as $format ) {
+			$result = $this->_fetch_with_format( $provider, $format );
+			if ( is_wp_error( $result ) && 'not-implemented' == $result->get_error_code() )
+				continue;
+			return ( $result && ! is_wp_error( $result ) ) ? $result : false;
+		}
+		return false;
+	}
+
+	/**
+	 * Fetches result from an oEmbed provider for a specific format and complete provider URL
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $provider_url_with_args URL to the provider with full arguments list (url, maxheight, etc.)
+	 * @param string $format Format to use
+	 * @return false|object|WP_Error False on failure, otherwise the result in the form of an object.
+	 */
+	private function _fetch_with_format( $provider_url_with_args, $format ) {
+		$provider_url_with_args = add_query_arg( 'format', $format, $provider_url_with_args );
+
+		/** This filter is documented in wp-includes/class-oembed.php */
+		$args = apply_filters( 'oembed_remote_get_args', array(), $provider_url_with_args );
+
+		$response = wp_safe_remote_get( $provider_url_with_args, $args );
+		if ( 501 == wp_remote_retrieve_response_code( $response ) )
+			return new WP_Error( 'not-implemented' );
+		if ( ! $body = wp_remote_retrieve_body( $response ) )
+			return false;
+		$parse_method = "_parse_$format";
+		return $this->$parse_method( $body );
+	}
+
+	/**
+	 * Parses a json response body.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $response_body
+	 * @return object|false
+	 */
+	private function _parse_json( $response_body ) {
+		$data = json_decode( trim( $response_body ) );
+		return ( $data && is_object( $data ) ) ? $data : false;
+	}
+
+	/**
+	 * Parses an XML response body.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $response_body
+	 * @return object|false
+	 */
+	private function _parse_xml( $response_body ) {
+		if ( ! function_exists( 'libxml_disable_entity_loader' ) )
+			return false;
+
+		$loader = libxml_disable_entity_loader( true );
+		$errors = libxml_use_internal_errors( true );
+
+		$return = $this->_parse_xml_body( $response_body );
+
+		libxml_use_internal_errors( $errors );
+		libxml_disable_entity_loader( $loader );
+
+		return $return;
+	}
+
+	/**
+	 * Serves as a helper function for parsing an XML response body.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @param string $response_body
+	 * @return stdClass|false
+	 */
+	private function _parse_xml_body( $response_body ) {
+		if ( ! function_exists( 'simplexml_import_dom' ) || ! class_exists( 'DOMDocument', false ) )
+			return false;
+
+		$dom = new DOMDocument;
+		$success = $dom->loadXML( $response_body );
+		if ( ! $success )
+			return false;
+
+		if ( isset( $dom->doctype ) )
+			return false;
+
+		foreach ( $dom->childNodes as $child ) {
+			if ( XML_DOCUMENT_TYPE_NODE === $child->nodeType )
+				return false;
+		}
+
+		$xml = simplexml_import_dom( $dom );
+		if ( ! $xml )
+			return false;
+
+		$return = new stdClass;
+		foreach ( $xml as $key => $value ) {
+			$return->$key = (string) $value;
+		}
+
+		return $return;
+	}
+
+	/**
+	 * Converts a data object from WP_oEmbed::fetch() and returns the HTML.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param object $data A data object result from an oEmbed provider.
+	 * @param string $url The URL to the content that is desired to be embedded.
+	 * @return false|string False on error, otherwise the HTML needed to embed.
+	 */
+	public function data2html( $data, $url ) {
+		if ( ! is_object( $data ) || empty( $data->type ) )
+			return false;
+
+		$return = false;
+
+		switch ( $data->type ) {
+			case 'photo':
+				if ( empty( $data->url ) || empty( $data->width ) || empty( $data->height ) )
+					break;
+				if ( ! is_string( $data->url ) || ! is_numeric( $data->width ) || ! is_numeric( $data->height ) )
+					break;
+
+				$title = ! empty( $data->title ) && is_string( $data->title ) ? $data->title : '';
+				$return = '<a href="' . esc_url( $url ) . '"><img src="' . esc_url( $data->url ) . '" alt="' . esc_attr($title) . '" width="' . esc_attr($data->width) . '" height="' . esc_attr($data->height) . '" /></a>';
+				break;
+
+			case 'video':
+			case 'rich':
+				if ( ! empty( $data->html ) && is_string( $data->html ) )
+					$return = $data->html;
+				break;
+
+			case 'link':
+				if ( ! empty( $data->title ) && is_string( $data->title ) )
+					$return = '<a href="' . esc_url( $url ) . '">' . esc_html( $data->title ) . '</a>';
+				break;
+
+			default:
+				$return = false;
+		}
+
+		/**
+		 * Filters the returned oEmbed HTML.
+		 *
+		 * Use this filter to add support for custom data types, or to filter the result.
+		 *
+		 * @since 2.9.0
+		 *
+		 * @param string $return The returned oEmbed HTML.
+		 * @param object $data   A data object result from an oEmbed provider.
+		 * @param string $url    The URL of the content to be embedded.
+		 */
+		return apply_filters( 'oembed_dataparse', $return, $data, $url );
+	}
+
+	/**
+	 * Strips any new lines from the HTML.
+	 *
+	 * @since 2.9.0 as strip_scribd_newlines()
+	 * @since 3.0.0
+	 *
+	 * @param string $html Existing HTML.
+	 * @param object $data Data object from WP_oEmbed::data2html()
+	 * @param string $url The original URL passed to oEmbed.
+	 * @return string Possibly modified $html
+	 */
+	public function _strip_newlines( $html, $data, $url ) {
+		if ( false === strpos( $html, "\n" ) ) {
+			return $html;
+		}
+
+		$count = 1;
+		$found = array();
+		$token = '__PRE__';
+		$search = array( "\t", "\n", "\r", ' ' );
+		$replace = array( '__TAB__', '__NL__', '__CR__', '__SPACE__' );
+		$tokenized = str_replace( $search, $replace, $html );
+
+		preg_match_all( '#(<pre[^>]*>.+?</pre>)#i', $tokenized, $matches, PREG_SET_ORDER );
+		foreach ( $matches as $i => $match ) {
+			$tag_html = str_replace( $replace, $search, $match[0] );
+			$tag_token = $token . $i;
+
+			$found[ $tag_token ] = $tag_html;
+			$html = str_replace( $tag_html, $tag_token, $html, $count );
+		}
+
+		$replaced = str_replace( $replace, $search, $html );
+		$stripped = str_replace( array( "\r\n", "\n" ), '', $replaced );
+		$pre = array_values( $found );
+		$tokens = array_keys( $found );
+
+		return str_replace( $tokens, $pre, $stripped );
+	}
+}
