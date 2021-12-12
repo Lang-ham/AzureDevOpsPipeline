@@ -961,4 +961,390 @@ function wp_generate_tag_cloud( $tags, $args = '' ) {
 		 *
 		 * @since 2.3.0
 		 *
-		 * @see 
+		 * @see wp_generate_tag_cloud()
+		 *
+		 * @param array|string $return String containing the generated HTML tag cloud output
+		 *                             or an array of tag links if the 'format' argument
+		 *                             equals 'array'.
+		 * @param array        $tags   An array of terms used in the tag cloud.
+		 * @param array        $args   An array of wp_generate_tag_cloud() arguments.
+		 */
+		return apply_filters( 'wp_generate_tag_cloud', $return, $tags, $args );
+	}
+
+	else
+		return $return;
+}
+
+/**
+ * Serves as a callback for comparing objects based on name.
+ *
+ * Used with `uasort()`.
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param object $a The first object to compare.
+ * @param object $b The second object to compare.
+ * @return int Negative number if `$a->name` is less than `$b->name`, zero if they are equal,
+ *             or greater than zero if `$a->name` is greater than `$b->name`.
+ */
+function _wp_object_name_sort_cb( $a, $b ) {
+	return strnatcasecmp( $a->name, $b->name );
+}
+
+/**
+ * Serves as a callback for comparing objects based on count.
+ *
+ * Used with `uasort()`.
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param object $a The first object to compare.
+ * @param object $b The second object to compare.
+ * @return bool Whether the count value for `$a` is greater than the count value for `$b`.
+ */
+function _wp_object_count_sort_cb( $a, $b ) {
+	return ( $a->count > $b->count );
+}
+
+//
+// Helper functions
+//
+
+/**
+ * Retrieve HTML list content for category list.
+ *
+ * @uses Walker_Category to create HTML list content.
+ * @since 2.1.0
+ * @see Walker_Category::walk() for parameters and return description.
+ * @return string
+ */
+function walk_category_tree() {
+	$args = func_get_args();
+	// the user's options are the third parameter
+	if ( empty( $args[2]['walker'] ) || ! ( $args[2]['walker'] instanceof Walker ) ) {
+		$walker = new Walker_Category;
+	} else {
+		$walker = $args[2]['walker'];
+	}
+	return call_user_func_array( array( $walker, 'walk' ), $args );
+}
+
+/**
+ * Retrieve HTML dropdown (select) content for category list.
+ *
+ * @uses Walker_CategoryDropdown to create HTML dropdown content.
+ * @since 2.1.0
+ * @see Walker_CategoryDropdown::walk() for parameters and return description.
+ * @return string
+ */
+function walk_category_dropdown_tree() {
+	$args = func_get_args();
+	// the user's options are the third parameter
+	if ( empty( $args[2]['walker'] ) || ! ( $args[2]['walker'] instanceof Walker ) ) {
+		$walker = new Walker_CategoryDropdown;
+	} else {
+		$walker = $args[2]['walker'];
+	}
+	return call_user_func_array( array( $walker, 'walk' ), $args );
+}
+
+//
+// Tags
+//
+
+/**
+ * Retrieve the link to the tag.
+ *
+ * @since 2.3.0
+ * @see get_term_link()
+ *
+ * @param int|object $tag Tag ID or object.
+ * @return string Link on success, empty string if tag does not exist.
+ */
+function get_tag_link( $tag ) {
+	return get_category_link( $tag );
+}
+
+/**
+ * Retrieve the tags for a post.
+ *
+ * @since 2.3.0
+ *
+ * @param int $id Post ID.
+ * @return array|false|WP_Error Array of tag objects on success, false on failure.
+ */
+function get_the_tags( $id = 0 ) {
+
+	/**
+	 * Filters the array of tags for the given post.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @see get_the_terms()
+	 *
+	 * @param array $terms An array of tags for the given post.
+	 */
+	return apply_filters( 'get_the_tags', get_the_terms( $id, 'post_tag' ) );
+}
+
+/**
+ * Retrieve the tags for a post formatted as a string.
+ *
+ * @since 2.3.0
+ *
+ * @param string $before Optional. Before tags.
+ * @param string $sep Optional. Between tags.
+ * @param string $after Optional. After tags.
+ * @param int $id Optional. Post ID. Defaults to the current post.
+ * @return string|false|WP_Error A list of tags on success, false if there are no terms, WP_Error on failure.
+ */
+function get_the_tag_list( $before = '', $sep = '', $after = '', $id = 0 ) {
+
+	/**
+	 * Filters the tags list for a given post.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param string $tag_list List of tags.
+	 * @param string $before   String to use before tags.
+	 * @param string $sep      String to use between the tags.
+	 * @param string $after    String to use after tags.
+	 * @param int    $id       Post ID.
+	 */
+	return apply_filters( 'the_tags', get_the_term_list( $id, 'post_tag', $before, $sep, $after ), $before, $sep, $after, $id );
+}
+
+/**
+ * Retrieve the tags for a post.
+ *
+ * @since 2.3.0
+ *
+ * @param string $before Optional. Before list.
+ * @param string $sep Optional. Separate items using this.
+ * @param string $after Optional. After list.
+ */
+function the_tags( $before = null, $sep = ', ', $after = '' ) {
+	if ( null === $before )
+		$before = __('Tags: ');
+
+	$the_tags = get_the_tag_list( $before, $sep, $after );
+
+	if ( ! is_wp_error( $the_tags ) ) {
+		echo $the_tags;
+	}
+}
+
+/**
+ * Retrieve tag description.
+ *
+ * @since 2.8.0
+ *
+ * @param int $tag Optional. Tag ID. Will use global tag ID by default.
+ * @return string Tag description, available.
+ */
+function tag_description( $tag = 0 ) {
+	return term_description( $tag );
+}
+
+/**
+ * Retrieve term description.
+ *
+ * @since 2.8.0
+ * @since 4.9.2 The `$taxonomy` parameter was deprecated.
+ *
+ * @param int  $term       Optional. Term ID. Will use global term ID by default.
+ * @param null $deprecated Deprecated argument.
+ * @return string Term description, available.
+ */
+function term_description( $term = 0, $deprecated = null ) {
+	if ( ! $term && ( is_tax() || is_tag() || is_category() ) ) {
+		$term = get_queried_object();
+		if ( $term ) {
+			$term = $term->term_id;
+		}
+	}
+	$description = get_term_field( 'description', $term );
+	return is_wp_error( $description ) ? '' : $description;
+}
+
+/**
+ * Retrieve the terms of the taxonomy that are attached to the post.
+ *
+ * @since 2.5.0
+ *
+ * @param int|object $post Post ID or object.
+ * @param string $taxonomy Taxonomy name.
+ * @return array|false|WP_Error Array of WP_Term objects on success, false if there are no terms
+ *                              or the post does not exist, WP_Error on failure.
+ */
+function get_the_terms( $post, $taxonomy ) {
+	if ( ! $post = get_post( $post ) )
+		return false;
+
+	$terms = get_object_term_cache( $post->ID, $taxonomy );
+	if ( false === $terms ) {
+		$terms = wp_get_object_terms( $post->ID, $taxonomy );
+		if ( ! is_wp_error( $terms ) ) {
+			$term_ids = wp_list_pluck( $terms, 'term_id' );
+			wp_cache_add( $post->ID, $term_ids, $taxonomy . '_relationships' );
+		}
+	}
+
+	/**
+	 * Filters the list of terms attached to the given post.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param array|WP_Error $terms    List of attached terms, or WP_Error on failure.
+	 * @param int            $post_id  Post ID.
+	 * @param string         $taxonomy Name of the taxonomy.
+	 */
+	$terms = apply_filters( 'get_the_terms', $terms, $post->ID, $taxonomy );
+
+	if ( empty( $terms ) )
+		return false;
+
+	return $terms;
+}
+
+/**
+ * Retrieve a post's terms as a list with specified format.
+ *
+ * @since 2.5.0
+ *
+ * @param int $id Post ID.
+ * @param string $taxonomy Taxonomy name.
+ * @param string $before Optional. Before list.
+ * @param string $sep Optional. Separate items using this.
+ * @param string $after Optional. After list.
+ * @return string|false|WP_Error A list of terms on success, false if there are no terms, WP_Error on failure.
+ */
+function get_the_term_list( $id, $taxonomy, $before = '', $sep = '', $after = '' ) {
+	$terms = get_the_terms( $id, $taxonomy );
+
+	if ( is_wp_error( $terms ) )
+		return $terms;
+
+	if ( empty( $terms ) )
+		return false;
+
+	$links = array();
+
+	foreach ( $terms as $term ) {
+		$link = get_term_link( $term, $taxonomy );
+		if ( is_wp_error( $link ) ) {
+			return $link;
+		}
+		$links[] = '<a href="' . esc_url( $link ) . '" rel="tag">' . $term->name . '</a>';
+	}
+
+	/**
+	 * Filters the term links for a given taxonomy.
+	 *
+	 * The dynamic portion of the filter name, `$taxonomy`, refers
+	 * to the taxonomy slug.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param array $links An array of term links.
+	 */
+	$term_links = apply_filters( "term_links-{$taxonomy}", $links );
+
+	return $before . join( $sep, $term_links ) . $after;
+}
+
+/**
+ * Retrieve term parents with separator.
+ *
+ * @since 4.8.0
+ *
+ * @param int     $term_id  Term ID.
+ * @param string  $taxonomy Taxonomy name.
+ * @param string|array $args {
+ *     Array of optional arguments.
+ *
+ *     @type string $format    Use term names or slugs for display. Accepts 'name' or 'slug'.
+ *                             Default 'name'.
+ *     @type string $separator Separator for between the terms. Default '/'.
+ *     @type bool   $link      Whether to format as a link. Default true.
+ *     @type bool   $inclusive Include the term to get the parents for. Default true.
+ * }
+ * @return string|WP_Error A list of term parents on success, WP_Error or empty string on failure.
+ */
+function get_term_parents_list( $term_id, $taxonomy, $args = array() ) {
+	$list = '';
+	$term = get_term( $term_id, $taxonomy );
+
+	if ( is_wp_error( $term ) ) {
+		return $term;
+	}
+
+	if ( ! $term ) {
+		return $list;
+	}
+
+	$term_id = $term->term_id;
+
+	$defaults = array(
+		'format'    => 'name',
+		'separator' => '/',
+		'link'      => true,
+		'inclusive' => true,
+	);
+
+	$args = wp_parse_args( $args, $defaults );
+
+	foreach ( array( 'link', 'inclusive' ) as $bool ) {
+		$args[ $bool ] = wp_validate_boolean( $args[ $bool ] );
+	}
+
+	$parents = get_ancestors( $term_id, $taxonomy, 'taxonomy' );
+
+	if ( $args['inclusive'] ) {
+		array_unshift( $parents, $term_id );
+	}
+
+	foreach ( array_reverse( $parents ) as $term_id ) {
+		$parent = get_term( $term_id, $taxonomy );
+		$name   = ( 'slug' === $args['format'] ) ? $parent->slug : $parent->name;
+
+		if ( $args['link'] ) {
+			$list .= '<a href="' . esc_url( get_term_link( $parent->term_id, $taxonomy ) ) . '">' . $name . '</a>' . $args['separator'];
+		} else {
+			$list .= $name . $args['separator'];
+		}
+	}
+
+	return $list;
+}
+
+/**
+ * Display the terms in a list.
+ *
+ * @since 2.5.0
+ *
+ * @param int $id Post ID.
+ * @param string $taxonomy Taxonomy name.
+ * @param string $before Optional. Before list.
+ * @param string $sep Optional. Separate items using this.
+ * @param string $after Optional. After list.
+ * @return false|void False on WordPress error.
+ */
+function the_terms( $id, $taxonomy, $before = '', $sep = ', ', $after = '' ) {
+	$term_list = get_the_term_list( $id, $taxonomy, $before, $sep, $after );
+
+	if ( is_wp_error( $term_list ) )
+		return false;
+
+	/**
+	 * Filters the list of terms to display.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param array  $term_list List of terms to display.
+	 * @param string $taxonomy  The taxonomy name.
+	 * @param string $before    String to use before the terms.
+	 * @param string $se
