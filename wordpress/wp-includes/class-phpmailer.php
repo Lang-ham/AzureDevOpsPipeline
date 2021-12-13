@@ -370,4 +370,418 @@ class PHPMailer
     /**
      * Whether to generate VERP addresses on send.
      * Only applicable when sending via SMTP.
-     * @link https://en.wikipedia.org/wiki/Var
+     * @link https://en.wikipedia.org/wiki/Variable_envelope_return_path
+     * @link http://www.postfix.org/VERP_README.html Postfix VERP info
+     * @var boolean
+     */
+    public $do_verp = false;
+
+    /**
+     * Whether to allow sending messages with an empty body.
+     * @var boolean
+     */
+    public $AllowEmpty = false;
+
+    /**
+     * The default line ending.
+     * @note The default remains "\n". We force CRLF where we know
+     *        it must be used via self::CRLF.
+     * @var string
+     */
+    public $LE = "\n";
+
+    /**
+     * DKIM selector.
+     * @var string
+     */
+    public $DKIM_selector = '';
+
+    /**
+     * DKIM Identity.
+     * Usually the email address used as the source of the email.
+     * @var string
+     */
+    public $DKIM_identity = '';
+
+    /**
+     * DKIM passphrase.
+     * Used if your key is encrypted.
+     * @var string
+     */
+    public $DKIM_passphrase = '';
+
+    /**
+     * DKIM signing domain name.
+     * @example 'example.com'
+     * @var string
+     */
+    public $DKIM_domain = '';
+
+    /**
+     * DKIM private key file path.
+     * @var string
+     */
+    public $DKIM_private = '';
+
+    /**
+     * DKIM private key string.
+     * If set, takes precedence over `$DKIM_private`.
+     * @var string
+     */
+    public $DKIM_private_string = '';
+
+    /**
+     * Callback Action function name.
+     *
+     * The function that handles the result of the send email action.
+     * It is called out by send() for each email sent.
+     *
+     * Value can be any php callable: http://www.php.net/is_callable
+     *
+     * Parameters:
+     *   boolean $result        result of the send action
+     *   string  $to            email address of the recipient
+     *   string  $cc            cc email addresses
+     *   string  $bcc           bcc email addresses
+     *   string  $subject       the subject
+     *   string  $body          the email body
+     *   string  $from          email address of sender
+     * @var string
+     */
+    public $action_function = '';
+
+    /**
+     * What to put in the X-Mailer header.
+     * Options: An empty string for PHPMailer default, whitespace for none, or a string to use
+     * @var string
+     */
+    public $XMailer = '';
+
+    /**
+     * Which validator to use by default when validating email addresses.
+     * May be a callable to inject your own validator, but there are several built-in validators.
+     * @see PHPMailer::validateAddress()
+     * @var string|callable
+     * @static
+     */
+    public static $validator = 'auto';
+
+    /**
+     * An instance of the SMTP sender class.
+     * @var SMTP
+     * @access protected
+     */
+    protected $smtp = null;
+
+    /**
+     * The array of 'to' names and addresses.
+     * @var array
+     * @access protected
+     */
+    protected $to = array();
+
+    /**
+     * The array of 'cc' names and addresses.
+     * @var array
+     * @access protected
+     */
+    protected $cc = array();
+
+    /**
+     * The array of 'bcc' names and addresses.
+     * @var array
+     * @access protected
+     */
+    protected $bcc = array();
+
+    /**
+     * The array of reply-to names and addresses.
+     * @var array
+     * @access protected
+     */
+    protected $ReplyTo = array();
+
+    /**
+     * An array of all kinds of addresses.
+     * Includes all of $to, $cc, $bcc
+     * @var array
+     * @access protected
+     * @see PHPMailer::$to @see PHPMailer::$cc @see PHPMailer::$bcc
+     */
+    protected $all_recipients = array();
+
+    /**
+     * An array of names and addresses queued for validation.
+     * In send(), valid and non duplicate entries are moved to $all_recipients
+     * and one of $to, $cc, or $bcc.
+     * This array is used only for addresses with IDN.
+     * @var array
+     * @access protected
+     * @see PHPMailer::$to @see PHPMailer::$cc @see PHPMailer::$bcc
+     * @see PHPMailer::$all_recipients
+     */
+    protected $RecipientsQueue = array();
+
+    /**
+     * An array of reply-to names and addresses queued for validation.
+     * In send(), valid and non duplicate entries are moved to $ReplyTo.
+     * This array is used only for addresses with IDN.
+     * @var array
+     * @access protected
+     * @see PHPMailer::$ReplyTo
+     */
+    protected $ReplyToQueue = array();
+
+    /**
+     * The array of attachments.
+     * @var array
+     * @access protected
+     */
+    protected $attachment = array();
+
+    /**
+     * The array of custom headers.
+     * @var array
+     * @access protected
+     */
+    protected $CustomHeader = array();
+
+    /**
+     * The most recent Message-ID (including angular brackets).
+     * @var string
+     * @access protected
+     */
+    protected $lastMessageID = '';
+
+    /**
+     * The message's MIME type.
+     * @var string
+     * @access protected
+     */
+    protected $message_type = '';
+
+    /**
+     * The array of MIME boundary strings.
+     * @var array
+     * @access protected
+     */
+    protected $boundary = array();
+
+    /**
+     * The array of available languages.
+     * @var array
+     * @access protected
+     */
+    protected $language = array();
+
+    /**
+     * The number of errors encountered.
+     * @var integer
+     * @access protected
+     */
+    protected $error_count = 0;
+
+    /**
+     * The S/MIME certificate file path.
+     * @var string
+     * @access protected
+     */
+    protected $sign_cert_file = '';
+
+    /**
+     * The S/MIME key file path.
+     * @var string
+     * @access protected
+     */
+    protected $sign_key_file = '';
+
+    /**
+     * The optional S/MIME extra certificates ("CA Chain") file path.
+     * @var string
+     * @access protected
+     */
+    protected $sign_extracerts_file = '';
+
+    /**
+     * The S/MIME password for the key.
+     * Used only if the key is encrypted.
+     * @var string
+     * @access protected
+     */
+    protected $sign_key_pass = '';
+
+    /**
+     * Whether to throw exceptions for errors.
+     * @var boolean
+     * @access protected
+     */
+    protected $exceptions = false;
+
+    /**
+     * Unique ID used for message ID and boundaries.
+     * @var string
+     * @access protected
+     */
+    protected $uniqueid = '';
+
+    /**
+     * Error severity: message only, continue processing.
+     */
+    const STOP_MESSAGE = 0;
+
+    /**
+     * Error severity: message, likely ok to continue processing.
+     */
+    const STOP_CONTINUE = 1;
+
+    /**
+     * Error severity: message, plus full stop, critical error reached.
+     */
+    const STOP_CRITICAL = 2;
+
+    /**
+     * SMTP RFC standard line ending.
+     */
+    const CRLF = "\r\n";
+
+    /**
+     * The maximum line length allowed by RFC 2822 section 2.1.1
+     * @var integer
+     */
+    const MAX_LINE_LENGTH = 998;
+
+    /**
+     * Constructor.
+     * @param boolean $exceptions Should we throw external exceptions?
+     */
+    public function __construct($exceptions = null)
+    {
+        if ($exceptions !== null) {
+            $this->exceptions = (boolean)$exceptions;
+        }
+    }
+
+    /**
+     * Destructor.
+     */
+    public function __destruct()
+    {
+        //Close any open SMTP connection nicely
+        $this->smtpClose();
+    }
+
+    /**
+     * Call mail() in a safe_mode-aware fashion.
+     * Also, unless sendmail_path points to sendmail (or something that
+     * claims to be sendmail), don't pass params (not a perfect fix,
+     * but it will do)
+     * @param string $to To
+     * @param string $subject Subject
+     * @param string $body Message Body
+     * @param string $header Additional Header(s)
+     * @param string $params Params
+     * @access private
+     * @return boolean
+     */
+    private function mailPassthru($to, $subject, $body, $header, $params)
+    {
+        //Check overloading of mail function to avoid double-encoding
+        if (ini_get('mbstring.func_overload') & 1) {
+            $subject = $this->secureHeader($subject);
+        } else {
+            $subject = $this->encodeHeader($this->secureHeader($subject));
+        }
+
+        //Can't use additional_parameters in safe_mode, calling mail() with null params breaks
+        //@link http://php.net/manual/en/function.mail.php
+        if (ini_get('safe_mode') or !$this->UseSendmailOptions or is_null($params)) {
+            $result = @mail($to, $subject, $body, $header);
+        } else {
+            $result = @mail($to, $subject, $body, $header, $params);
+        }
+        return $result;
+    }
+    /**
+     * Output debugging info via user-defined method.
+     * Only generates output if SMTP debug output is enabled (@see SMTP::$do_debug).
+     * @see PHPMailer::$Debugoutput
+     * @see PHPMailer::$SMTPDebug
+     * @param string $str
+     */
+    protected function edebug($str)
+    {
+        if ($this->SMTPDebug <= 0) {
+            return;
+        }
+        //Avoid clash with built-in function names
+        if (!in_array($this->Debugoutput, array('error_log', 'html', 'echo')) and is_callable($this->Debugoutput)) {
+            call_user_func($this->Debugoutput, $str, $this->SMTPDebug);
+            return;
+        }
+        switch ($this->Debugoutput) {
+            case 'error_log':
+                //Don't output, just log
+                error_log($str);
+                break;
+            case 'html':
+                //Cleans up output a bit for a better looking, HTML-safe output
+                echo htmlentities(
+                    preg_replace('/[\r\n]+/', '', $str),
+                    ENT_QUOTES,
+                    'UTF-8'
+                )
+                . "<br>\n";
+                break;
+            case 'echo':
+            default:
+                //Normalize line breaks
+                $str = preg_replace('/\r\n?/ms', "\n", $str);
+                echo gmdate('Y-m-d H:i:s') . "\t" . str_replace(
+                    "\n",
+                    "\n                   \t                  ",
+                    trim($str)
+                ) . "\n";
+        }
+    }
+
+    /**
+     * Sets message type to HTML or plain.
+     * @param boolean $isHtml True for HTML mode.
+     * @return void
+     */
+    public function isHTML($isHtml = true)
+    {
+        if ($isHtml) {
+            $this->ContentType = 'text/html';
+        } else {
+            $this->ContentType = 'text/plain';
+        }
+    }
+
+    /**
+     * Send messages using SMTP.
+     * @return void
+     */
+    public function isSMTP()
+    {
+        $this->Mailer = 'smtp';
+    }
+
+    /**
+     * Send messages using PHP's mail() function.
+     * @return void
+     */
+    public function isMail()
+    {
+        $this->Mailer = 'mail';
+    }
+
+    /**
+     * Send messages using $Sendmail.
+     * @return void
+     */
+    public function isSendmail()
+    {
+        $ini_sendmail_path = ini_get('sendmail_path');
+
+        i
