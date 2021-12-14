@@ -784,4 +784,271 @@ class PHPMailer
     {
         $ini_sendmail_path = ini_get('sendmail_path');
 
-        i
+        if (!stristr($ini_sendmail_path, 'sendmail')) {
+            $this->Sendmail = '/usr/sbin/sendmail';
+        } else {
+            $this->Sendmail = $ini_sendmail_path;
+        }
+        $this->Mailer = 'sendmail';
+    }
+
+    /**
+     * Send messages using qmail.
+     * @return void
+     */
+    public function isQmail()
+    {
+        $ini_sendmail_path = ini_get('sendmail_path');
+
+        if (!stristr($ini_sendmail_path, 'qmail')) {
+            $this->Sendmail = '/var/qmail/bin/qmail-inject';
+        } else {
+            $this->Sendmail = $ini_sendmail_path;
+        }
+        $this->Mailer = 'qmail';
+    }
+
+    /**
+     * Add a "To" address.
+     * @param string $address The email address to send to
+     * @param string $name
+     * @return boolean true on success, false if address already used or invalid in some way
+     */
+    public function addAddress($address, $name = '')
+    {
+        return $this->addOrEnqueueAnAddress('to', $address, $name);
+    }
+
+    /**
+     * Add a "CC" address.
+     * @note: This function works with the SMTP mailer on win32, not with the "mail" mailer.
+     * @param string $address The email address to send to
+     * @param string $name
+     * @return boolean true on success, false if address already used or invalid in some way
+     */
+    public function addCC($address, $name = '')
+    {
+        return $this->addOrEnqueueAnAddress('cc', $address, $name);
+    }
+
+    /**
+     * Add a "BCC" address.
+     * @note: This function works with the SMTP mailer on win32, not with the "mail" mailer.
+     * @param string $address The email address to send to
+     * @param string $name
+     * @return boolean true on success, false if address already used or invalid in some way
+     */
+    public function addBCC($address, $name = '')
+    {
+        return $this->addOrEnqueueAnAddress('bcc', $address, $name);
+    }
+
+    /**
+     * Add a "Reply-To" address.
+     * @param string $address The email address to reply to
+     * @param string $name
+     * @return boolean true on success, false if address already used or invalid in some way
+     */
+    public function addReplyTo($address, $name = '')
+    {
+        return $this->addOrEnqueueAnAddress('Reply-To', $address, $name);
+    }
+
+    /**
+     * Add an address to one of the recipient arrays or to the ReplyTo array. Because PHPMailer
+     * can't validate addresses with an IDN without knowing the PHPMailer::$CharSet (that can still
+     * be modified after calling this function), addition of such addresses is delayed until send().
+     * Addresses that have been added already return false, but do not throw exceptions.
+     * @param string $kind One of 'to', 'cc', 'bcc', or 'ReplyTo'
+     * @param string $address The email address to send, resp. to reply to
+     * @param string $name
+     * @throws phpmailerException
+     * @return boolean true on success, false if address already used or invalid in some way
+     * @access protected
+     */
+    protected function addOrEnqueueAnAddress($kind, $address, $name)
+    {
+        $address = trim($address);
+        $name = trim(preg_replace('/[\r\n]+/', '', $name)); //Strip breaks and trim
+        if (($pos = strrpos($address, '@')) === false) {
+            // At-sign is misssing.
+            $error_message = $this->lang('invalid_address') . " (addAnAddress $kind): $address";
+            $this->setError($error_message);
+            $this->edebug($error_message);
+            if ($this->exceptions) {
+                throw new phpmailerException($error_message);
+            }
+            return false;
+        }
+        $params = array($kind, $address, $name);
+        // Enqueue addresses with IDN until we know the PHPMailer::$CharSet.
+        if ($this->has8bitChars(substr($address, ++$pos)) and $this->idnSupported()) {
+            if ($kind != 'Reply-To') {
+                if (!array_key_exists($address, $this->RecipientsQueue)) {
+                    $this->RecipientsQueue[$address] = $params;
+                    return true;
+                }
+            } else {
+                if (!array_key_exists($address, $this->ReplyToQueue)) {
+                    $this->ReplyToQueue[$address] = $params;
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Immediately add standard addresses without IDN.
+        return call_user_func_array(array($this, 'addAnAddress'), $params);
+    }
+
+    /**
+     * Add an address to one of the recipient arrays or to the ReplyTo array.
+     * Addresses that have been added already return false, but do not throw exceptions.
+     * @param string $kind One of 'to', 'cc', 'bcc', or 'ReplyTo'
+     * @param string $address The email address to send, resp. to reply to
+     * @param string $name
+     * @throws phpmailerException
+     * @return boolean true on success, false if address already used or invalid in some way
+     * @access protected
+     */
+    protected function addAnAddress($kind, $address, $name = '')
+    {
+        if (!in_array($kind, array('to', 'cc', 'bcc', 'Reply-To'))) {
+            $error_message = $this->lang('Invalid recipient kind: ') . $kind;
+            $this->setError($error_message);
+            $this->edebug($error_message);
+            if ($this->exceptions) {
+                throw new phpmailerException($error_message);
+            }
+            return false;
+        }
+        if (!$this->validateAddress($address)) {
+            $error_message = $this->lang('invalid_address') . " (addAnAddress $kind): $address";
+            $this->setError($error_message);
+            $this->edebug($error_message);
+            if ($this->exceptions) {
+                throw new phpmailerException($error_message);
+            }
+            return false;
+        }
+        if ($kind != 'Reply-To') {
+            if (!array_key_exists(strtolower($address), $this->all_recipients)) {
+                array_push($this->$kind, array($address, $name));
+                $this->all_recipients[strtolower($address)] = true;
+                return true;
+            }
+        } else {
+            if (!array_key_exists(strtolower($address), $this->ReplyTo)) {
+                $this->ReplyTo[strtolower($address)] = array($address, $name);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Parse and validate a string containing one or more RFC822-style comma-separated email addresses
+     * of the form "display name <address>" into an array of name/address pairs.
+     * Uses the imap_rfc822_parse_adrlist function if the IMAP extension is available.
+     * Note that quotes in the name part are removed.
+     * @param string $addrstr The address list string
+     * @param bool $useimap Whether to use the IMAP extension to parse the list
+     * @return array
+     * @link http://www.andrew.cmu.edu/user/agreen1/testing/mrbs/web/Mail/RFC822.php A more careful implementation
+     */
+    public function parseAddresses($addrstr, $useimap = true)
+    {
+        $addresses = array();
+        if ($useimap and function_exists('imap_rfc822_parse_adrlist')) {
+            //Use this built-in parser if it's available
+            $list = imap_rfc822_parse_adrlist($addrstr, '');
+            foreach ($list as $address) {
+                if ($address->host != '.SYNTAX-ERROR.') {
+                    if ($this->validateAddress($address->mailbox . '@' . $address->host)) {
+                        $addresses[] = array(
+                            'name' => (property_exists($address, 'personal') ? $address->personal : ''),
+                            'address' => $address->mailbox . '@' . $address->host
+                        );
+                    }
+                }
+            }
+        } else {
+            //Use this simpler parser
+            $list = explode(',', $addrstr);
+            foreach ($list as $address) {
+                $address = trim($address);
+                //Is there a separate name part?
+                if (strpos($address, '<') === false) {
+                    //No separate name, just use the whole thing
+                    if ($this->validateAddress($address)) {
+                        $addresses[] = array(
+                            'name' => '',
+                            'address' => $address
+                        );
+                    }
+                } else {
+                    list($name, $email) = explode('<', $address);
+                    $email = trim(str_replace('>', '', $email));
+                    if ($this->validateAddress($email)) {
+                        $addresses[] = array(
+                            'name' => trim(str_replace(array('"', "'"), '', $name)),
+                            'address' => $email
+                        );
+                    }
+                }
+            }
+        }
+        return $addresses;
+    }
+
+    /**
+     * Set the From and FromName properties.
+     * @param string $address
+     * @param string $name
+     * @param boolean $auto Whether to also set the Sender address, defaults to true
+     * @throws phpmailerException
+     * @return boolean
+     */
+    public function setFrom($address, $name = '', $auto = true)
+    {
+        $address = trim($address);
+        $name = trim(preg_replace('/[\r\n]+/', '', $name)); //Strip breaks and trim
+        // Don't validate now addresses with IDN. Will be done in send().
+        if (($pos = strrpos($address, '@')) === false or
+            (!$this->has8bitChars(substr($address, ++$pos)) or !$this->idnSupported()) and
+            !$this->validateAddress($address)) {
+            $error_message = $this->lang('invalid_address') . " (setFrom) $address";
+            $this->setError($error_message);
+            $this->edebug($error_message);
+            if ($this->exceptions) {
+                throw new phpmailerException($error_message);
+            }
+            return false;
+        }
+        $this->From = $address;
+        $this->FromName = $name;
+        if ($auto) {
+            if (empty($this->Sender)) {
+                $this->Sender = $address;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Return the Message-ID header of the last email.
+     * Technically this is the value from the last time the headers were created,
+     * but it's also the message ID of the last sent message except in
+     * pathological cases.
+     * @return string
+     */
+    public function getLastMessageID()
+    {
+        return $this->lastMessageID;
+    }
+
+    /**
+     * Check that a string looks like an email address.
+     * @param string $address The email address to check
+     * @param string|callable $patternselect A selector for the validation pattern to use :
+     * * `auto` Pick best pattern automatically;
+     * * `pcre8` Use the squiloople.com
