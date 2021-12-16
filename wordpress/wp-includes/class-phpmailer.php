@@ -1548,4 +1548,267 @@ class PHPMailer
         }
         if (!$this->smtp->mail($smtp_from)) {
             $this->setError($this->lang('from_failed') . $smtp_from . ' : ' . implode(',', $this->smtp->getError()));
-            throw new ph
+            throw new phpmailerException($this->ErrorInfo, self::STOP_CRITICAL);
+        }
+
+        // Attempt to send to all recipients
+        foreach (array($this->to, $this->cc, $this->bcc) as $togroup) {
+            foreach ($togroup as $to) {
+                if (!$this->smtp->recipient($to[0])) {
+                    $error = $this->smtp->getError();
+                    $bad_rcpt[] = array('to' => $to[0], 'error' => $error['detail']);
+                    $isSent = false;
+                } else {
+                    $isSent = true;
+                }
+                $this->doCallback($isSent, array($to[0]), array(), array(), $this->Subject, $body, $this->From);
+            }
+        }
+
+        // Only send the DATA command if we have viable recipients
+        if ((count($this->all_recipients) > count($bad_rcpt)) and !$this->smtp->data($header . $body)) {
+            throw new phpmailerException($this->lang('data_not_accepted'), self::STOP_CRITICAL);
+        }
+        if ($this->SMTPKeepAlive) {
+            $this->smtp->reset();
+        } else {
+            $this->smtp->quit();
+            $this->smtp->close();
+        }
+        //Create error message for any bad addresses
+        if (count($bad_rcpt) > 0) {
+            $errstr = '';
+            foreach ($bad_rcpt as $bad) {
+                $errstr .= $bad['to'] . ': ' . $bad['error'];
+            }
+            throw new phpmailerException(
+                $this->lang('recipients_failed') . $errstr,
+                self::STOP_CONTINUE
+            );
+        }
+        return true;
+    }
+
+    /**
+     * Initiate a connection to an SMTP server.
+     * Returns false if the operation failed.
+     * @param array $options An array of options compatible with stream_context_create()
+     * @uses SMTP
+     * @access public
+     * @throws phpmailerException
+     * @return boolean
+     */
+    public function smtpConnect($options = null)
+    {
+        if (is_null($this->smtp)) {
+            $this->smtp = $this->getSMTPInstance();
+        }
+
+        //If no options are provided, use whatever is set in the instance
+        if (is_null($options)) {
+            $options = $this->SMTPOptions;
+        }
+
+        // Already connected?
+        if ($this->smtp->connected()) {
+            return true;
+        }
+
+        $this->smtp->setTimeout($this->Timeout);
+        $this->smtp->setDebugLevel($this->SMTPDebug);
+        $this->smtp->setDebugOutput($this->Debugoutput);
+        $this->smtp->setVerp($this->do_verp);
+        $hosts = explode(';', $this->Host);
+        $lastexception = null;
+
+        foreach ($hosts as $hostentry) {
+            $hostinfo = array();
+            if (!preg_match('/^((ssl|tls):\/\/)*([a-zA-Z0-9\.-]*):?([0-9]*)$/', trim($hostentry), $hostinfo)) {
+                // Not a valid host entry
+                continue;
+            }
+            // $hostinfo[2]: optional ssl or tls prefix
+            // $hostinfo[3]: the hostname
+            // $hostinfo[4]: optional port number
+            // The host string prefix can temporarily override the current setting for SMTPSecure
+            // If it's not specified, the default value is used
+            $prefix = '';
+            $secure = $this->SMTPSecure;
+            $tls = ($this->SMTPSecure == 'tls');
+            if ('ssl' == $hostinfo[2] or ('' == $hostinfo[2] and 'ssl' == $this->SMTPSecure)) {
+                $prefix = 'ssl://';
+                $tls = false; // Can't have SSL and TLS at the same time
+                $secure = 'ssl';
+            } elseif ($hostinfo[2] == 'tls') {
+                $tls = true;
+                // tls doesn't use a prefix
+                $secure = 'tls';
+            }
+            //Do we need the OpenSSL extension?
+            $sslext = defined('OPENSSL_ALGO_SHA1');
+            if ('tls' === $secure or 'ssl' === $secure) {
+                //Check for an OpenSSL constant rather than using extension_loaded, which is sometimes disabled
+                if (!$sslext) {
+                    throw new phpmailerException($this->lang('extension_missing').'openssl', self::STOP_CRITICAL);
+                }
+            }
+            $host = $hostinfo[3];
+            $port = $this->Port;
+            $tport = (integer)$hostinfo[4];
+            if ($tport > 0 and $tport < 65536) {
+                $port = $tport;
+            }
+            if ($this->smtp->connect($prefix . $host, $port, $this->Timeout, $options)) {
+                try {
+                    if ($this->Helo) {
+                        $hello = $this->Helo;
+                    } else {
+                        $hello = $this->serverHostname();
+                    }
+                    $this->smtp->hello($hello);
+                    //Automatically enable TLS encryption if:
+                    // * it's not disabled
+                    // * we have openssl extension
+                    // * we are not already using SSL
+                    // * the server offers STARTTLS
+                    if ($this->SMTPAutoTLS and $sslext and $secure != 'ssl' and $this->smtp->getServerExt('STARTTLS')) {
+                        $tls = true;
+                    }
+                    if ($tls) {
+                        if (!$this->smtp->startTLS()) {
+                            throw new phpmailerException($this->lang('connect_host'));
+                        }
+                        // We must resend EHLO after TLS negotiation
+                        $this->smtp->hello($hello);
+                    }
+                    if ($this->SMTPAuth) {
+                        if (!$this->smtp->authenticate(
+                            $this->Username,
+                            $this->Password,
+                            $this->AuthType,
+                            $this->Realm,
+                            $this->Workstation
+                        )
+                        ) {
+                            throw new phpmailerException($this->lang('authenticate'));
+                        }
+                    }
+                    return true;
+                } catch (phpmailerException $exc) {
+                    $lastexception = $exc;
+                    $this->edebug($exc->getMessage());
+                    // We must have connected, but then failed TLS or Auth, so close connection nicely
+                    $this->smtp->quit();
+                }
+            }
+        }
+        // If we get here, all connection attempts have failed, so close connection hard
+        $this->smtp->close();
+        // As we've caught all exceptions, just report whatever the last one was
+        if ($this->exceptions and !is_null($lastexception)) {
+            throw $lastexception;
+        }
+        return false;
+    }
+
+    /**
+     * Close the active SMTP session if one exists.
+     * @return void
+     */
+    public function smtpClose()
+    {
+        if (is_a($this->smtp, 'SMTP')) {
+            if ($this->smtp->connected()) {
+                $this->smtp->quit();
+                $this->smtp->close();
+            }
+        }
+    }
+
+    /**
+     * Set the language for error messages.
+     * Returns false if it cannot load the language file.
+     * The default language is English.
+     * @param string $langcode ISO 639-1 2-character language code (e.g. French is "fr")
+     * @param string $lang_path Path to the language file directory, with trailing separator (slash)
+     * @return boolean
+     * @access public
+     */
+    public function setLanguage($langcode = 'en', $lang_path = '')
+    {
+        // Backwards compatibility for renamed language codes
+        $renamed_langcodes = array(
+            'br' => 'pt_br',
+            'cz' => 'cs',
+            'dk' => 'da',
+            'no' => 'nb',
+            'se' => 'sv',
+        );
+
+        if (isset($renamed_langcodes[$langcode])) {
+            $langcode = $renamed_langcodes[$langcode];
+        }
+
+        // Define full set of translatable strings in English
+        $PHPMAILER_LANG = array(
+            'authenticate' => 'SMTP Error: Could not authenticate.',
+            'connect_host' => 'SMTP Error: Could not connect to SMTP host.',
+            'data_not_accepted' => 'SMTP Error: data not accepted.',
+            'empty_message' => 'Message body empty',
+            'encoding' => 'Unknown encoding: ',
+            'execute' => 'Could not execute: ',
+            'file_access' => 'Could not access file: ',
+            'file_open' => 'File Error: Could not open file: ',
+            'from_failed' => 'The following From address failed: ',
+            'instantiate' => 'Could not instantiate mail function.',
+            'invalid_address' => 'Invalid address: ',
+            'mailer_not_supported' => ' mailer is not supported.',
+            'provide_address' => 'You must provide at least one recipient email address.',
+            'recipients_failed' => 'SMTP Error: The following recipients failed: ',
+            'signing' => 'Signing Error: ',
+            'smtp_connect_failed' => 'SMTP connect() failed.',
+            'smtp_error' => 'SMTP server error: ',
+            'variable_set' => 'Cannot set or reset variable: ',
+            'extension_missing' => 'Extension missing: '
+        );
+        if (empty($lang_path)) {
+            // Calculate an absolute path so it can work if CWD is not here
+            $lang_path = dirname(__FILE__). DIRECTORY_SEPARATOR . 'language'. DIRECTORY_SEPARATOR;
+        }
+        //Validate $langcode
+        if (!preg_match('/^[a-z]{2}(?:_[a-zA-Z]{2})?$/', $langcode)) {
+            $langcode = 'en';
+        }
+        $foundlang = true;
+        $lang_file = $lang_path . 'phpmailer.lang-' . $langcode . '.php';
+        // There is no English translation file
+        if ($langcode != 'en') {
+            // Make sure language file path is readable
+            if (!is_readable($lang_file)) {
+                $foundlang = false;
+            } else {
+                // Overwrite language-specific strings.
+                // This way we'll never have missing translation keys.
+                $foundlang = include $lang_file;
+            }
+        }
+        $this->language = $PHPMAILER_LANG;
+        return (boolean)$foundlang; // Returns false if language not found
+    }
+
+    /**
+     * Get the array of strings for the current language.
+     * @return array
+     */
+    public function getTranslations()
+    {
+        return $this->language;
+    }
+
+    /**
+     * Create recipient headers.
+     * @access public
+     * @param string $type
+     * @param array $addr An array of recipient,
+     * where each recipient is a 2-element indexed array with element 0 containing an address
+     * 
