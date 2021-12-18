@@ -2617,4 +2617,285 @@ class PHPMailer
                 }
 
                 if ($disposition == 'inline') {
-                    $mime[] = spri
+                    $mime[] = sprintf('Content-ID: <%s>%s', $cid, $this->LE);
+                }
+
+                // If a filename contains any of these chars, it should be quoted,
+                // but not otherwise: RFC2183 & RFC2045 5.1
+                // Fixes a warning in IETF's msglint MIME checker
+                // Allow for bypassing the Content-Disposition header totally
+                if (!(empty($disposition))) {
+                    $encoded_name = $this->encodeHeader($this->secureHeader($name));
+                    if (preg_match('/[ \(\)<>@,;:\\"\/\[\]\?=]/', $encoded_name)) {
+                        $mime[] = sprintf(
+                            'Content-Disposition: %s; filename="%s"%s',
+                            $disposition,
+                            $encoded_name,
+                            $this->LE . $this->LE
+                        );
+                    } else {
+                        if (!empty($encoded_name)) {
+                            $mime[] = sprintf(
+                                'Content-Disposition: %s; filename=%s%s',
+                                $disposition,
+                                $encoded_name,
+                                $this->LE . $this->LE
+                            );
+                        } else {
+                            $mime[] = sprintf(
+                                'Content-Disposition: %s%s',
+                                $disposition,
+                                $this->LE . $this->LE
+                            );
+                        }
+                    }
+                } else {
+                    $mime[] = $this->LE;
+                }
+
+                // Encode as string attachment
+                if ($bString) {
+                    $mime[] = $this->encodeString($string, $encoding);
+                    if ($this->isError()) {
+                        return '';
+                    }
+                    $mime[] = $this->LE . $this->LE;
+                } else {
+                    $mime[] = $this->encodeFile($path, $encoding);
+                    if ($this->isError()) {
+                        return '';
+                    }
+                    $mime[] = $this->LE . $this->LE;
+                }
+            }
+        }
+
+        $mime[] = sprintf('--%s--%s', $boundary, $this->LE);
+
+        return implode('', $mime);
+    }
+
+    /**
+     * Encode a file attachment in requested format.
+     * Returns an empty string on failure.
+     * @param string $path The full path to the file
+     * @param string $encoding The encoding to use; one of 'base64', '7bit', '8bit', 'binary', 'quoted-printable'
+     * @throws phpmailerException
+     * @access protected
+     * @return string
+     */
+    protected function encodeFile($path, $encoding = 'base64')
+    {
+        try {
+            if (!is_readable($path)) {
+                throw new phpmailerException($this->lang('file_open') . $path, self::STOP_CONTINUE);
+            }
+            $magic_quotes = get_magic_quotes_runtime();
+            if ($magic_quotes) {
+                if (version_compare(PHP_VERSION, '5.3.0', '<')) {
+                    set_magic_quotes_runtime(false);
+                } else {
+                    //Doesn't exist in PHP 5.4, but we don't need to check because
+                    //get_magic_quotes_runtime always returns false in 5.4+
+                    //so it will never get here
+                    ini_set('magic_quotes_runtime', false);
+                }
+            }
+            $file_buffer = file_get_contents($path);
+            $file_buffer = $this->encodeString($file_buffer, $encoding);
+            if ($magic_quotes) {
+                if (version_compare(PHP_VERSION, '5.3.0', '<')) {
+                    set_magic_quotes_runtime($magic_quotes);
+                } else {
+                    ini_set('magic_quotes_runtime', $magic_quotes);
+                }
+            }
+            return $file_buffer;
+        } catch (Exception $exc) {
+            $this->setError($exc->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * Encode a string in requested format.
+     * Returns an empty string on failure.
+     * @param string $str The text to encode
+     * @param string $encoding The encoding to use; one of 'base64', '7bit', '8bit', 'binary', 'quoted-printable'
+     * @access public
+     * @return string
+     */
+    public function encodeString($str, $encoding = 'base64')
+    {
+        $encoded = '';
+        switch (strtolower($encoding)) {
+            case 'base64':
+                $encoded = chunk_split(base64_encode($str), 76, $this->LE);
+                break;
+            case '7bit':
+            case '8bit':
+                $encoded = $this->fixEOL($str);
+                // Make sure it ends with a line break
+                if (substr($encoded, -(strlen($this->LE))) != $this->LE) {
+                    $encoded .= $this->LE;
+                }
+                break;
+            case 'binary':
+                $encoded = $str;
+                break;
+            case 'quoted-printable':
+                $encoded = $this->encodeQP($str);
+                break;
+            default:
+                $this->setError($this->lang('encoding') . $encoding);
+                break;
+        }
+        return $encoded;
+    }
+
+    /**
+     * Encode a header string optimally.
+     * Picks shortest of Q, B, quoted-printable or none.
+     * @access public
+     * @param string $str
+     * @param string $position
+     * @return string
+     */
+    public function encodeHeader($str, $position = 'text')
+    {
+        $matchcount = 0;
+        switch (strtolower($position)) {
+            case 'phrase':
+                if (!preg_match('/[\200-\377]/', $str)) {
+                    // Can't use addslashes as we don't know the value of magic_quotes_sybase
+                    $encoded = addcslashes($str, "\0..\37\177\\\"");
+                    if (($str == $encoded) && !preg_match('/[^A-Za-z0-9!#$%&\'*+\/=?^_`{|}~ -]/', $str)) {
+                        return ($encoded);
+                    } else {
+                        return ("\"$encoded\"");
+                    }
+                }
+                $matchcount = preg_match_all('/[^\040\041\043-\133\135-\176]/', $str, $matches);
+                break;
+            /** @noinspection PhpMissingBreakStatementInspection */
+            case 'comment':
+                $matchcount = preg_match_all('/[()"]/', $str, $matches);
+                // Intentional fall-through
+            case 'text':
+            default:
+                $matchcount += preg_match_all('/[\000-\010\013\014\016-\037\177-\377]/', $str, $matches);
+                break;
+        }
+
+        //There are no chars that need encoding
+        if ($matchcount == 0) {
+            return ($str);
+        }
+
+        $maxlen = 75 - 7 - strlen($this->CharSet);
+        // Try to select the encoding which should produce the shortest output
+        if ($matchcount > strlen($str) / 3) {
+            // More than a third of the content will need encoding, so B encoding will be most efficient
+            $encoding = 'B';
+            if (function_exists('mb_strlen') && $this->hasMultiBytes($str)) {
+                // Use a custom function which correctly encodes and wraps long
+                // multibyte strings without breaking lines within a character
+                $encoded = $this->base64EncodeWrapMB($str, "\n");
+            } else {
+                $encoded = base64_encode($str);
+                $maxlen -= $maxlen % 4;
+                $encoded = trim(chunk_split($encoded, $maxlen, "\n"));
+            }
+        } else {
+            $encoding = 'Q';
+            $encoded = $this->encodeQ($str, $position);
+            $encoded = $this->wrapText($encoded, $maxlen, true);
+            $encoded = str_replace('=' . self::CRLF, "\n", trim($encoded));
+        }
+
+        $encoded = preg_replace('/^(.*)$/m', ' =?' . $this->CharSet . "?$encoding?\\1?=", $encoded);
+        $encoded = trim(str_replace("\n", $this->LE, $encoded));
+
+        return $encoded;
+    }
+
+    /**
+     * Check if a string contains multi-byte characters.
+     * @access public
+     * @param string $str multi-byte text to wrap encode
+     * @return boolean
+     */
+    public function hasMultiBytes($str)
+    {
+        if (function_exists('mb_strlen')) {
+            return (strlen($str) > mb_strlen($str, $this->CharSet));
+        } else { // Assume no multibytes (we can't handle without mbstring functions anyway)
+            return false;
+        }
+    }
+
+    /**
+     * Does a string contain any 8-bit chars (in any charset)?
+     * @param string $text
+     * @return boolean
+     */
+    public function has8bitChars($text)
+    {
+        return (boolean)preg_match('/[\x80-\xFF]/', $text);
+    }
+
+    /**
+     * Encode and wrap long multibyte strings for mail headers
+     * without breaking lines within a character.
+     * Adapted from a function by paravoid
+     * @link http://www.php.net/manual/en/function.mb-encode-mimeheader.php#60283
+     * @access public
+     * @param string $str multi-byte text to wrap encode
+     * @param string $linebreak string to use as linefeed/end-of-line
+     * @return string
+     */
+    public function base64EncodeWrapMB($str, $linebreak = null)
+    {
+        $start = '=?' . $this->CharSet . '?B?';
+        $end = '?=';
+        $encoded = '';
+        if ($linebreak === null) {
+            $linebreak = $this->LE;
+        }
+
+        $mb_length = mb_strlen($str, $this->CharSet);
+        // Each line must have length <= 75, including $start and $end
+        $length = 75 - strlen($start) - strlen($end);
+        // Average multi-byte ratio
+        $ratio = $mb_length / strlen($str);
+        // Base64 has a 4:3 ratio
+        $avgLength = floor($length * $ratio * .75);
+
+        for ($i = 0; $i < $mb_length; $i += $offset) {
+            $lookBack = 0;
+            do {
+                $offset = $avgLength - $lookBack;
+                $chunk = mb_substr($str, $i, $offset, $this->CharSet);
+                $chunk = base64_encode($chunk);
+                $lookBack++;
+            } while (strlen($chunk) > $length);
+            $encoded .= $chunk . $linebreak;
+        }
+
+        // Chomp the last linefeed
+        $encoded = substr($encoded, 0, -strlen($linebreak));
+        return $encoded;
+    }
+
+    /**
+     * Encode a string in quoted-printable format.
+     * According to RFC2045 section 6.7.
+     * @access public
+     * @param string $string The text to encode
+     * @param integer $line_max Number of chars allowed on a line before wrapping
+     * @return string
+     * @link http://www.php.net/manual/en/function.quoted-printable-decode.php#89417 Adapted from this comment
+     */
+    public function encodeQP($string, $line_max = 76)
+    {
+        // Use native function if it's available (>= PHP5.3)
