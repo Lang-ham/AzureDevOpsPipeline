@@ -2089,4 +2089,235 @@ class PHPMailer
                 'PHPMailer ' . $this->Version . ' (https://github.com/PHPMailer/PHPMailer)'
             );
         } else {
- 
+            $myXmailer = trim($this->XMailer);
+            if ($myXmailer) {
+                $result .= $this->headerLine('X-Mailer', $myXmailer);
+            }
+        }
+
+        if ($this->ConfirmReadingTo != '') {
+            $result .= $this->headerLine('Disposition-Notification-To', '<' . $this->ConfirmReadingTo . '>');
+        }
+
+        // Add custom headers
+        foreach ($this->CustomHeader as $header) {
+            $result .= $this->headerLine(
+                trim($header[0]),
+                $this->encodeHeader(trim($header[1]))
+            );
+        }
+        if (!$this->sign_key_file) {
+            $result .= $this->headerLine('MIME-Version', '1.0');
+            $result .= $this->getMailMIME();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the message MIME type headers.
+     * @access public
+     * @return string
+     */
+    public function getMailMIME()
+    {
+        $result = '';
+        $ismultipart = true;
+        switch ($this->message_type) {
+            case 'inline':
+                $result .= $this->headerLine('Content-Type', 'multipart/related;');
+                $result .= $this->textLine("\tboundary=\"" . $this->boundary[1] . '"');
+                break;
+            case 'attach':
+            case 'inline_attach':
+            case 'alt_attach':
+            case 'alt_inline_attach':
+                $result .= $this->headerLine('Content-Type', 'multipart/mixed;');
+                $result .= $this->textLine("\tboundary=\"" . $this->boundary[1] . '"');
+                break;
+            case 'alt':
+            case 'alt_inline':
+                $result .= $this->headerLine('Content-Type', 'multipart/alternative;');
+                $result .= $this->textLine("\tboundary=\"" . $this->boundary[1] . '"');
+                break;
+            default:
+                // Catches case 'plain': and case '':
+                $result .= $this->textLine('Content-Type: ' . $this->ContentType . '; charset=' . $this->CharSet);
+                $ismultipart = false;
+                break;
+        }
+        // RFC1341 part 5 says 7bit is assumed if not specified
+        if ($this->Encoding != '7bit') {
+            // RFC 2045 section 6.4 says multipart MIME parts may only use 7bit, 8bit or binary CTE
+            if ($ismultipart) {
+                if ($this->Encoding == '8bit') {
+                    $result .= $this->headerLine('Content-Transfer-Encoding', '8bit');
+                }
+                // The only remaining alternatives are quoted-printable and base64, which are both 7bit compatible
+            } else {
+                $result .= $this->headerLine('Content-Transfer-Encoding', $this->Encoding);
+            }
+        }
+
+        if ($this->Mailer != 'mail') {
+            $result .= $this->LE;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns the whole MIME message.
+     * Includes complete headers and body.
+     * Only valid post preSend().
+     * @see PHPMailer::preSend()
+     * @access public
+     * @return string
+     */
+    public function getSentMIMEMessage()
+    {
+        return rtrim($this->MIMEHeader . $this->mailHeader, "\n\r") . self::CRLF . self::CRLF . $this->MIMEBody;
+    }
+
+    /**
+     * Create unique ID
+     * @return string
+     */
+    protected function generateId() {
+        return md5(uniqid(time()));
+    }
+
+    /**
+     * Assemble the message body.
+     * Returns an empty string on failure.
+     * @access public
+     * @throws phpmailerException
+     * @return string The assembled message body
+     */
+    public function createBody()
+    {
+        $body = '';
+        //Create unique IDs and preset boundaries
+        $this->uniqueid = $this->generateId();
+        $this->boundary[1] = 'b1_' . $this->uniqueid;
+        $this->boundary[2] = 'b2_' . $this->uniqueid;
+        $this->boundary[3] = 'b3_' . $this->uniqueid;
+
+        if ($this->sign_key_file) {
+            $body .= $this->getMailMIME() . $this->LE;
+        }
+
+        $this->setWordWrap();
+
+        $bodyEncoding = $this->Encoding;
+        $bodyCharSet = $this->CharSet;
+        //Can we do a 7-bit downgrade?
+        if ($bodyEncoding == '8bit' and !$this->has8bitChars($this->Body)) {
+            $bodyEncoding = '7bit';
+            //All ISO 8859, Windows codepage and UTF-8 charsets are ascii compatible up to 7-bit
+            $bodyCharSet = 'us-ascii';
+        }
+        //If lines are too long, and we're not already using an encoding that will shorten them,
+        //change to quoted-printable transfer encoding for the body part only
+        if ('base64' != $this->Encoding and self::hasLineLongerThanMax($this->Body)) {
+            $bodyEncoding = 'quoted-printable';
+        }
+
+        $altBodyEncoding = $this->Encoding;
+        $altBodyCharSet = $this->CharSet;
+        //Can we do a 7-bit downgrade?
+        if ($altBodyEncoding == '8bit' and !$this->has8bitChars($this->AltBody)) {
+            $altBodyEncoding = '7bit';
+            //All ISO 8859, Windows codepage and UTF-8 charsets are ascii compatible up to 7-bit
+            $altBodyCharSet = 'us-ascii';
+        }
+        //If lines are too long, and we're not already using an encoding that will shorten them,
+        //change to quoted-printable transfer encoding for the alt body part only
+        if ('base64' != $altBodyEncoding and self::hasLineLongerThanMax($this->AltBody)) {
+            $altBodyEncoding = 'quoted-printable';
+        }
+        //Use this as a preamble in all multipart message types
+        $mimepre = "This is a multi-part message in MIME format." . $this->LE . $this->LE;
+        switch ($this->message_type) {
+            case 'inline':
+                $body .= $mimepre;
+                $body .= $this->getBoundary($this->boundary[1], $bodyCharSet, '', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->attachAll('inline', $this->boundary[1]);
+                break;
+            case 'attach':
+                $body .= $mimepre;
+                $body .= $this->getBoundary($this->boundary[1], $bodyCharSet, '', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->attachAll('attachment', $this->boundary[1]);
+                break;
+            case 'inline_attach':
+                $body .= $mimepre;
+                $body .= $this->textLine('--' . $this->boundary[1]);
+                $body .= $this->headerLine('Content-Type', 'multipart/related;');
+                $body .= $this->textLine("\tboundary=\"" . $this->boundary[2] . '"');
+                $body .= $this->LE;
+                $body .= $this->getBoundary($this->boundary[2], $bodyCharSet, '', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->attachAll('inline', $this->boundary[2]);
+                $body .= $this->LE;
+                $body .= $this->attachAll('attachment', $this->boundary[1]);
+                break;
+            case 'alt':
+                $body .= $mimepre;
+                $body .= $this->getBoundary($this->boundary[1], $altBodyCharSet, 'text/plain', $altBodyEncoding);
+                $body .= $this->encodeString($this->AltBody, $altBodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->getBoundary($this->boundary[1], $bodyCharSet, 'text/html', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                if (!empty($this->Ical)) {
+                    $body .= $this->getBoundary($this->boundary[1], '', 'text/calendar; method=REQUEST', '');
+                    $body .= $this->encodeString($this->Ical, $this->Encoding);
+                    $body .= $this->LE . $this->LE;
+                }
+                $body .= $this->endBoundary($this->boundary[1]);
+                break;
+            case 'alt_inline':
+                $body .= $mimepre;
+                $body .= $this->getBoundary($this->boundary[1], $altBodyCharSet, 'text/plain', $altBodyEncoding);
+                $body .= $this->encodeString($this->AltBody, $altBodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->textLine('--' . $this->boundary[1]);
+                $body .= $this->headerLine('Content-Type', 'multipart/related;');
+                $body .= $this->textLine("\tboundary=\"" . $this->boundary[2] . '"');
+                $body .= $this->LE;
+                $body .= $this->getBoundary($this->boundary[2], $bodyCharSet, 'text/html', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->attachAll('inline', $this->boundary[2]);
+                $body .= $this->LE;
+                $body .= $this->endBoundary($this->boundary[1]);
+                break;
+            case 'alt_attach':
+                $body .= $mimepre;
+                $body .= $this->textLine('--' . $this->boundary[1]);
+                $body .= $this->headerLine('Content-Type', 'multipart/alternative;');
+                $body .= $this->textLine("\tboundary=\"" . $this->boundary[2] . '"');
+                $body .= $this->LE;
+                $body .= $this->getBoundary($this->boundary[2], $altBodyCharSet, 'text/plain', $altBodyEncoding);
+                $body .= $this->encodeString($this->AltBody, $altBodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->getBoundary($this->boundary[2], $bodyCharSet, 'text/html', $bodyEncoding);
+                $body .= $this->encodeString($this->Body, $bodyEncoding);
+                $body .= $this->LE . $this->LE;
+                $body .= $this->endBoundary($this->boundary[2]);
+                $body .= $this->LE;
+                $body .= $this->attachAll('attachment', $this->boundary[1]);
+                break;
+            case 'alt_inline_attach':
+                $body .= $mimepre;
+                $body .= $this->textLine('--' . $this->boundary[1]);
+                $body .= $this->headerLine('Content-Type', 'multipart/alternative;');
+                $body .= $this->textLine("\tboundary=\"" . $this->boundary[2] . '"');
+                $body .= $this->LE;
+                $body .= $this->getBoundary($this->boundary[2], $altBodyCharSet, 'text/plain', $altBodyEncoding);
+                $body .= $this->encodeString($th
