@@ -1811,4 +1811,282 @@ class PHPMailer
      * @param string $type
      * @param array $addr An array of recipient,
      * where each recipient is a 2-element indexed array with element 0 containing an address
-     * 
+     * and element 1 containing a name, like:
+     * array(array('joe@example.com', 'Joe User'), array('zoe@example.com', 'Zoe User'))
+     * @return string
+     */
+    public function addrAppend($type, $addr)
+    {
+        $addresses = array();
+        foreach ($addr as $address) {
+            $addresses[] = $this->addrFormat($address);
+        }
+        return $type . ': ' . implode(', ', $addresses) . $this->LE;
+    }
+
+    /**
+     * Format an address for use in a message header.
+     * @access public
+     * @param array $addr A 2-element indexed array, element 0 containing an address, element 1 containing a name
+     *      like array('joe@example.com', 'Joe User')
+     * @return string
+     */
+    public function addrFormat($addr)
+    {
+        if (empty($addr[1])) { // No name provided
+            return $this->secureHeader($addr[0]);
+        } else {
+            return $this->encodeHeader($this->secureHeader($addr[1]), 'phrase') . ' <' . $this->secureHeader(
+                $addr[0]
+            ) . '>';
+        }
+    }
+
+    /**
+     * Word-wrap message.
+     * For use with mailers that do not automatically perform wrapping
+     * and for quoted-printable encoded messages.
+     * Original written by philippe.
+     * @param string $message The message to wrap
+     * @param integer $length The line length to wrap to
+     * @param boolean $qp_mode Whether to run in Quoted-Printable mode
+     * @access public
+     * @return string
+     */
+    public function wrapText($message, $length, $qp_mode = false)
+    {
+        if ($qp_mode) {
+            $soft_break = sprintf(' =%s', $this->LE);
+        } else {
+            $soft_break = $this->LE;
+        }
+        // If utf-8 encoding is used, we will need to make sure we don't
+        // split multibyte characters when we wrap
+        $is_utf8 = (strtolower($this->CharSet) == 'utf-8');
+        $lelen = strlen($this->LE);
+        $crlflen = strlen(self::CRLF);
+
+        $message = $this->fixEOL($message);
+        //Remove a trailing line break
+        if (substr($message, -$lelen) == $this->LE) {
+            $message = substr($message, 0, -$lelen);
+        }
+
+        //Split message into lines
+        $lines = explode($this->LE, $message);
+        //Message will be rebuilt in here
+        $message = '';
+        foreach ($lines as $line) {
+            $words = explode(' ', $line);
+            $buf = '';
+            $firstword = true;
+            foreach ($words as $word) {
+                if ($qp_mode and (strlen($word) > $length)) {
+                    $space_left = $length - strlen($buf) - $crlflen;
+                    if (!$firstword) {
+                        if ($space_left > 20) {
+                            $len = $space_left;
+                            if ($is_utf8) {
+                                $len = $this->utf8CharBoundary($word, $len);
+                            } elseif (substr($word, $len - 1, 1) == '=') {
+                                $len--;
+                            } elseif (substr($word, $len - 2, 1) == '=') {
+                                $len -= 2;
+                            }
+                            $part = substr($word, 0, $len);
+                            $word = substr($word, $len);
+                            $buf .= ' ' . $part;
+                            $message .= $buf . sprintf('=%s', self::CRLF);
+                        } else {
+                            $message .= $buf . $soft_break;
+                        }
+                        $buf = '';
+                    }
+                    while (strlen($word) > 0) {
+                        if ($length <= 0) {
+                            break;
+                        }
+                        $len = $length;
+                        if ($is_utf8) {
+                            $len = $this->utf8CharBoundary($word, $len);
+                        } elseif (substr($word, $len - 1, 1) == '=') {
+                            $len--;
+                        } elseif (substr($word, $len - 2, 1) == '=') {
+                            $len -= 2;
+                        }
+                        $part = substr($word, 0, $len);
+                        $word = substr($word, $len);
+
+                        if (strlen($word) > 0) {
+                            $message .= $part . sprintf('=%s', self::CRLF);
+                        } else {
+                            $buf = $part;
+                        }
+                    }
+                } else {
+                    $buf_o = $buf;
+                    if (!$firstword) {
+                        $buf .= ' ';
+                    }
+                    $buf .= $word;
+
+                    if (strlen($buf) > $length and $buf_o != '') {
+                        $message .= $buf_o . $soft_break;
+                        $buf = $word;
+                    }
+                }
+                $firstword = false;
+            }
+            $message .= $buf . self::CRLF;
+        }
+
+        return $message;
+    }
+
+    /**
+     * Find the last character boundary prior to $maxLength in a utf-8
+     * quoted-printable encoded string.
+     * Original written by Colin Brown.
+     * @access public
+     * @param string $encodedText utf-8 QP text
+     * @param integer $maxLength Find the last character boundary prior to this length
+     * @return integer
+     */
+    public function utf8CharBoundary($encodedText, $maxLength)
+    {
+        $foundSplitPos = false;
+        $lookBack = 3;
+        while (!$foundSplitPos) {
+            $lastChunk = substr($encodedText, $maxLength - $lookBack, $lookBack);
+            $encodedCharPos = strpos($lastChunk, '=');
+            if (false !== $encodedCharPos) {
+                // Found start of encoded character byte within $lookBack block.
+                // Check the encoded byte value (the 2 chars after the '=')
+                $hex = substr($encodedText, $maxLength - $lookBack + $encodedCharPos + 1, 2);
+                $dec = hexdec($hex);
+                if ($dec < 128) {
+                    // Single byte character.
+                    // If the encoded char was found at pos 0, it will fit
+                    // otherwise reduce maxLength to start of the encoded char
+                    if ($encodedCharPos > 0) {
+                        $maxLength = $maxLength - ($lookBack - $encodedCharPos);
+                    }
+                    $foundSplitPos = true;
+                } elseif ($dec >= 192) {
+                    // First byte of a multi byte character
+                    // Reduce maxLength to split at start of character
+                    $maxLength = $maxLength - ($lookBack - $encodedCharPos);
+                    $foundSplitPos = true;
+                } elseif ($dec < 192) {
+                    // Middle byte of a multi byte character, look further back
+                    $lookBack += 3;
+                }
+            } else {
+                // No encoded character found
+                $foundSplitPos = true;
+            }
+        }
+        return $maxLength;
+    }
+
+    /**
+     * Apply word wrapping to the message body.
+     * Wraps the message body to the number of chars set in the WordWrap property.
+     * You should only do this to plain-text bodies as wrapping HTML tags may break them.
+     * This is called automatically by createBody(), so you don't need to call it yourself.
+     * @access public
+     * @return void
+     */
+    public function setWordWrap()
+    {
+        if ($this->WordWrap < 1) {
+            return;
+        }
+
+        switch ($this->message_type) {
+            case 'alt':
+            case 'alt_inline':
+            case 'alt_attach':
+            case 'alt_inline_attach':
+                $this->AltBody = $this->wrapText($this->AltBody, $this->WordWrap);
+                break;
+            default:
+                $this->Body = $this->wrapText($this->Body, $this->WordWrap);
+                break;
+        }
+    }
+
+    /**
+     * Assemble message headers.
+     * @access public
+     * @return string The assembled headers
+     */
+    public function createHeader()
+    {
+        $result = '';
+
+        if ($this->MessageDate == '') {
+            $this->MessageDate = self::rfcDate();
+        }
+        $result .= $this->headerLine('Date', $this->MessageDate);
+
+        // To be created automatically by mail()
+        if ($this->SingleTo) {
+            if ($this->Mailer != 'mail') {
+                foreach ($this->to as $toaddr) {
+                    $this->SingleToArray[] = $this->addrFormat($toaddr);
+                }
+            }
+        } else {
+            if (count($this->to) > 0) {
+                if ($this->Mailer != 'mail') {
+                    $result .= $this->addrAppend('To', $this->to);
+                }
+            } elseif (count($this->cc) == 0) {
+                $result .= $this->headerLine('To', 'undisclosed-recipients:;');
+            }
+        }
+
+        $result .= $this->addrAppend('From', array(array(trim($this->From), $this->FromName)));
+
+        // sendmail and mail() extract Cc from the header before sending
+        if (count($this->cc) > 0) {
+            $result .= $this->addrAppend('Cc', $this->cc);
+        }
+
+        // sendmail and mail() extract Bcc from the header before sending
+        if ((
+                $this->Mailer == 'sendmail' or $this->Mailer == 'qmail' or $this->Mailer == 'mail'
+            )
+            and count($this->bcc) > 0
+        ) {
+            $result .= $this->addrAppend('Bcc', $this->bcc);
+        }
+
+        if (count($this->ReplyTo) > 0) {
+            $result .= $this->addrAppend('Reply-To', $this->ReplyTo);
+        }
+
+        // mail() sets the subject itself
+        if ($this->Mailer != 'mail') {
+            $result .= $this->headerLine('Subject', $this->encodeHeader($this->secureHeader($this->Subject)));
+        }
+
+        // Only allow a custom message ID if it conforms to RFC 5322 section 3.6.4
+        // https://tools.ietf.org/html/rfc5322#section-3.6.4
+        if ('' != $this->MessageID and preg_match('/^<.*@.*>$/', $this->MessageID)) {
+            $this->lastMessageID = $this->MessageID;
+        } else {
+            $this->lastMessageID = sprintf('<%s@%s>', $this->uniqueid, $this->serverHostname());
+        }
+        $result .= $this->headerLine('Message-ID', $this->lastMessageID);
+        if (!is_null($this->Priority)) {
+            $result .= $this->headerLine('X-Priority', $this->Priority);
+        }
+        if ($this->XMailer == '') {
+            $result .= $this->headerLine(
+                'X-Mailer',
+                'PHPMailer ' . $this->Version . ' (https://github.com/PHPMailer/PHPMailer)'
+            );
+        } else {
+ 
