@@ -3519,4 +3519,276 @@ class PHPMailer
             'doc'   => 'application/msword',
             'word'  => 'application/msword',
             'xlsx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'xltx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.te
+            'xltx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+            'potx'  => 'application/vnd.openxmlformats-officedocument.presentationml.template',
+            'ppsx'  => 'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+            'pptx'  => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'sldx'  => 'application/vnd.openxmlformats-officedocument.presentationml.slide',
+            'docx'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'dotx'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+            'xlam'  => 'application/vnd.ms-excel.addin.macroEnabled.12',
+            'xlsb'  => 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+            'class' => 'application/octet-stream',
+            'dll'   => 'application/octet-stream',
+            'dms'   => 'application/octet-stream',
+            'exe'   => 'application/octet-stream',
+            'lha'   => 'application/octet-stream',
+            'lzh'   => 'application/octet-stream',
+            'psd'   => 'application/octet-stream',
+            'sea'   => 'application/octet-stream',
+            'so'    => 'application/octet-stream',
+            'oda'   => 'application/oda',
+            'pdf'   => 'application/pdf',
+            'ai'    => 'application/postscript',
+            'eps'   => 'application/postscript',
+            'ps'    => 'application/postscript',
+            'smi'   => 'application/smil',
+            'smil'  => 'application/smil',
+            'mif'   => 'application/vnd.mif',
+            'xls'   => 'application/vnd.ms-excel',
+            'ppt'   => 'application/vnd.ms-powerpoint',
+            'wbxml' => 'application/vnd.wap.wbxml',
+            'wmlc'  => 'application/vnd.wap.wmlc',
+            'dcr'   => 'application/x-director',
+            'dir'   => 'application/x-director',
+            'dxr'   => 'application/x-director',
+            'dvi'   => 'application/x-dvi',
+            'gtar'  => 'application/x-gtar',
+            'php3'  => 'application/x-httpd-php',
+            'php4'  => 'application/x-httpd-php',
+            'php'   => 'application/x-httpd-php',
+            'phtml' => 'application/x-httpd-php',
+            'phps'  => 'application/x-httpd-php-source',
+            'swf'   => 'application/x-shockwave-flash',
+            'sit'   => 'application/x-stuffit',
+            'tar'   => 'application/x-tar',
+            'tgz'   => 'application/x-tar',
+            'xht'   => 'application/xhtml+xml',
+            'xhtml' => 'application/xhtml+xml',
+            'zip'   => 'application/zip',
+            'mid'   => 'audio/midi',
+            'midi'  => 'audio/midi',
+            'mp2'   => 'audio/mpeg',
+            'mp3'   => 'audio/mpeg',
+            'mpga'  => 'audio/mpeg',
+            'aif'   => 'audio/x-aiff',
+            'aifc'  => 'audio/x-aiff',
+            'aiff'  => 'audio/x-aiff',
+            'ram'   => 'audio/x-pn-realaudio',
+            'rm'    => 'audio/x-pn-realaudio',
+            'rpm'   => 'audio/x-pn-realaudio-plugin',
+            'ra'    => 'audio/x-realaudio',
+            'wav'   => 'audio/x-wav',
+            'bmp'   => 'image/bmp',
+            'gif'   => 'image/gif',
+            'jpeg'  => 'image/jpeg',
+            'jpe'   => 'image/jpeg',
+            'jpg'   => 'image/jpeg',
+            'png'   => 'image/png',
+            'tiff'  => 'image/tiff',
+            'tif'   => 'image/tiff',
+            'eml'   => 'message/rfc822',
+            'css'   => 'text/css',
+            'html'  => 'text/html',
+            'htm'   => 'text/html',
+            'shtml' => 'text/html',
+            'log'   => 'text/plain',
+            'text'  => 'text/plain',
+            'txt'   => 'text/plain',
+            'rtx'   => 'text/richtext',
+            'rtf'   => 'text/rtf',
+            'vcf'   => 'text/vcard',
+            'vcard' => 'text/vcard',
+            'xml'   => 'text/xml',
+            'xsl'   => 'text/xml',
+            'mpeg'  => 'video/mpeg',
+            'mpe'   => 'video/mpeg',
+            'mpg'   => 'video/mpeg',
+            'mov'   => 'video/quicktime',
+            'qt'    => 'video/quicktime',
+            'rv'    => 'video/vnd.rn-realvideo',
+            'avi'   => 'video/x-msvideo',
+            'movie' => 'video/x-sgi-movie'
+        );
+        if (array_key_exists(strtolower($ext), $mimes)) {
+            return $mimes[strtolower($ext)];
+        }
+        return 'application/octet-stream';
+    }
+
+    /**
+     * Map a file name to a MIME type.
+     * Defaults to 'application/octet-stream', i.e.. arbitrary binary data.
+     * @param string $filename A file name or full path, does not need to exist as a file
+     * @return string
+     * @static
+     */
+    public static function filenameToType($filename)
+    {
+        // In case the path is a URL, strip any query string before getting extension
+        $qpos = strpos($filename, '?');
+        if (false !== $qpos) {
+            $filename = substr($filename, 0, $qpos);
+        }
+        $pathinfo = self::mb_pathinfo($filename);
+        return self::_mime_types($pathinfo['extension']);
+    }
+
+    /**
+     * Multi-byte-safe pathinfo replacement.
+     * Drop-in replacement for pathinfo(), but multibyte-safe, cross-platform-safe, old-version-safe.
+     * Works similarly to the one in PHP >= 5.2.0
+     * @link http://www.php.net/manual/en/function.pathinfo.php#107461
+     * @param string $path A filename or path, does not need to exist as a file
+     * @param integer|string $options Either a PATHINFO_* constant,
+     *      or a string name to return only the specified piece, allows 'filename' to work on PHP < 5.2
+     * @return string|array
+     * @static
+     */
+    public static function mb_pathinfo($path, $options = null)
+    {
+        $ret = array('dirname' => '', 'basename' => '', 'extension' => '', 'filename' => '');
+        $pathinfo = array();
+        if (preg_match('%^(.*?)[\\\\/]*(([^/\\\\]*?)(\.([^\.\\\\/]+?)|))[\\\\/\.]*$%im', $path, $pathinfo)) {
+            if (array_key_exists(1, $pathinfo)) {
+                $ret['dirname'] = $pathinfo[1];
+            }
+            if (array_key_exists(2, $pathinfo)) {
+                $ret['basename'] = $pathinfo[2];
+            }
+            if (array_key_exists(5, $pathinfo)) {
+                $ret['extension'] = $pathinfo[5];
+            }
+            if (array_key_exists(3, $pathinfo)) {
+                $ret['filename'] = $pathinfo[3];
+            }
+        }
+        switch ($options) {
+            case PATHINFO_DIRNAME:
+            case 'dirname':
+                return $ret['dirname'];
+            case PATHINFO_BASENAME:
+            case 'basename':
+                return $ret['basename'];
+            case PATHINFO_EXTENSION:
+            case 'extension':
+                return $ret['extension'];
+            case PATHINFO_FILENAME:
+            case 'filename':
+                return $ret['filename'];
+            default:
+                return $ret;
+        }
+    }
+
+    /**
+     * Set or reset instance properties.
+     * You should avoid this function - it's more verbose, less efficient, more error-prone and
+     * harder to debug than setting properties directly.
+     * Usage Example:
+     * `$mail->set('SMTPSecure', 'tls');`
+     *   is the same as:
+     * `$mail->SMTPSecure = 'tls';`
+     * @access public
+     * @param string $name The property name to set
+     * @param mixed $value The value to set the property to
+     * @return boolean
+     * @TODO Should this not be using the __set() magic function?
+     */
+    public function set($name, $value = '')
+    {
+        if (property_exists($this, $name)) {
+            $this->$name = $value;
+            return true;
+        } else {
+            $this->setError($this->lang('variable_set') . $name);
+            return false;
+        }
+    }
+
+    /**
+     * Strip newlines to prevent header injection.
+     * @access public
+     * @param string $str
+     * @return string
+     */
+    public function secureHeader($str)
+    {
+        return trim(str_replace(array("\r", "\n"), '', $str));
+    }
+
+    /**
+     * Normalize line breaks in a string.
+     * Converts UNIX LF, Mac CR and Windows CRLF line breaks into a single line break format.
+     * Defaults to CRLF (for message bodies) and preserves consecutive breaks.
+     * @param string $text
+     * @param string $breaktype What kind of line break to use, defaults to CRLF
+     * @return string
+     * @access public
+     * @static
+     */
+    public static function normalizeBreaks($text, $breaktype = "\r\n")
+    {
+        return preg_replace('/(\r\n|\r|\n)/ms', $breaktype, $text);
+    }
+
+    /**
+     * Set the public and private key files and password for S/MIME signing.
+     * @access public
+     * @param string $cert_filename
+     * @param string $key_filename
+     * @param string $key_pass Password for private key
+     * @param string $extracerts_filename Optional path to chain certificate
+     */
+    public function sign($cert_filename, $key_filename, $key_pass, $extracerts_filename = '')
+    {
+        $this->sign_cert_file = $cert_filename;
+        $this->sign_key_file = $key_filename;
+        $this->sign_key_pass = $key_pass;
+        $this->sign_extracerts_file = $extracerts_filename;
+    }
+
+    /**
+     * Quoted-Printable-encode a DKIM header.
+     * @access public
+     * @param string $txt
+     * @return string
+     */
+    public function DKIM_QP($txt)
+    {
+        $line = '';
+        for ($i = 0; $i < strlen($txt); $i++) {
+            $ord = ord($txt[$i]);
+            if (((0x21 <= $ord) && ($ord <= 0x3A)) || $ord == 0x3C || ((0x3E <= $ord) && ($ord <= 0x7E))) {
+                $line .= $txt[$i];
+            } else {
+                $line .= '=' . sprintf('%02X', $ord);
+            }
+        }
+        return $line;
+    }
+
+    /**
+     * Generate a DKIM signature.
+     * @access public
+     * @param string $signHeader
+     * @throws phpmailerException
+     * @return string The DKIM signature value
+     */
+    public function DKIM_Sign($signHeader)
+    {
+        if (!defined('PKCS7_TEXT')) {
+            if ($this->exceptions) {
+                throw new phpmailerException($this->lang('extension_missing') . 'openssl');
+            }
+            return '';
+        }
+        $privKeyStr = !empty($this->DKIM_private_string) ? $this->DKIM_private_string : file_get_contents($this->DKIM_private);
+        if ('' != $this->DKIM_passphrase) {
+            $privKey = openssl_pkey_get_private($privKeyStr, $this->DKIM_passphrase);
+        } else {
+            $privKey = openssl_pkey_get_private($privKeyStr);
+        }
+        //Workaround for missing digest algorithms in old PHP & OpenSSL versions
+        //@link http://stackoverflow.com/a/11117338/333340
+        if (version_compare(PHP_VERSI
