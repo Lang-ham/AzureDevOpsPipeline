@@ -2899,3 +2899,345 @@ class PHPMailer
     public function encodeQP($string, $line_max = 76)
     {
         // Use native function if it's available (>= PHP5.3)
+        if (function_exists('quoted_printable_encode')) {
+            return quoted_printable_encode($string);
+        }
+        // Fall back to a pure PHP implementation
+        $string = str_replace(
+            array('%20', '%0D%0A.', '%0D%0A', '%'),
+            array(' ', "\r\n=2E", "\r\n", '='),
+            rawurlencode($string)
+        );
+        return preg_replace('/[^\r\n]{' . ($line_max - 3) . '}[^=\r\n]{2}/', "$0=\r\n", $string);
+    }
+
+    /**
+     * Backward compatibility wrapper for an old QP encoding function that was removed.
+     * @see PHPMailer::encodeQP()
+     * @access public
+     * @param string $string
+     * @param integer $line_max
+     * @param boolean $space_conv
+     * @return string
+     * @deprecated Use encodeQP instead.
+     */
+    public function encodeQPphp(
+        $string,
+        $line_max = 76,
+        /** @noinspection PhpUnusedParameterInspection */ $space_conv = false
+    ) {
+        return $this->encodeQP($string, $line_max);
+    }
+
+    /**
+     * Encode a string using Q encoding.
+     * @link http://tools.ietf.org/html/rfc2047
+     * @param string $str the text to encode
+     * @param string $position Where the text is going to be used, see the RFC for what that means
+     * @access public
+     * @return string
+     */
+    public function encodeQ($str, $position = 'text')
+    {
+        // There should not be any EOL in the string
+        $pattern = '';
+        $encoded = str_replace(array("\r", "\n"), '', $str);
+        switch (strtolower($position)) {
+            case 'phrase':
+                // RFC 2047 section 5.3
+                $pattern = '^A-Za-z0-9!*+\/ -';
+                break;
+            /** @noinspection PhpMissingBreakStatementInspection */
+            case 'comment':
+                // RFC 2047 section 5.2
+                $pattern = '\(\)"';
+                // intentional fall-through
+                // for this reason we build the $pattern without including delimiters and []
+            case 'text':
+            default:
+                // RFC 2047 section 5.1
+                // Replace every high ascii, control, =, ? and _ characters
+                $pattern = '\000-\011\013\014\016-\037\075\077\137\177-\377' . $pattern;
+                break;
+        }
+        $matches = array();
+        if (preg_match_all("/[{$pattern}]/", $encoded, $matches)) {
+            // If the string contains an '=', make sure it's the first thing we replace
+            // so as to avoid double-encoding
+            $eqkey = array_search('=', $matches[0]);
+            if (false !== $eqkey) {
+                unset($matches[0][$eqkey]);
+                array_unshift($matches[0], '=');
+            }
+            foreach (array_unique($matches[0]) as $char) {
+                $encoded = str_replace($char, '=' . sprintf('%02X', ord($char)), $encoded);
+            }
+        }
+        // Replace every spaces to _ (more readable than =20)
+        return str_replace(' ', '_', $encoded);
+    }
+
+    /**
+     * Add a string or binary attachment (non-filesystem).
+     * This method can be used to attach ascii or binary data,
+     * such as a BLOB record from a database.
+     * @param string $string String attachment data.
+     * @param string $filename Name of the attachment.
+     * @param string $encoding File encoding (see $Encoding).
+     * @param string $type File extension (MIME) type.
+     * @param string $disposition Disposition to use
+     * @return void
+     */
+    public function addStringAttachment(
+        $string,
+        $filename,
+        $encoding = 'base64',
+        $type = '',
+        $disposition = 'attachment'
+    ) {
+        // If a MIME type is not specified, try to work it out from the file name
+        if ($type == '') {
+            $type = self::filenameToType($filename);
+        }
+        // Append to $attachment array
+        $this->attachment[] = array(
+            0 => $string,
+            1 => $filename,
+            2 => basename($filename),
+            3 => $encoding,
+            4 => $type,
+            5 => true, // isStringAttachment
+            6 => $disposition,
+            7 => 0
+        );
+    }
+
+    /**
+     * Add an embedded (inline) attachment from a file.
+     * This can include images, sounds, and just about any other document type.
+     * These differ from 'regular' attachments in that they are intended to be
+     * displayed inline with the message, not just attached for download.
+     * This is used in HTML messages that embed the images
+     * the HTML refers to using the $cid value.
+     * Never use a user-supplied path to a file!
+     * @param string $path Path to the attachment.
+     * @param string $cid Content ID of the attachment; Use this to reference
+     *        the content when using an embedded image in HTML.
+     * @param string $name Overrides the attachment name.
+     * @param string $encoding File encoding (see $Encoding).
+     * @param string $type File MIME type.
+     * @param string $disposition Disposition to use
+     * @return boolean True on successfully adding an attachment
+     */
+    public function addEmbeddedImage($path, $cid, $name = '', $encoding = 'base64', $type = '', $disposition = 'inline')
+    {
+        if (!@is_file($path)) {
+            $this->setError($this->lang('file_access') . $path);
+            return false;
+        }
+
+        // If a MIME type is not specified, try to work it out from the file name
+        if ($type == '') {
+            $type = self::filenameToType($path);
+        }
+
+        $filename = basename($path);
+        if ($name == '') {
+            $name = $filename;
+        }
+
+        // Append to $attachment array
+        $this->attachment[] = array(
+            0 => $path,
+            1 => $filename,
+            2 => $name,
+            3 => $encoding,
+            4 => $type,
+            5 => false, // isStringAttachment
+            6 => $disposition,
+            7 => $cid
+        );
+        return true;
+    }
+
+    /**
+     * Add an embedded stringified attachment.
+     * This can include images, sounds, and just about any other document type.
+     * Be sure to set the $type to an image type for images:
+     * JPEG images use 'image/jpeg', GIF uses 'image/gif', PNG uses 'image/png'.
+     * @param string $string The attachment binary data.
+     * @param string $cid Content ID of the attachment; Use this to reference
+     *        the content when using an embedded image in HTML.
+     * @param string $name
+     * @param string $encoding File encoding (see $Encoding).
+     * @param string $type MIME type.
+     * @param string $disposition Disposition to use
+     * @return boolean True on successfully adding an attachment
+     */
+    public function addStringEmbeddedImage(
+        $string,
+        $cid,
+        $name = '',
+        $encoding = 'base64',
+        $type = '',
+        $disposition = 'inline'
+    ) {
+        // If a MIME type is not specified, try to work it out from the name
+        if ($type == '' and !empty($name)) {
+            $type = self::filenameToType($name);
+        }
+
+        // Append to $attachment array
+        $this->attachment[] = array(
+            0 => $string,
+            1 => $name,
+            2 => $name,
+            3 => $encoding,
+            4 => $type,
+            5 => true, // isStringAttachment
+            6 => $disposition,
+            7 => $cid
+        );
+        return true;
+    }
+
+    /**
+     * Check if an inline attachment is present.
+     * @access public
+     * @return boolean
+     */
+    public function inlineImageExists()
+    {
+        foreach ($this->attachment as $attachment) {
+            if ($attachment[6] == 'inline') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if an attachment (non-inline) is present.
+     * @return boolean
+     */
+    public function attachmentExists()
+    {
+        foreach ($this->attachment as $attachment) {
+            if ($attachment[6] == 'attachment') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if this message has an alternative body set.
+     * @return boolean
+     */
+    public function alternativeExists()
+    {
+        return !empty($this->AltBody);
+    }
+
+    /**
+     * Clear queued addresses of given kind.
+     * @access protected
+     * @param string $kind 'to', 'cc', or 'bcc'
+     * @return void
+     */
+    public function clearQueuedAddresses($kind)
+    {
+        $RecipientsQueue = $this->RecipientsQueue;
+        foreach ($RecipientsQueue as $address => $params) {
+            if ($params[0] == $kind) {
+                unset($this->RecipientsQueue[$address]);
+            }
+        }
+    }
+
+    /**
+     * Clear all To recipients.
+     * @return void
+     */
+    public function clearAddresses()
+    {
+        foreach ($this->to as $to) {
+            unset($this->all_recipients[strtolower($to[0])]);
+        }
+        $this->to = array();
+        $this->clearQueuedAddresses('to');
+    }
+
+    /**
+     * Clear all CC recipients.
+     * @return void
+     */
+    public function clearCCs()
+    {
+        foreach ($this->cc as $cc) {
+            unset($this->all_recipients[strtolower($cc[0])]);
+        }
+        $this->cc = array();
+        $this->clearQueuedAddresses('cc');
+    }
+
+    /**
+     * Clear all BCC recipients.
+     * @return void
+     */
+    public function clearBCCs()
+    {
+        foreach ($this->bcc as $bcc) {
+            unset($this->all_recipients[strtolower($bcc[0])]);
+        }
+        $this->bcc = array();
+        $this->clearQueuedAddresses('bcc');
+    }
+
+    /**
+     * Clear all ReplyTo recipients.
+     * @return void
+     */
+    public function clearReplyTos()
+    {
+        $this->ReplyTo = array();
+        $this->ReplyToQueue = array();
+    }
+
+    /**
+     * Clear all recipient types.
+     * @return void
+     */
+    public function clearAllRecipients()
+    {
+        $this->to = array();
+        $this->cc = array();
+        $this->bcc = array();
+        $this->all_recipients = array();
+        $this->RecipientsQueue = array();
+    }
+
+    /**
+     * Clear all filesystem, string, and binary attachments.
+     * @return void
+     */
+    public function clearAttachments()
+    {
+        $this->attachment = array();
+    }
+
+    /**
+     * Clear all custom headers.
+     * @return void
+     */
+    public function clearCustomHeaders()
+    {
+        $this->CustomHeader = array();
+    }
+
+    /**
+     * Add an error message to the error container.
+     * @access protected
+     * @param string $msg
+     * @return void
+     *
