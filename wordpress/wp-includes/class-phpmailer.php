@@ -3240,4 +3240,283 @@ class PHPMailer
      * @access protected
      * @param string $msg
      * @return void
-     *
+     */
+    protected function setError($msg)
+    {
+        $this->error_count++;
+        if ($this->Mailer == 'smtp' and !is_null($this->smtp)) {
+            $lasterror = $this->smtp->getError();
+            if (!empty($lasterror['error'])) {
+                $msg .= $this->lang('smtp_error') . $lasterror['error'];
+                if (!empty($lasterror['detail'])) {
+                    $msg .= ' Detail: '. $lasterror['detail'];
+                }
+                if (!empty($lasterror['smtp_code'])) {
+                    $msg .= ' SMTP code: ' . $lasterror['smtp_code'];
+                }
+                if (!empty($lasterror['smtp_code_ex'])) {
+                    $msg .= ' Additional SMTP info: ' . $lasterror['smtp_code_ex'];
+                }
+            }
+        }
+        $this->ErrorInfo = $msg;
+    }
+
+    /**
+     * Return an RFC 822 formatted date.
+     * @access public
+     * @return string
+     * @static
+     */
+    public static function rfcDate()
+    {
+        // Set the time zone to whatever the default is to avoid 500 errors
+        // Will default to UTC if it's not set properly in php.ini
+        date_default_timezone_set(@date_default_timezone_get());
+        return date('D, j M Y H:i:s O');
+    }
+
+    /**
+     * Get the server hostname.
+     * Returns 'localhost.localdomain' if unknown.
+     * @access protected
+     * @return string
+     */
+    protected function serverHostname()
+    {
+        $result = 'localhost.localdomain';
+        if (!empty($this->Hostname)) {
+            $result = $this->Hostname;
+        } elseif (isset($_SERVER) and array_key_exists('SERVER_NAME', $_SERVER) and !empty($_SERVER['SERVER_NAME'])) {
+            $result = $_SERVER['SERVER_NAME'];
+        } elseif (function_exists('gethostname') && gethostname() !== false) {
+            $result = gethostname();
+        } elseif (php_uname('n') !== false) {
+            $result = php_uname('n');
+        }
+        return $result;
+    }
+
+    /**
+     * Get an error message in the current language.
+     * @access protected
+     * @param string $key
+     * @return string
+     */
+    protected function lang($key)
+    {
+        if (count($this->language) < 1) {
+            $this->setLanguage('en'); // set the default language
+        }
+
+        if (array_key_exists($key, $this->language)) {
+            if ($key == 'smtp_connect_failed') {
+                //Include a link to troubleshooting docs on SMTP connection failure
+                //this is by far the biggest cause of support questions
+                //but it's usually not PHPMailer's fault.
+                return $this->language[$key] . ' https://github.com/PHPMailer/PHPMailer/wiki/Troubleshooting';
+            }
+            return $this->language[$key];
+        } else {
+            //Return the key as a fallback
+            return $key;
+        }
+    }
+
+    /**
+     * Check if an error occurred.
+     * @access public
+     * @return boolean True if an error did occur.
+     */
+    public function isError()
+    {
+        return ($this->error_count > 0);
+    }
+
+    /**
+     * Ensure consistent line endings in a string.
+     * Changes every end of line from CRLF, CR or LF to $this->LE.
+     * @access public
+     * @param string $str String to fixEOL
+     * @return string
+     */
+    public function fixEOL($str)
+    {
+        // Normalise to \n
+        $nstr = str_replace(array("\r\n", "\r"), "\n", $str);
+        // Now convert LE as needed
+        if ($this->LE !== "\n") {
+            $nstr = str_replace("\n", $this->LE, $nstr);
+        }
+        return $nstr;
+    }
+
+    /**
+     * Add a custom header.
+     * $name value can be overloaded to contain
+     * both header name and value (name:value)
+     * @access public
+     * @param string $name Custom header name
+     * @param string $value Header value
+     * @return void
+     */
+    public function addCustomHeader($name, $value = null)
+    {
+        if ($value === null) {
+            // Value passed in as name:value
+            $this->CustomHeader[] = explode(':', $name, 2);
+        } else {
+            $this->CustomHeader[] = array($name, $value);
+        }
+    }
+
+    /**
+     * Returns all custom headers.
+     * @return array
+     */
+    public function getCustomHeaders()
+    {
+        return $this->CustomHeader;
+    }
+
+    /**
+     * Create a message body from an HTML string.
+     * Automatically inlines images and creates a plain-text version by converting the HTML,
+     * overwriting any existing values in Body and AltBody.
+     * Do not source $message content from user input!
+     * $basedir is prepended when handling relative URLs, e.g. <img src="/images/a.png"> and must not be empty
+     * will look for an image file in $basedir/images/a.png and convert it to inline.
+     * If you don't provide a $basedir, relative paths will be left untouched (and thus probably break in email)
+     * If you don't want to apply these transformations to your HTML, just set Body and AltBody directly.
+     * @access public
+     * @param string $message HTML message string
+     * @param string $basedir Absolute path to a base directory to prepend to relative paths to images
+     * @param boolean|callable $advanced Whether to use the internal HTML to text converter
+     *    or your own custom converter @see PHPMailer::html2text()
+     * @return string $message The transformed message Body
+     */
+    public function msgHTML($message, $basedir = '', $advanced = false)
+    {
+        preg_match_all('/(src|background)=["\'](.*)["\']/Ui', $message, $images);
+        if (array_key_exists(2, $images)) {
+            if (strlen($basedir) > 1 && substr($basedir, -1) != '/') {
+                // Ensure $basedir has a trailing /
+                $basedir .= '/';
+            }
+            foreach ($images[2] as $imgindex => $url) {
+                // Convert data URIs into embedded images
+                if (preg_match('#^data:(image[^;,]*)(;base64)?,#', $url, $match)) {
+                    $data = substr($url, strpos($url, ','));
+                    if ($match[2]) {
+                        $data = base64_decode($data);
+                    } else {
+                        $data = rawurldecode($data);
+                    }
+                    $cid = md5($url) . '@phpmailer.0'; // RFC2392 S 2
+                    if ($this->addStringEmbeddedImage($data, $cid, 'embed' . $imgindex, 'base64', $match[1])) {
+                        $message = str_replace(
+                            $images[0][$imgindex],
+                            $images[1][$imgindex] . '="cid:' . $cid . '"',
+                            $message
+                        );
+                    }
+                    continue;
+                }
+                if (
+                    // Only process relative URLs if a basedir is provided (i.e. no absolute local paths)
+                    !empty($basedir)
+                    // Ignore URLs containing parent dir traversal (..)
+                    && (strpos($url, '..') === false)
+                    // Do not change urls that are already inline images
+                    && substr($url, 0, 4) !== 'cid:'
+                    // Do not change absolute URLs, including anonymous protocol
+                    && !preg_match('#^[a-z][a-z0-9+.-]*:?//#i', $url)
+                ) {
+                    $filename = basename($url);
+                    $directory = dirname($url);
+                    if ($directory == '.') {
+                        $directory = '';
+                    }
+                    $cid = md5($url) . '@phpmailer.0'; // RFC2392 S 2
+                    if (strlen($directory) > 1 && substr($directory, -1) != '/') {
+                        $directory .= '/';
+                    }
+                    if ($this->addEmbeddedImage(
+                        $basedir . $directory . $filename,
+                        $cid,
+                        $filename,
+                        'base64',
+                        self::_mime_types((string)self::mb_pathinfo($filename, PATHINFO_EXTENSION))
+                    )
+                    ) {
+                        $message = preg_replace(
+                            '/' . $images[1][$imgindex] . '=["\']' . preg_quote($url, '/') . '["\']/Ui',
+                            $images[1][$imgindex] . '="cid:' . $cid . '"',
+                            $message
+                        );
+                    }
+                }
+            }
+        }
+        $this->isHTML(true);
+        // Convert all message body line breaks to CRLF, makes quoted-printable encoding work much better
+        $this->Body = $this->normalizeBreaks($message);
+        $this->AltBody = $this->normalizeBreaks($this->html2text($message, $advanced));
+        if (!$this->alternativeExists()) {
+            $this->AltBody = 'To view this email message, open it in a program that understands HTML!' .
+                self::CRLF . self::CRLF;
+        }
+        return $this->Body;
+    }
+
+    /**
+     * Convert an HTML string into plain text.
+     * This is used by msgHTML().
+     * Note - older versions of this function used a bundled advanced converter
+     * which was been removed for license reasons in #232.
+     * Example usage:
+     * <code>
+     * // Use default conversion
+     * $plain = $mail->html2text($html);
+     * // Use your own custom converter
+     * $plain = $mail->html2text($html, function($html) {
+     *     $converter = new MyHtml2text($html);
+     *     return $converter->get_text();
+     * });
+     * </code>
+     * @param string $html The HTML text to convert
+     * @param boolean|callable $advanced Any boolean value to use the internal converter,
+     *   or provide your own callable for custom conversion.
+     * @return string
+     */
+    public function html2text($html, $advanced = false)
+    {
+        if (is_callable($advanced)) {
+            return call_user_func($advanced, $html);
+        }
+        return html_entity_decode(
+            trim(strip_tags(preg_replace('/<(head|title|style|script)[^>]*>.*?<\/\\1>/si', '', $html))),
+            ENT_QUOTES,
+            $this->CharSet
+        );
+    }
+
+    /**
+     * Get the MIME type for a file extension.
+     * @param string $ext File extension
+     * @access public
+     * @return string MIME type of file.
+     * @static
+     */
+    public static function _mime_types($ext = '')
+    {
+        $mimes = array(
+            'xl'    => 'application/excel',
+            'js'    => 'application/javascript',
+            'hqx'   => 'application/mac-binhex40',
+            'cpt'   => 'application/mac-compactpro',
+            'bin'   => 'application/macbinary',
+            'doc'   => 'application/msword',
+            'word'  => 'application/msword',
+            'xlsx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'xltx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.te
