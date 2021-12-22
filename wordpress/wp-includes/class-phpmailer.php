@@ -3791,4 +3791,250 @@ class PHPMailer
         }
         //Workaround for missing digest algorithms in old PHP & OpenSSL versions
         //@link http://stackoverflow.com/a/11117338/333340
-        if (version_compare(PHP_VERSI
+        if (version_compare(PHP_VERSION, '5.3.0') >= 0 and
+            in_array('sha256WithRSAEncryption', openssl_get_md_methods(true))) {
+            if (openssl_sign($signHeader, $signature, $privKey, 'sha256WithRSAEncryption')) {
+                openssl_pkey_free($privKey);
+                return base64_encode($signature);
+            }
+        } else {
+            $pinfo = openssl_pkey_get_details($privKey);
+            $hash = hash('sha256', $signHeader);
+            //'Magic' constant for SHA256 from RFC3447
+            //@link https://tools.ietf.org/html/rfc3447#page-43
+            $t = '3031300d060960864801650304020105000420' . $hash;
+            $pslen = $pinfo['bits'] / 8 - (strlen($t) / 2 + 3);
+            $eb = pack('H*', '0001' . str_repeat('FF', $pslen) . '00' . $t);
+
+            if (openssl_private_encrypt($eb, $signature, $privKey, OPENSSL_NO_PADDING)) {
+                openssl_pkey_free($privKey);
+                return base64_encode($signature);
+            }
+        }
+        openssl_pkey_free($privKey);
+        return '';
+    }
+
+    /**
+     * Generate a DKIM canonicalization header.
+     * @access public
+     * @param string $signHeader Header
+     * @return string
+     */
+    public function DKIM_HeaderC($signHeader)
+    {
+        $signHeader = preg_replace('/\r\n\s+/', ' ', $signHeader);
+        $lines = explode("\r\n", $signHeader);
+        foreach ($lines as $key => $line) {
+            list($heading, $value) = explode(':', $line, 2);
+            $heading = strtolower($heading);
+            $value = preg_replace('/\s{2,}/', ' ', $value); // Compress useless spaces
+            $lines[$key] = $heading . ':' . trim($value); // Don't forget to remove WSP around the value
+        }
+        $signHeader = implode("\r\n", $lines);
+        return $signHeader;
+    }
+
+    /**
+     * Generate a DKIM canonicalization body.
+     * @access public
+     * @param string $body Message Body
+     * @return string
+     */
+    public function DKIM_BodyC($body)
+    {
+        if ($body == '') {
+            return "\r\n";
+        }
+        // stabilize line endings
+        $body = str_replace("\r\n", "\n", $body);
+        $body = str_replace("\n", "\r\n", $body);
+        // END stabilize line endings
+        while (substr($body, strlen($body) - 4, 4) == "\r\n\r\n") {
+            $body = substr($body, 0, strlen($body) - 2);
+        }
+        return $body;
+    }
+
+    /**
+     * Create the DKIM header and body in a new message header.
+     * @access public
+     * @param string $headers_line Header lines
+     * @param string $subject Subject
+     * @param string $body Body
+     * @return string
+     */
+    public function DKIM_Add($headers_line, $subject, $body)
+    {
+        $DKIMsignatureType = 'rsa-sha256'; // Signature & hash algorithms
+        $DKIMcanonicalization = 'relaxed/simple'; // Canonicalization of header/body
+        $DKIMquery = 'dns/txt'; // Query method
+        $DKIMtime = time(); // Signature Timestamp = seconds since 00:00:00 - Jan 1, 1970 (UTC time zone)
+        $subject_header = "Subject: $subject";
+        $headers = explode($this->LE, $headers_line);
+        $from_header = '';
+        $to_header = '';
+        $date_header = '';
+        $current = '';
+        foreach ($headers as $header) {
+            if (strpos($header, 'From:') === 0) {
+                $from_header = $header;
+                $current = 'from_header';
+            } elseif (strpos($header, 'To:') === 0) {
+                $to_header = $header;
+                $current = 'to_header';
+            } elseif (strpos($header, 'Date:') === 0) {
+                $date_header = $header;
+                $current = 'date_header';
+            } else {
+                if (!empty($$current) && strpos($header, ' =?') === 0) {
+                    $$current .= $header;
+                } else {
+                    $current = '';
+                }
+            }
+        }
+        $from = str_replace('|', '=7C', $this->DKIM_QP($from_header));
+        $to = str_replace('|', '=7C', $this->DKIM_QP($to_header));
+        $date = str_replace('|', '=7C', $this->DKIM_QP($date_header));
+        $subject = str_replace(
+            '|',
+            '=7C',
+            $this->DKIM_QP($subject_header)
+        ); // Copied header fields (dkim-quoted-printable)
+        $body = $this->DKIM_BodyC($body);
+        $DKIMlen = strlen($body); // Length of body
+        $DKIMb64 = base64_encode(pack('H*', hash('sha256', $body))); // Base64 of packed binary SHA-256 hash of body
+        if ('' == $this->DKIM_identity) {
+            $ident = '';
+        } else {
+            $ident = ' i=' . $this->DKIM_identity . ';';
+        }
+        $dkimhdrs = 'DKIM-Signature: v=1; a=' .
+            $DKIMsignatureType . '; q=' .
+            $DKIMquery . '; l=' .
+            $DKIMlen . '; s=' .
+            $this->DKIM_selector .
+            ";\r\n" .
+            "\tt=" . $DKIMtime . '; c=' . $DKIMcanonicalization . ";\r\n" .
+            "\th=From:To:Date:Subject;\r\n" .
+            "\td=" . $this->DKIM_domain . ';' . $ident . "\r\n" .
+            "\tz=$from\r\n" .
+            "\t|$to\r\n" .
+            "\t|$date\r\n" .
+            "\t|$subject;\r\n" .
+            "\tbh=" . $DKIMb64 . ";\r\n" .
+            "\tb=";
+        $toSign = $this->DKIM_HeaderC(
+            $from_header . "\r\n" .
+            $to_header . "\r\n" .
+            $date_header . "\r\n" .
+            $subject_header . "\r\n" .
+            $dkimhdrs
+        );
+        $signed = $this->DKIM_Sign($toSign);
+        return $dkimhdrs . $signed . "\r\n";
+    }
+
+    /**
+     * Detect if a string contains a line longer than the maximum line length allowed.
+     * @param string $str
+     * @return boolean
+     * @static
+     */
+    public static function hasLineLongerThanMax($str)
+    {
+        //+2 to include CRLF line break for a 1000 total
+        return (boolean)preg_match('/^(.{'.(self::MAX_LINE_LENGTH + 2).',})/m', $str);
+    }
+
+    /**
+     * Allows for public read access to 'to' property.
+     * @note: Before the send() call, queued addresses (i.e. with IDN) are not yet included.
+     * @access public
+     * @return array
+     */
+    public function getToAddresses()
+    {
+        return $this->to;
+    }
+
+    /**
+     * Allows for public read access to 'cc' property.
+     * @note: Before the send() call, queued addresses (i.e. with IDN) are not yet included.
+     * @access public
+     * @return array
+     */
+    public function getCcAddresses()
+    {
+        return $this->cc;
+    }
+
+    /**
+     * Allows for public read access to 'bcc' property.
+     * @note: Before the send() call, queued addresses (i.e. with IDN) are not yet included.
+     * @access public
+     * @return array
+     */
+    public function getBccAddresses()
+    {
+        return $this->bcc;
+    }
+
+    /**
+     * Allows for public read access to 'ReplyTo' property.
+     * @note: Before the send() call, queued addresses (i.e. with IDN) are not yet included.
+     * @access public
+     * @return array
+     */
+    public function getReplyToAddresses()
+    {
+        return $this->ReplyTo;
+    }
+
+    /**
+     * Allows for public read access to 'all_recipients' property.
+     * @note: Before the send() call, queued addresses (i.e. with IDN) are not yet included.
+     * @access public
+     * @return array
+     */
+    public function getAllRecipientAddresses()
+    {
+        return $this->all_recipients;
+    }
+
+    /**
+     * Perform a callback.
+     * @param boolean $isSent
+     * @param array $to
+     * @param array $cc
+     * @param array $bcc
+     * @param string $subject
+     * @param string $body
+     * @param string $from
+     */
+    protected function doCallback($isSent, $to, $cc, $bcc, $subject, $body, $from)
+    {
+        if (!empty($this->action_function) && is_callable($this->action_function)) {
+            $params = array($isSent, $to, $cc, $bcc, $subject, $body, $from);
+            call_user_func_array($this->action_function, $params);
+        }
+    }
+}
+
+/**
+ * PHPMailer exception handler
+ * @package PHPMailer
+ */
+class phpmailerException extends Exception
+{
+    /**
+     * Prettify error message output
+     * @return string
+     */
+    public function errorMessage()
+    {
+        $errorMsg = '<strong>' . $this->getMessage() . "</strong><br />\n";
+        return $errorMsg;
+    }
+}
