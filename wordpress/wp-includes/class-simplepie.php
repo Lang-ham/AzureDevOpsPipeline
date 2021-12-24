@@ -942,4 +942,399 @@ class SimplePie
 	/**
 	 * Set which class SimplePie uses for caching
 	 */
-	public function set_cache_class
+	public function set_cache_class($class = 'SimplePie_Cache')
+	{
+		return $this->registry->register('Cache', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for auto-discovery
+	 */
+	public function set_locator_class($class = 'SimplePie_Locator')
+	{
+		return $this->registry->register('Locator', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for XML parsing
+	 */
+	public function set_parser_class($class = 'SimplePie_Parser')
+	{
+		return $this->registry->register('Parser', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for remote file fetching
+	 */
+	public function set_file_class($class = 'SimplePie_File')
+	{
+		return $this->registry->register('File', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for data sanitization
+	 */
+	public function set_sanitize_class($class = 'SimplePie_Sanitize')
+	{
+		return $this->registry->register('Sanitize', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for handling feed items
+	 */
+	public function set_item_class($class = 'SimplePie_Item')
+	{
+		return $this->registry->register('Item', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for handling author data
+	 */
+	public function set_author_class($class = 'SimplePie_Author')
+	{
+		return $this->registry->register('Author', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for handling category data
+	 */
+	public function set_category_class($class = 'SimplePie_Category')
+	{
+		return $this->registry->register('Category', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for feed enclosures
+	 */
+	public function set_enclosure_class($class = 'SimplePie_Enclosure')
+	{
+		return $this->registry->register('Enclosure', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for `<media:text>` captions
+	 */
+	public function set_caption_class($class = 'SimplePie_Caption')
+	{
+		return $this->registry->register('Caption', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for `<media:copyright>`
+	 */
+	public function set_copyright_class($class = 'SimplePie_Copyright')
+	{
+		return $this->registry->register('Copyright', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for `<media:credit>`
+	 */
+	public function set_credit_class($class = 'SimplePie_Credit')
+	{
+		return $this->registry->register('Credit', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for `<media:rating>`
+	 */
+	public function set_rating_class($class = 'SimplePie_Rating')
+	{
+		return $this->registry->register('Rating', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for `<media:restriction>`
+	 */
+	public function set_restriction_class($class = 'SimplePie_Restriction')
+	{
+		return $this->registry->register('Restriction', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses for content-type sniffing
+	 */
+	public function set_content_type_sniffer_class($class = 'SimplePie_Content_Type_Sniffer')
+	{
+		return $this->registry->register('Content_Type_Sniffer', $class, true);
+	}
+
+	/**
+	 * Set which class SimplePie uses item sources
+	 */
+	public function set_source_class($class = 'SimplePie_Source')
+	{
+		return $this->registry->register('Source', $class, true);
+	}
+	/**#@-*/
+
+	/**
+	 * Set the user agent string
+	 *
+	 * @param string $ua New user agent string.
+	 */
+	public function set_useragent($ua = SIMPLEPIE_USERAGENT)
+	{
+		$this->useragent = (string) $ua;
+	}
+
+	/**
+	 * Set callback function to create cache filename with
+	 *
+	 * @param mixed $function Callback function
+	 */
+	public function set_cache_name_function($function = 'md5')
+	{
+		if (is_callable($function))
+		{
+			$this->cache_name_function = $function;
+		}
+	}
+
+	/**
+	 * Set options to make SP as fast as possible
+	 *
+	 * Forgoes a substantial amount of data sanitization in favor of speed. This
+	 * turns SimplePie into a dumb parser of feeds.
+	 *
+	 * @param bool $set Whether to set them or not
+	 */
+	public function set_stupidly_fast($set = false)
+	{
+		if ($set)
+		{
+			$this->enable_order_by_date(false);
+			$this->remove_div(false);
+			$this->strip_comments(false);
+			$this->strip_htmltags(false);
+			$this->strip_attributes(false);
+			$this->set_image_handler(false);
+		}
+	}
+
+	/**
+	 * Set maximum number of feeds to check with autodiscovery
+	 *
+	 * @param int $max Maximum number of feeds to check
+	 */
+	public function set_max_checked_feeds($max = 10)
+	{
+		$this->max_checked_feeds = (int) $max;
+	}
+
+	public function remove_div($enable = true)
+	{
+		$this->sanitize->remove_div($enable);
+	}
+
+	public function strip_htmltags($tags = '', $encode = null)
+	{
+		if ($tags === '')
+		{
+			$tags = $this->strip_htmltags;
+		}
+		$this->sanitize->strip_htmltags($tags);
+		if ($encode !== null)
+		{
+			$this->sanitize->encode_instead_of_strip($tags);
+		}
+	}
+
+	public function encode_instead_of_strip($enable = true)
+	{
+		$this->sanitize->encode_instead_of_strip($enable);
+	}
+
+	public function strip_attributes($attribs = '')
+	{
+		if ($attribs === '')
+		{
+			$attribs = $this->strip_attributes;
+		}
+		$this->sanitize->strip_attributes($attribs);
+	}
+
+	/**
+	 * Set the output encoding
+	 *
+	 * Allows you to override SimplePie's output to match that of your webpage.
+	 * This is useful for times when your webpages are not being served as
+	 * UTF-8.  This setting will be obeyed by {@see handle_content_type()}, and
+	 * is similar to {@see set_input_encoding()}.
+	 *
+	 * It should be noted, however, that not all character encodings can support
+	 * all characters.  If your page is being served as ISO-8859-1 and you try
+	 * to display a Japanese feed, you'll likely see garbled characters.
+	 * Because of this, it is highly recommended to ensure that your webpages
+	 * are served as UTF-8.
+	 *
+	 * The number of supported character encodings depends on whether your web
+	 * host supports {@link http://php.net/mbstring mbstring},
+	 * {@link http://php.net/iconv iconv}, or both. See
+	 * {@link http://simplepie.org/wiki/faq/Supported_Character_Encodings} for
+	 * more information.
+	 *
+	 * @param string $encoding
+	 */
+	public function set_output_encoding($encoding = 'UTF-8')
+	{
+		$this->sanitize->set_output_encoding($encoding);
+	}
+
+	public function strip_comments($strip = false)
+	{
+		$this->sanitize->strip_comments($strip);
+	}
+
+	/**
+	 * Set element/attribute key/value pairs of HTML attributes
+	 * containing URLs that need to be resolved relative to the feed
+	 *
+	 * Defaults to |a|@href, |area|@href, |blockquote|@cite, |del|@cite,
+	 * |form|@action, |img|@longdesc, |img|@src, |input|@src, |ins|@cite,
+	 * |q|@cite
+	 *
+	 * @since 1.0
+	 * @param array|null $element_attribute Element/attribute key/value pairs, null for default
+	 */
+	public function set_url_replacements($element_attribute = null)
+	{
+		$this->sanitize->set_url_replacements($element_attribute);
+	}
+
+	/**
+	 * Set the handler to enable the display of cached images.
+	 *
+	 * @param str $page Web-accessible path to the handler_image.php file.
+	 * @param str $qs The query string that the value should be passed to.
+	 */
+	public function set_image_handler($page = false, $qs = 'i')
+	{
+		if ($page !== false)
+		{
+			$this->sanitize->set_image_handler($page . '?' . $qs . '=');
+		}
+		else
+		{
+			$this->image_handler = '';
+		}
+	}
+
+	/**
+	 * Set the limit for items returned per-feed with multifeeds
+	 *
+	 * @param integer $limit The maximum number of items to return.
+	 */
+	public function set_item_limit($limit = 0)
+	{
+		$this->item_limit = (int) $limit;
+	}
+
+	/**
+	 * Initialize the feed object
+	 *
+	 * This is what makes everything happen.  Period.  This is where all of the
+	 * configuration options get processed, feeds are fetched, cached, and
+	 * parsed, and all of that other good stuff.
+	 *
+	 * @return boolean True if successful, false otherwise
+	 */
+	public function init()
+	{
+		// Check absolute bare minimum requirements.
+		if (!extension_loaded('xml') || !extension_loaded('pcre'))
+		{
+			return false;
+		}
+		// Then check the xml extension is sane (i.e., libxml 2.7.x issue on PHP < 5.2.9 and libxml 2.7.0 to 2.7.2 on any version) if we don't have xmlreader.
+		elseif (!extension_loaded('xmlreader'))
+		{
+			static $xml_is_sane = null;
+			if ($xml_is_sane === null)
+			{
+				$parser_check = xml_parser_create();
+				xml_parse_into_struct($parser_check, '<foo>&amp;</foo>', $values);
+				xml_parser_free($parser_check);
+				$xml_is_sane = isset($values[0]['value']);
+			}
+			if (!$xml_is_sane)
+			{
+				return false;
+			}
+		}
+
+		if (method_exists($this->sanitize, 'set_registry'))
+		{
+			$this->sanitize->set_registry($this->registry);
+		}
+
+		// Pass whatever was set with config options over to the sanitizer.
+		// Pass the classes in for legacy support; new classes should use the registry instead
+		$this->sanitize->pass_cache_data($this->cache, $this->cache_location, $this->cache_name_function, $this->registry->get_class('Cache'));
+		$this->sanitize->pass_file_data($this->registry->get_class('File'), $this->timeout, $this->useragent, $this->force_fsockopen);
+
+		if (!empty($this->multifeed_url))
+		{
+			$i = 0;
+			$success = 0;
+			$this->multifeed_objects = array();
+			$this->error = array();
+			foreach ($this->multifeed_url as $url)
+			{
+				$this->multifeed_objects[$i] = clone $this;
+				$this->multifeed_objects[$i]->set_feed_url($url);
+				$single_success = $this->multifeed_objects[$i]->init();
+				$success |= $single_success;
+				if (!$single_success)
+				{
+					$this->error[$i] = $this->multifeed_objects[$i]->error();
+				}
+				$i++;
+			}
+			return (bool) $success;
+		}
+		elseif ($this->feed_url === null && $this->raw_data === null)
+		{
+			return false;
+		}
+
+		$this->error = null;
+		$this->data = array();
+		$this->multifeed_objects = array();
+		$cache = false;
+
+		if ($this->feed_url !== null)
+		{
+			$parsed_feed_url = $this->registry->call('Misc', 'parse_url', array($this->feed_url));
+
+			// Decide whether to enable caching
+			if ($this->cache && $parsed_feed_url['scheme'] !== '')
+			{
+				$cache = $this->registry->call('Cache', 'get_handler', array($this->cache_location, call_user_func($this->cache_name_function, $this->feed_url), 'spc'));
+			}
+
+			// Fetch the data via SimplePie_File into $this->raw_data
+			if (($fetched = $this->fetch_data($cache)) === true)
+			{
+				return true;
+			}
+			elseif ($fetched === false) {
+				return false;
+			}
+
+			list($headers, $sniffed) = $fetched;
+		}
+
+		// Set up array of possible encodings
+		$encodings = array();
+
+		// First check to see if input has been overridden.
+		if ($this->input_encoding !== false)
+		{
+			$encodings[] = $this->input_encoding;
+		}
+
+		$application_types = array('application/xml', 'application/xml-dtd', 'application/xml-external-parsed-entity');
+		$text_types = array('text/xml', 'text/xml-external-parsed-entity');
+
+		// RFC 3023 (only applies to 
