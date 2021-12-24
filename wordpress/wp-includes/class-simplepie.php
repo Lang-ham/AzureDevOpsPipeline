@@ -1337,4 +1337,317 @@ class SimplePie
 		$application_types = array('application/xml', 'application/xml-dtd', 'application/xml-external-parsed-entity');
 		$text_types = array('text/xml', 'text/xml-external-parsed-entity');
 
-		// RFC 3023 (only applies to 
+		// RFC 3023 (only applies to sniffed content)
+		if (isset($sniffed))
+		{
+			if (in_array($sniffed, $application_types) || substr($sniffed, 0, 12) === 'application/' && substr($sniffed, -4) === '+xml')
+			{
+				if (isset($headers['content-type']) && preg_match('/;\x20?charset=([^;]*)/i', $headers['content-type'], $charset))
+				{
+					$encodings[] = strtoupper($charset[1]);
+				}
+				$encodings = array_merge($encodings, $this->registry->call('Misc', 'xml_encoding', array($this->raw_data, &$this->registry)));
+				$encodings[] = 'UTF-8';
+			}
+			elseif (in_array($sniffed, $text_types) || substr($sniffed, 0, 5) === 'text/' && substr($sniffed, -4) === '+xml')
+			{
+				if (isset($headers['content-type']) && preg_match('/;\x20?charset=([^;]*)/i', $headers['content-type'], $charset))
+				{
+					$encodings[] = $charset[1];
+				}
+				$encodings[] = 'US-ASCII';
+			}
+			// Text MIME-type default
+			elseif (substr($sniffed, 0, 5) === 'text/')
+			{
+				$encodings[] = 'US-ASCII';
+			}
+		}
+
+		// Fallback to XML 1.0 Appendix F.1/UTF-8/ISO-8859-1
+		$encodings = array_merge($encodings, $this->registry->call('Misc', 'xml_encoding', array($this->raw_data, &$this->registry)));
+		$encodings[] = 'UTF-8';
+		$encodings[] = 'ISO-8859-1';
+
+		// There's no point in trying an encoding twice
+		$encodings = array_unique($encodings);
+
+		// Loop through each possible encoding, till we return something, or run out of possibilities
+		foreach ($encodings as $encoding)
+		{
+			// Change the encoding to UTF-8 (as we always use UTF-8 internally)
+			if ($utf8_data = $this->registry->call('Misc', 'change_encoding', array($this->raw_data, $encoding, 'UTF-8')))
+			{
+				// Create new parser
+				$parser = $this->registry->create('Parser');
+
+				// If it's parsed fine
+				if ($parser->parse($utf8_data, 'UTF-8'))
+				{
+					$this->data = $parser->get_data();
+					if (!($this->get_type() & ~SIMPLEPIE_TYPE_NONE))
+					{
+						$this->error = "A feed could not be found at $this->feed_url. This does not appear to be a valid RSS or Atom feed.";
+						$this->registry->call('Misc', 'error', array($this->error, E_USER_NOTICE, __FILE__, __LINE__));
+						return false;
+					}
+
+					if (isset($headers))
+					{
+						$this->data['headers'] = $headers;
+					}
+					$this->data['build'] = SIMPLEPIE_BUILD;
+
+					// Cache the file if caching is enabled
+					if ($cache && !$cache->save($this))
+					{
+						trigger_error("$this->cache_location is not writeable. Make sure you've set the correct relative or absolute path, and that the location is server-writable.", E_USER_WARNING);
+					}
+					return true;
+				}
+			}
+		}
+
+		if (isset($parser))
+		{
+			// We have an error, just set SimplePie_Misc::error to it and quit
+			$this->error = sprintf('This XML document is invalid, likely due to invalid characters. XML error: %s at line %d, column %d', $parser->get_error_string(), $parser->get_current_line(), $parser->get_current_column());
+		}
+		else
+		{
+			$this->error = 'The data could not be converted to UTF-8. You MUST have either the iconv or mbstring extension installed. Upgrading to PHP 5.x (which includes iconv) is highly recommended.';
+		}
+
+		$this->registry->call('Misc', 'error', array($this->error, E_USER_NOTICE, __FILE__, __LINE__));
+
+		return false;
+	}
+
+	/**
+	 * Fetch the data via SimplePie_File
+	 *
+	 * If the data is already cached, attempt to fetch it from there instead
+	 * @param SimplePie_Cache|false $cache Cache handler, or false to not load from the cache
+	 * @return array|true Returns true if the data was loaded from the cache, or an array of HTTP headers and sniffed type
+	 */
+	protected function fetch_data(&$cache)
+	{
+		// If it's enabled, use the cache
+		if ($cache)
+		{
+			// Load the Cache
+			$this->data = $cache->load();
+			if (!empty($this->data))
+			{
+				// If the cache is for an outdated build of SimplePie
+				if (!isset($this->data['build']) || $this->data['build'] !== SIMPLEPIE_BUILD)
+				{
+					$cache->unlink();
+					$this->data = array();
+				}
+				// If we've hit a collision just rerun it with caching disabled
+				elseif (isset($this->data['url']) && $this->data['url'] !== $this->feed_url)
+				{
+					$cache = false;
+					$this->data = array();
+				}
+				// If we've got a non feed_url stored (if the page isn't actually a feed, or is a redirect) use that URL.
+				elseif (isset($this->data['feed_url']))
+				{
+					// If the autodiscovery cache is still valid use it.
+					if ($cache->mtime() + $this->autodiscovery_cache_duration > time())
+					{
+						// Do not need to do feed autodiscovery yet.
+						if ($this->data['feed_url'] !== $this->data['url'])
+						{
+							$this->set_feed_url($this->data['feed_url']);
+							return $this->init();
+						}
+
+						$cache->unlink();
+						$this->data = array();
+					}
+				}
+				// Check if the cache has been updated
+				elseif ($cache->mtime() + $this->cache_duration < time())
+				{
+					// If we have last-modified and/or etag set
+					if (isset($this->data['headers']['last-modified']) || isset($this->data['headers']['etag']))
+					{
+						$headers = array(
+							'Accept' => 'application/atom+xml, application/rss+xml, application/rdf+xml;q=0.9, application/xml;q=0.8, text/xml;q=0.8, text/html;q=0.7, unknown/unknown;q=0.1, application/unknown;q=0.1, */*;q=0.1',
+						);
+						if (isset($this->data['headers']['last-modified']))
+						{
+							$headers['if-modified-since'] = $this->data['headers']['last-modified'];
+						}
+						if (isset($this->data['headers']['etag']))
+						{
+							$headers['if-none-match'] = $this->data['headers']['etag'];
+						}
+
+						$file = $this->registry->create('File', array($this->feed_url, $this->timeout/10, 5, $headers, $this->useragent, $this->force_fsockopen));
+
+						if ($file->success)
+						{
+							if ($file->status_code === 304)
+							{
+								$cache->touch();
+								return true;
+							}
+						}
+						else
+						{
+							unset($file);
+						}
+					}
+				}
+				// If the cache is still valid, just return true
+				else
+				{
+					$this->raw_data = false;
+					return true;
+				}
+			}
+			// If the cache is empty, delete it
+			else
+			{
+				$cache->unlink();
+				$this->data = array();
+			}
+		}
+		// If we don't already have the file (it'll only exist if we've opened it to check if the cache has been modified), open it.
+		if (!isset($file))
+		{
+			if ($this->file instanceof SimplePie_File && $this->file->url === $this->feed_url)
+			{
+				$file =& $this->file;
+			}
+			else
+			{
+				$headers = array(
+					'Accept' => 'application/atom+xml, application/rss+xml, application/rdf+xml;q=0.9, application/xml;q=0.8, text/xml;q=0.8, text/html;q=0.7, unknown/unknown;q=0.1, application/unknown;q=0.1, */*;q=0.1',
+				);
+				$file = $this->registry->create('File', array($this->feed_url, $this->timeout, 5, $headers, $this->useragent, $this->force_fsockopen));
+			}
+		}
+		// If the file connection has an error, set SimplePie::error to that and quit
+		if (!$file->success && !($file->method & SIMPLEPIE_FILE_SOURCE_REMOTE === 0 || ($file->status_code === 200 || $file->status_code > 206 && $file->status_code < 300)))
+		{
+			$this->error = $file->error;
+			return !empty($this->data);
+		}
+
+		if (!$this->force_feed)
+		{
+			// Check if the supplied URL is a feed, if it isn't, look for it.
+			$locate = $this->registry->create('Locator', array(&$file, $this->timeout, $this->useragent, $this->max_checked_feeds));
+
+			if (!$locate->is_feed($file))
+			{
+				// We need to unset this so that if SimplePie::set_file() has been called that object is untouched
+				unset($file);
+				try
+				{
+					if (!($file = $locate->find($this->autodiscovery, $this->all_discovered_feeds)))
+					{
+						$this->error = "A feed could not be found at $this->feed_url. A feed with an invalid mime type may fall victim to this error, or " . SIMPLEPIE_NAME . " was unable to auto-discover it.. Use force_feed() if you are certain this URL is a real feed.";
+						$this->registry->call('Misc', 'error', array($this->error, E_USER_NOTICE, __FILE__, __LINE__));
+						return false;
+					}
+				}
+				catch (SimplePie_Exception $e)
+				{
+					// This is usually because DOMDocument doesn't exist
+					$this->error = $e->getMessage();
+					$this->registry->call('Misc', 'error', array($this->error, E_USER_NOTICE, $e->getFile(), $e->getLine()));
+					return false;
+				}
+				if ($cache)
+				{
+					$this->data = array('url' => $this->feed_url, 'feed_url' => $file->url, 'build' => SIMPLEPIE_BUILD);
+					if (!$cache->save($this))
+					{
+						trigger_error("$this->cache_location is not writeable. Make sure you've set the correct relative or absolute path, and that the location is server-writable.", E_USER_WARNING);
+					}
+					$cache = $this->registry->call('Cache', 'get_handler', array($this->cache_location, call_user_func($this->cache_name_function, $file->url), 'spc'));
+				}
+				$this->feed_url = $file->url;
+			}
+			$locate = null;
+		}
+
+		$this->raw_data = $file->body;
+
+		$headers = $file->headers;
+		$sniffer = $this->registry->create('Content_Type_Sniffer', array(&$file));
+		$sniffed = $sniffer->get_type();
+
+		return array($headers, $sniffed);
+	}
+
+	/**
+	 * Get the error message for the occurred error.
+	 *
+	 * @return string|array Error message, or array of messages for multifeeds
+	 */
+	public function error()
+	{
+		return $this->error;
+	}
+
+	/**
+	 * Get the raw XML
+	 *
+	 * This is the same as the old `$feed->enable_xml_dump(true)`, but returns
+	 * the data instead of printing it.
+	 *
+	 * @return string|boolean Raw XML data, false if the cache is used
+	 */
+	public function get_raw_data()
+	{
+		return $this->raw_data;
+	}
+
+	/**
+	 * Get the character encoding used for output
+	 *
+	 * @since Preview Release
+	 * @return string
+	 */
+	public function get_encoding()
+	{
+		return $this->sanitize->output_encoding;
+	}
+
+	/**
+	 * Send the content-type header with correct encoding
+	 *
+	 * This method ensures that the SimplePie-enabled page is being served with
+	 * the correct {@link http://www.iana.org/assignments/media-types/ mime-type}
+	 * and character encoding HTTP headers (character encoding determined by the
+	 * {@see set_output_encoding} config option).
+	 *
+	 * This won't work properly if any content or whitespace has already been
+	 * sent to the browser, because it relies on PHP's
+	 * {@link http://php.net/header header()} function, and these are the
+	 * circumstances under which the function works.
+	 *
+	 * Because it's setting these settings for the entire page (as is the nature
+	 * of HTTP headers), this should only be used once per page (again, at the
+	 * top).
+	 *
+	 * @param string $mime MIME type to serve the page as
+	 */
+	public function handle_content_type($mime = 'text/html')
+	{
+		if (!headers_sent())
+		{
+			$header = "Content-type: $mime;";
+			if ($this->get_encoding())
+			{
+				$header .= ' charset=' . $this->get_encoding();
+			}
+			else
+			{
+				$header .= ' charset=UTF-8';
