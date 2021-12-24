@@ -1651,3 +1651,331 @@ class SimplePie
 			else
 			{
 				$header .= ' charset=UTF-8';
+			}
+			header($header);
+		}
+	}
+
+	/**
+	 * Get the type of the feed
+	 *
+	 * This returns a SIMPLEPIE_TYPE_* constant, which can be tested against
+	 * using {@link http://php.net/language.operators.bitwise bitwise operators}
+	 *
+	 * @since 0.8 (usage changed to using constants in 1.0)
+	 * @see SIMPLEPIE_TYPE_NONE Unknown.
+	 * @see SIMPLEPIE_TYPE_RSS_090 RSS 0.90.
+	 * @see SIMPLEPIE_TYPE_RSS_091_NETSCAPE RSS 0.91 (Netscape).
+	 * @see SIMPLEPIE_TYPE_RSS_091_USERLAND RSS 0.91 (Userland).
+	 * @see SIMPLEPIE_TYPE_RSS_091 RSS 0.91.
+	 * @see SIMPLEPIE_TYPE_RSS_092 RSS 0.92.
+	 * @see SIMPLEPIE_TYPE_RSS_093 RSS 0.93.
+	 * @see SIMPLEPIE_TYPE_RSS_094 RSS 0.94.
+	 * @see SIMPLEPIE_TYPE_RSS_10 RSS 1.0.
+	 * @see SIMPLEPIE_TYPE_RSS_20 RSS 2.0.x.
+	 * @see SIMPLEPIE_TYPE_RSS_RDF RDF-based RSS.
+	 * @see SIMPLEPIE_TYPE_RSS_SYNDICATION Non-RDF-based RSS (truly intended as syndication format).
+	 * @see SIMPLEPIE_TYPE_RSS_ALL Any version of RSS.
+	 * @see SIMPLEPIE_TYPE_ATOM_03 Atom 0.3.
+	 * @see SIMPLEPIE_TYPE_ATOM_10 Atom 1.0.
+	 * @see SIMPLEPIE_TYPE_ATOM_ALL Any version of Atom.
+	 * @see SIMPLEPIE_TYPE_ALL Any known/supported feed type.
+	 * @return int SIMPLEPIE_TYPE_* constant
+	 */
+	public function get_type()
+	{
+		if (!isset($this->data['type']))
+		{
+			$this->data['type'] = SIMPLEPIE_TYPE_ALL;
+			if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['feed']))
+			{
+				$this->data['type'] &= SIMPLEPIE_TYPE_ATOM_10;
+			}
+			elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['feed']))
+			{
+				$this->data['type'] &= SIMPLEPIE_TYPE_ATOM_03;
+			}
+			elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF']))
+			{
+				if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_10]['channel'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_10]['image'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_10]['item'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_10]['textinput']))
+				{
+					$this->data['type'] &= SIMPLEPIE_TYPE_RSS_10;
+				}
+				if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_090]['channel'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_090]['image'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_090]['item'])
+				|| isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_090]['textinput']))
+				{
+					$this->data['type'] &= SIMPLEPIE_TYPE_RSS_090;
+				}
+			}
+			elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss']))
+			{
+				$this->data['type'] &= SIMPLEPIE_TYPE_RSS_ALL;
+				if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['attribs']['']['version']))
+				{
+					switch (trim($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['attribs']['']['version']))
+					{
+						case '0.91':
+							$this->data['type'] &= SIMPLEPIE_TYPE_RSS_091;
+							if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_20]['skiphours']['hour'][0]['data']))
+							{
+								switch (trim($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['child'][SIMPLEPIE_NAMESPACE_RSS_20]['skiphours']['hour'][0]['data']))
+								{
+									case '0':
+										$this->data['type'] &= SIMPLEPIE_TYPE_RSS_091_NETSCAPE;
+										break;
+
+									case '24':
+										$this->data['type'] &= SIMPLEPIE_TYPE_RSS_091_USERLAND;
+										break;
+								}
+							}
+							break;
+
+						case '0.92':
+							$this->data['type'] &= SIMPLEPIE_TYPE_RSS_092;
+							break;
+
+						case '0.93':
+							$this->data['type'] &= SIMPLEPIE_TYPE_RSS_093;
+							break;
+
+						case '0.94':
+							$this->data['type'] &= SIMPLEPIE_TYPE_RSS_094;
+							break;
+
+						case '2.0':
+							$this->data['type'] &= SIMPLEPIE_TYPE_RSS_20;
+							break;
+					}
+				}
+			}
+			else
+			{
+				$this->data['type'] = SIMPLEPIE_TYPE_NONE;
+			}
+		}
+		return $this->data['type'];
+	}
+
+	/**
+	 * Get the URL for the feed
+	 *
+	 * May or may not be different from the URL passed to {@see set_feed_url()},
+	 * depending on whether auto-discovery was used.
+	 *
+	 * @since Preview Release (previously called `get_feed_url()` since SimplePie 0.8.)
+	 * @todo If we have a perm redirect we should return the new URL
+	 * @todo When we make the above change, let's support <itunes:new-feed-url> as well
+	 * @todo Also, |atom:link|@rel=self
+	 * @return string|null
+	 */
+	public function subscribe_url()
+	{
+		if ($this->feed_url !== null)
+		{
+			return $this->sanitize($this->feed_url, SIMPLEPIE_CONSTRUCT_IRI);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get data for an feed-level element
+	 *
+	 * This method allows you to get access to ANY element/attribute that is a
+	 * sub-element of the opening feed tag.
+	 *
+	 * The return value is an indexed array of elements matching the given
+	 * namespace and tag name. Each element has `attribs`, `data` and `child`
+	 * subkeys. For `attribs` and `child`, these contain namespace subkeys.
+	 * `attribs` then has one level of associative name => value data (where
+	 * `value` is a string) after the namespace. `child` has tag-indexed keys
+	 * after the namespace, each member of which is an indexed array matching
+	 * this same format.
+	 *
+	 * For example:
+	 * <pre>
+	 * // This is probably a bad example because we already support
+	 * // <media:content> natively, but it shows you how to parse through
+	 * // the nodes.
+	 * $group = $item->get_item_tags(SIMPLEPIE_NAMESPACE_MEDIARSS, 'group');
+	 * $content = $group[0]['child'][SIMPLEPIE_NAMESPACE_MEDIARSS]['content'];
+	 * $file = $content[0]['attribs']['']['url'];
+	 * echo $file;
+	 * </pre>
+	 *
+	 * @since 1.0
+	 * @see http://simplepie.org/wiki/faq/supported_xml_namespaces
+	 * @param string $namespace The URL of the XML namespace of the elements you're trying to access
+	 * @param string $tag Tag name
+	 * @return array
+	 */
+	public function get_feed_tags($namespace, $tag)
+	{
+		$type = $this->get_type();
+		if ($type & SIMPLEPIE_TYPE_ATOM_10)
+		{
+			if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['feed'][0]['child'][$namespace][$tag]))
+			{
+				return $this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['feed'][0]['child'][$namespace][$tag];
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_ATOM_03)
+		{
+			if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['feed'][0]['child'][$namespace][$tag]))
+			{
+				return $this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['feed'][0]['child'][$namespace][$tag];
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_RDF)
+		{
+			if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][$namespace][$tag]))
+			{
+				return $this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['child'][$namespace][$tag];
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_SYNDICATION)
+		{
+			if (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['child'][$namespace][$tag]))
+			{
+				return $this->data['child'][SIMPLEPIE_NAMESPACE_RSS_20]['rss'][0]['child'][$namespace][$tag];
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get data for an channel-level element
+	 *
+	 * This method allows you to get access to ANY element/attribute in the
+	 * channel/header section of the feed.
+	 *
+	 * See {@see SimplePie::get_feed_tags()} for a description of the return value
+	 *
+	 * @since 1.0
+	 * @see http://simplepie.org/wiki/faq/supported_xml_namespaces
+	 * @param string $namespace The URL of the XML namespace of the elements you're trying to access
+	 * @param string $tag Tag name
+	 * @return array
+	 */
+	public function get_channel_tags($namespace, $tag)
+	{
+		$type = $this->get_type();
+		if ($type & SIMPLEPIE_TYPE_ATOM_ALL)
+		{
+			if ($return = $this->get_feed_tags($namespace, $tag))
+			{
+				return $return;
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_10)
+		{
+			if ($channel = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'channel'))
+			{
+				if (isset($channel[0]['child'][$namespace][$tag]))
+				{
+					return $channel[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_090)
+		{
+			if ($channel = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'channel'))
+			{
+				if (isset($channel[0]['child'][$namespace][$tag]))
+				{
+					return $channel[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_SYNDICATION)
+		{
+			if ($channel = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'channel'))
+			{
+				if (isset($channel[0]['child'][$namespace][$tag]))
+				{
+					return $channel[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get data for an channel-level element
+	 *
+	 * This method allows you to get access to ANY element/attribute in the
+	 * image/logo section of the feed.
+	 *
+	 * See {@see SimplePie::get_feed_tags()} for a description of the return value
+	 *
+	 * @since 1.0
+	 * @see http://simplepie.org/wiki/faq/supported_xml_namespaces
+	 * @param string $namespace The URL of the XML namespace of the elements you're trying to access
+	 * @param string $tag Tag name
+	 * @return array
+	 */
+	public function get_image_tags($namespace, $tag)
+	{
+		$type = $this->get_type();
+		if ($type & SIMPLEPIE_TYPE_RSS_10)
+		{
+			if ($image = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'image'))
+			{
+				if (isset($image[0]['child'][$namespace][$tag]))
+				{
+					return $image[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_090)
+		{
+			if ($image = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'image'))
+			{
+				if (isset($image[0]['child'][$namespace][$tag]))
+				{
+					return $image[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		if ($type & SIMPLEPIE_TYPE_RSS_SYNDICATION)
+		{
+			if ($image = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'image'))
+			{
+				if (isset($image[0]['child'][$namespace][$tag]))
+				{
+					return $image[0]['child'][$namespace][$tag];
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get the base URL value from the feed
+	 *
+	 * Uses `<xml:base>` if available, otherwise uses the first link in the
+	 * feed, or failing that, the URL of the feed itself.
+	 *
+	 * @see get_link
+	 * @see subscribe_url
+	 *
+	 * @param array $element
+	 * @return string
+	 */
+	public function get_base($element = array())
+	{
+		if (!($this->get_type() & SIMPLEPIE_TYPE_RSS_SYNDICATION) && !empty($element['xml_base_explicit']) && isset($element['xml_base']))
+		{
+			return $element['xml_base'];
+		}
+		elseif ($this->get_link() !== null)
+		{
+			return $this->g
