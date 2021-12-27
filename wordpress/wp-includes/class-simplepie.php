@@ -1978,4 +1978,322 @@ class SimplePie
 		}
 		elseif ($this->get_link() !== null)
 		{
-			return $this->g
+			return $this->get_link();
+		}
+		else
+		{
+			return $this->subscribe_url();
+		}
+	}
+
+	/**
+	 * Sanitize feed data
+	 *
+	 * @access private
+	 * @see SimplePie_Sanitize::sanitize()
+	 * @param string $data Data to sanitize
+	 * @param int $type One of the SIMPLEPIE_CONSTRUCT_* constants
+	 * @param string $base Base URL to resolve URLs against
+	 * @return string Sanitized data
+	 */
+	public function sanitize($data, $type, $base = '')
+	{
+		return $this->sanitize->sanitize($data, $type, $base);
+	}
+
+	/**
+	 * Get the title of the feed
+	 *
+	 * Uses `<atom:title>`, `<title>` or `<dc:title>`
+	 *
+	 * @since 1.0 (previously called `get_feed_title` since 0.8)
+	 * @return string|null
+	 */
+	public function get_title()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_10_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_03_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_MAYBE_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_MAYBE_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_MAYBE_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get a category for the feed
+	 *
+	 * @since Unknown
+	 * @param int $key The category that you want to return.  Remember that arrays begin with 0, not 1
+	 * @return SimplePie_Category|null
+	 */
+	public function get_category($key = 0)
+	{
+		$categories = $this->get_categories();
+		if (isset($categories[$key]))
+		{
+			return $categories[$key];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get all categories for the feed
+	 *
+	 * Uses `<atom:category>`, `<category>` or `<dc:subject>`
+	 *
+	 * @since Unknown
+	 * @return array|null List of {@see SimplePie_Category} objects
+	 */
+	public function get_categories()
+	{
+		$categories = array();
+
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'category') as $category)
+		{
+			$term = null;
+			$scheme = null;
+			$label = null;
+			if (isset($category['attribs']['']['term']))
+			{
+				$term = $this->sanitize($category['attribs']['']['term'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($category['attribs']['']['scheme']))
+			{
+				$scheme = $this->sanitize($category['attribs']['']['scheme'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($category['attribs']['']['label']))
+			{
+				$label = $this->sanitize($category['attribs']['']['label'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			$categories[] = $this->registry->create('Category', array($term, $scheme, $label));
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'category') as $category)
+		{
+			// This is really the label, but keep this as the term also for BC.
+			// Label will also work on retrieving because that falls back to term.
+			$term = $this->sanitize($category['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			if (isset($category['attribs']['']['domain']))
+			{
+				$scheme = $this->sanitize($category['attribs']['']['domain'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			else
+			{
+				$scheme = null;
+			}
+			$categories[] = $this->registry->create('Category', array($term, $scheme, null));
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'subject') as $category)
+		{
+			$categories[] = $this->registry->create('Category', array($this->sanitize($category['data'], SIMPLEPIE_CONSTRUCT_TEXT), null, null));
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'subject') as $category)
+		{
+			$categories[] = $this->registry->create('Category', array($this->sanitize($category['data'], SIMPLEPIE_CONSTRUCT_TEXT), null, null));
+		}
+
+		if (!empty($categories))
+		{
+			return array_unique($categories);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get an author for the feed
+	 *
+	 * @since 1.1
+	 * @param int $key The author that you want to return.  Remember that arrays begin with 0, not 1
+	 * @return SimplePie_Author|null
+	 */
+	public function get_author($key = 0)
+	{
+		$authors = $this->get_authors();
+		if (isset($authors[$key]))
+		{
+			return $authors[$key];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get all authors for the feed
+	 *
+	 * Uses `<atom:author>`, `<author>`, `<dc:creator>` or `<itunes:author>`
+	 *
+	 * @since 1.1
+	 * @return array|null List of {@see SimplePie_Author} objects
+	 */
+	public function get_authors()
+	{
+		$authors = array();
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'author') as $author)
+		{
+			$name = null;
+			$uri = null;
+			$email = null;
+			if (isset($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['name'][0]['data']))
+			{
+				$name = $this->sanitize($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['name'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]['data']))
+			{
+				$uri = $this->sanitize($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]));
+			}
+			if (isset($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['email'][0]['data']))
+			{
+				$email = $this->sanitize($author['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['email'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if ($name !== null || $email !== null || $uri !== null)
+			{
+				$authors[] = $this->registry->create('Author', array($name, $uri, $email));
+			}
+		}
+		if ($author = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'author'))
+		{
+			$name = null;
+			$url = null;
+			$email = null;
+			if (isset($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['name'][0]['data']))
+			{
+				$name = $this->sanitize($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['name'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]['data']))
+			{
+				$url = $this->sanitize($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]));
+			}
+			if (isset($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data']))
+			{
+				$email = $this->sanitize($author[0]['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if ($name !== null || $email !== null || $url !== null)
+			{
+				$authors[] = $this->registry->create('Author', array($name, $url, $email));
+			}
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'creator') as $author)
+		{
+			$authors[] = $this->registry->create('Author', array($this->sanitize($author['data'], SIMPLEPIE_CONSTRUCT_TEXT), null, null));
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'creator') as $author)
+		{
+			$authors[] = $this->registry->create('Author', array($this->sanitize($author['data'], SIMPLEPIE_CONSTRUCT_TEXT), null, null));
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ITUNES, 'author') as $author)
+		{
+			$authors[] = $this->registry->create('Author', array($this->sanitize($author['data'], SIMPLEPIE_CONSTRUCT_TEXT), null, null));
+		}
+
+		if (!empty($authors))
+		{
+			return array_unique($authors);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get a contributor for the feed
+	 *
+	 * @since 1.1
+	 * @param int $key The contrbutor that you want to return.  Remember that arrays begin with 0, not 1
+	 * @return SimplePie_Author|null
+	 */
+	public function get_contributor($key = 0)
+	{
+		$contributors = $this->get_contributors();
+		if (isset($contributors[$key]))
+		{
+			return $contributors[$key];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get all contributors for the feed
+	 *
+	 * Uses `<atom:contributor>`
+	 *
+	 * @since 1.1
+	 * @return array|null List of {@see SimplePie_Author} objects
+	 */
+	public function get_contributors()
+	{
+		$contributors = array();
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'contributor') as $contributor)
+		{
+			$name = null;
+			$uri = null;
+			$email = null;
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['name'][0]['data']))
+			{
+				$name = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['name'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]['data']))
+			{
+				$uri = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['uri'][0]));
+			}
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['email'][0]['data']))
+			{
+				$email = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['email'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if ($name !== null || $email !== null || $uri !== null)
+			{
+				$contributors[] = $this->registry->create('Author', array($name, $uri, $email));
+			}
+		}
+		foreach ((array) $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'contributor') as $contributor)
+		{
+			$name = null;
+			$url = null;
+			$email = null;
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['name'][0]['data']))
+			{
+				$name = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['name'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]['data']))
+			{
+				$url = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['url'][0]));
+			}
+			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data']))
+			{
+				$email = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data'
