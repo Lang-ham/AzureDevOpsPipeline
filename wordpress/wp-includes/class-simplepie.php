@@ -2296,4 +2296,329 @@ class SimplePie
 			}
 			if (isset($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data']))
 			{
-				$email = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data'
+				$email = $this->sanitize($contributor['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['email'][0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+			}
+			if ($name !== null || $email !== null || $url !== null)
+			{
+				$contributors[] = $this->registry->create('Author', array($name, $url, $email));
+			}
+		}
+
+		if (!empty($contributors))
+		{
+			return array_unique($contributors);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get a single link for the feed
+	 *
+	 * @since 1.0 (previously called `get_feed_link` since Preview Release, `get_feed_permalink()` since 0.8)
+	 * @param int $key The link that you want to return.  Remember that arrays begin with 0, not 1
+	 * @param string $rel The relationship of the link to return
+	 * @return string|null Link URL
+	 */
+	public function get_link($key = 0, $rel = 'alternate')
+	{
+		$links = $this->get_links($rel);
+		if (isset($links[$key]))
+		{
+			return $links[$key];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the permalink for the item
+	 *
+	 * Returns the first link available with a relationship of "alternate".
+	 * Identical to {@see get_link()} with key 0
+	 *
+	 * @see get_link
+	 * @since 1.0 (previously called `get_feed_link` since Preview Release, `get_feed_permalink()` since 0.8)
+	 * @internal Added for parity between the parent-level and the item/entry-level.
+	 * @return string|null Link URL
+	 */
+	public function get_permalink()
+	{
+		return $this->get_link(0);
+	}
+
+	/**
+	 * Get all links for the feed
+	 *
+	 * Uses `<atom:link>` or `<link>`
+	 *
+	 * @since Beta 2
+	 * @param string $rel The relationship of links to return
+	 * @return array|null Links found for the feed (strings)
+	 */
+	public function get_links($rel = 'alternate')
+	{
+		if (!isset($this->data['links']))
+		{
+			$this->data['links'] = array();
+			if ($links = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'link'))
+			{
+				foreach ($links as $link)
+				{
+					if (isset($link['attribs']['']['href']))
+					{
+						$link_rel = (isset($link['attribs']['']['rel'])) ? $link['attribs']['']['rel'] : 'alternate';
+						$this->data['links'][$link_rel][] = $this->sanitize($link['attribs']['']['href'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($link));
+					}
+				}
+			}
+			if ($links = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'link'))
+			{
+				foreach ($links as $link)
+				{
+					if (isset($link['attribs']['']['href']))
+					{
+						$link_rel = (isset($link['attribs']['']['rel'])) ? $link['attribs']['']['rel'] : 'alternate';
+						$this->data['links'][$link_rel][] = $this->sanitize($link['attribs']['']['href'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($link));
+
+					}
+				}
+			}
+			if ($links = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'link'))
+			{
+				$this->data['links']['alternate'][] = $this->sanitize($links[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($links[0]));
+			}
+			if ($links = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'link'))
+			{
+				$this->data['links']['alternate'][] = $this->sanitize($links[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($links[0]));
+			}
+			if ($links = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'link'))
+			{
+				$this->data['links']['alternate'][] = $this->sanitize($links[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($links[0]));
+			}
+
+			$keys = array_keys($this->data['links']);
+			foreach ($keys as $key)
+			{
+				if ($this->registry->call('Misc', 'is_isegment_nz_nc', array($key)))
+				{
+					if (isset($this->data['links'][SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY . $key]))
+					{
+						$this->data['links'][SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY . $key] = array_merge($this->data['links'][$key], $this->data['links'][SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY . $key]);
+						$this->data['links'][$key] =& $this->data['links'][SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY . $key];
+					}
+					else
+					{
+						$this->data['links'][SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY . $key] =& $this->data['links'][$key];
+					}
+				}
+				elseif (substr($key, 0, 41) === SIMPLEPIE_IANA_LINK_RELATIONS_REGISTRY)
+				{
+					$this->data['links'][substr($key, 41)] =& $this->data['links'][$key];
+				}
+				$this->data['links'][$key] = array_unique($this->data['links'][$key]);
+			}
+		}
+
+		if (isset($this->data['links'][$rel]))
+		{
+			return $this->data['links'][$rel];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	public function get_all_discovered_feeds()
+	{
+		return $this->all_discovered_feeds;
+	}
+
+	/**
+	 * Get the content for the item
+	 *
+	 * Uses `<atom:subtitle>`, `<atom:tagline>`, `<description>`,
+	 * `<dc:description>`, `<itunes:summary>` or `<itunes:subtitle>`
+	 *
+	 * @since 1.0 (previously called `get_feed_description()` since 0.8)
+	 * @return string|null
+	 */
+	public function get_description()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'subtitle'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_10_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'tagline'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_03_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'description'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_MAYBE_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'description'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_MAYBE_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'description'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'description'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'description'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ITUNES, 'summary'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_HTML, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ITUNES, 'subtitle'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_HTML, $this->get_base($return[0]));
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the copyright info for the feed
+	 *
+	 * Uses `<atom:rights>`, `<atom:copyright>` or `<dc:rights>`
+	 *
+	 * @since 1.0 (previously called `get_feed_copyright()` since 0.8)
+	 * @return string|null
+	 */
+	public function get_copyright()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'rights'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_10_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'copyright'))
+		{
+			return $this->sanitize($return[0]['data'], $this->registry->call('Misc', 'atom_03_construct_type', array($return[0]['attribs'])), $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'copyright'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'rights'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'rights'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the language for the feed
+	 *
+	 * Uses `<language>`, `<dc:language>`, or @xml_lang
+	 *
+	 * @since 1.0 (previously called `get_feed_language()` since 0.8)
+	 * @return string|null
+	 */
+	public function get_language()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'language'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_11, 'language'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_DC_10, 'language'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['feed'][0]['xml_lang']))
+		{
+			return $this->sanitize($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_10]['feed'][0]['xml_lang'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['feed'][0]['xml_lang']))
+		{
+			return $this->sanitize($this->data['child'][SIMPLEPIE_NAMESPACE_ATOM_03]['feed'][0]['xml_lang'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif (isset($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['xml_lang']))
+		{
+			return $this->sanitize($this->data['child'][SIMPLEPIE_NAMESPACE_RDF]['RDF'][0]['xml_lang'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif (isset($this->data['headers']['content-language']))
+		{
+			return $this->sanitize($this->data['headers']['content-language'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the latitude coordinates for the item
+	 *
+	 * Compatible with the W3C WGS84 Basic Geo and GeoRSS specifications
+	 *
+	 * Uses `<geo:lat>` or `<georss:point>`
+	 *
+	 * @since 1.0
+	 * @link http://www.w3.org/2003/01/geo/ W3C WGS84 Basic Geo
+	 * @link http://www.georss.org/ GeoRSS
+	 * @return string|null
+	 */
+	public function get_latitude()
+	{
+
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_W3C_BASIC_GEO, 'lat'))
+		{
+			return (float) $return[0]['data'];
+		}
+		elseif (($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_GEORSS, 'point')) && preg_match('/^((?:-)?[0-9]+(?:\.[0-9]+)) ((?:-)?[0-9]+(?:\.[0-9]+))$/', trim($return[0]['data']), $match))
+		{
+			return (float) $match[1];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the longitude coordinates for the feed
+	 *
+	 * Compatible with the W3C WGS84 Basic Geo and GeoRSS specifications
+	 *
+	 * Uses `<geo:long>`, `<geo:lon>` or `<georss:point>`
+	 *
+	 * @since 1.0
+	 * @link http://www.w3.org/2003/01/geo/ W3C WGS84 Basic Geo
+	 * @link http://www.georss.org/ GeoRSS
+	 * @return string|null
+	 */
+	public function get_longitude()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_W3C_BASIC_GEO, 'long'))
+		{
+			return (float) $return[0]['data'];
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_W3C_BASIC_GEO, 'lon'))
+		{
+			return
