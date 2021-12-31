@@ -2621,4 +2621,410 @@ class SimplePie
 		}
 		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_W3C_BASIC_GEO, 'lon'))
 		{
-			return
+			return (float) $return[0]['data'];
+		}
+		elseif (($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_GEORSS, 'point')) && preg_match('/^((?:-)?[0-9]+(?:\.[0-9]+)) ((?:-)?[0-9]+(?:\.[0-9]+))$/', trim($return[0]['data']), $match))
+		{
+			return (float) $match[2];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the feed logo's title
+	 *
+	 * RSS 0.9.0, 1.0 and 2.0 feeds are allowed to have a "feed logo" title.
+	 *
+	 * Uses `<image><title>` or `<image><dc:title>`
+	 *
+	 * @return string|null
+	 */
+	public function get_image_title()
+	{
+		if ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_DC_11, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_DC_10, 'title'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_TEXT);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the feed logo's URL
+	 *
+	 * RSS 0.9.0, 2.0, Atom 1.0, and feeds with iTunes RSS tags are allowed to
+	 * have a "feed logo" URL. This points directly to the image itself.
+	 *
+	 * Uses `<itunes:image>`, `<atom:logo>`, `<atom:icon>`,
+	 * `<image><title>` or `<image><dc:title>`
+	 *
+	 * @return string|null
+	 */
+	public function get_image_url()
+	{
+		if ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ITUNES, 'image'))
+		{
+			return $this->sanitize($return[0]['attribs']['']['href'], SIMPLEPIE_CONSTRUCT_IRI);
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'logo'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'icon'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'url'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'url'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'url'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+
+	/**
+	 * Get the feed logo's link
+	 *
+	 * RSS 0.9.0, 1.0 and 2.0 feeds are allowed to have a "feed logo" link. This
+	 * points to a human-readable page that the image should link to.
+	 *
+	 * Uses `<itunes:image>`, `<atom:logo>`, `<atom:icon>`,
+	 * `<image><title>` or `<image><dc:title>`
+	 *
+	 * @return string|null
+	 */
+	public function get_image_link()
+	{
+		if ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'link'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'link'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		elseif ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'link'))
+		{
+			return $this->sanitize($return[0]['data'], SIMPLEPIE_CONSTRUCT_IRI, $this->get_base($return[0]));
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the feed logo's link
+	 *
+	 * RSS 2.0 feeds are allowed to have a "feed logo" width.
+	 *
+	 * Uses `<image><width>` or defaults to 88.0 if no width is specified and
+	 * the feed is an RSS 2.0 feed.
+	 *
+	 * @return int|float|null
+	 */
+	public function get_image_width()
+	{
+		if ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'width'))
+		{
+			return round($return[0]['data']);
+		}
+		elseif ($this->get_type() & SIMPLEPIE_TYPE_RSS_SYNDICATION && $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'url'))
+		{
+			return 88.0;
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the feed logo's height
+	 *
+	 * RSS 2.0 feeds are allowed to have a "feed logo" height.
+	 *
+	 * Uses `<image><height>` or defaults to 31.0 if no height is specified and
+	 * the feed is an RSS 2.0 feed.
+	 *
+	 * @return int|float|null
+	 */
+	public function get_image_height()
+	{
+		if ($return = $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'height'))
+		{
+			return round($return[0]['data']);
+		}
+		elseif ($this->get_type() & SIMPLEPIE_TYPE_RSS_SYNDICATION && $this->get_image_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'url'))
+		{
+			return 31.0;
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get the number of items in the feed
+	 *
+	 * This is well-suited for {@link http://php.net/for for()} loops with
+	 * {@see get_item()}
+	 *
+	 * @param int $max Maximum value to return. 0 for no limit
+	 * @return int Number of items in the feed
+	 */
+	public function get_item_quantity($max = 0)
+	{
+		$max = (int) $max;
+		$qty = count($this->get_items());
+		if ($max === 0)
+		{
+			return $qty;
+		}
+		else
+		{
+			return ($qty > $max) ? $max : $qty;
+		}
+	}
+
+	/**
+	 * Get a single item from the feed
+	 *
+	 * This is better suited for {@link http://php.net/for for()} loops, whereas
+	 * {@see get_items()} is better suited for
+	 * {@link http://php.net/foreach foreach()} loops.
+	 *
+	 * @see get_item_quantity()
+	 * @since Beta 2
+	 * @param int $key The item that you want to return.  Remember that arrays begin with 0, not 1
+	 * @return SimplePie_Item|null
+	 */
+	public function get_item($key = 0)
+	{
+		$items = $this->get_items();
+		if (isset($items[$key]))
+		{
+			return $items[$key];
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Get all items from the feed
+	 *
+	 * This is better suited for {@link http://php.net/for for()} loops, whereas
+	 * {@see get_items()} is better suited for
+	 * {@link http://php.net/foreach foreach()} loops.
+	 *
+	 * @see get_item_quantity
+	 * @since Beta 2
+	 * @param int $start Index to start at
+	 * @param int $end Number of items to return. 0 for all items after `$start`
+	 * @return array|null List of {@see SimplePie_Item} objects
+	 */
+	public function get_items($start = 0, $end = 0)
+	{
+		if (!isset($this->data['items']))
+		{
+			if (!empty($this->multifeed_objects))
+			{
+				$this->data['items'] = SimplePie::merge_items($this->multifeed_objects, $start, $end, $this->item_limit);
+			}
+			else
+			{
+				$this->data['items'] = array();
+				if ($items = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_ATOM_10, 'entry'))
+				{
+					$keys = array_keys($items);
+					foreach ($keys as $key)
+					{
+						$this->data['items'][] = $this->registry->create('Item', array($this, $items[$key]));
+					}
+				}
+				if ($items = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_ATOM_03, 'entry'))
+				{
+					$keys = array_keys($items);
+					foreach ($keys as $key)
+					{
+						$this->data['items'][] = $this->registry->create('Item', array($this, $items[$key]));
+					}
+				}
+				if ($items = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_10, 'item'))
+				{
+					$keys = array_keys($items);
+					foreach ($keys as $key)
+					{
+						$this->data['items'][] = $this->registry->create('Item', array($this, $items[$key]));
+					}
+				}
+				if ($items = $this->get_feed_tags(SIMPLEPIE_NAMESPACE_RSS_090, 'item'))
+				{
+					$keys = array_keys($items);
+					foreach ($keys as $key)
+					{
+						$this->data['items'][] = $this->registry->create('Item', array($this, $items[$key]));
+					}
+				}
+				if ($items = $this->get_channel_tags(SIMPLEPIE_NAMESPACE_RSS_20, 'item'))
+				{
+					$keys = array_keys($items);
+					foreach ($keys as $key)
+					{
+						$this->data['items'][] = $this->registry->create('Item', array($this, $items[$key]));
+					}
+				}
+			}
+		}
+
+		if (!empty($this->data['items']))
+		{
+			// If we want to order it by date, check if all items have a date, and then sort it
+			if ($this->order_by_date && empty($this->multifeed_objects))
+			{
+				if (!isset($this->data['ordered_items']))
+				{
+					$do_sort = true;
+					foreach ($this->data['items'] as $item)
+					{
+						if (!$item->get_date('U'))
+						{
+							$do_sort = false;
+							break;
+						}
+					}
+					$item = null;
+					$this->data['ordered_items'] = $this->data['items'];
+					if ($do_sort)
+					{
+						usort($this->data['ordered_items'], array(get_class($this), 'sort_items'));
+					}
+				}
+				$items = $this->data['ordered_items'];
+			}
+			else
+			{
+				$items = $this->data['items'];
+			}
+
+			// Slice the data as desired
+			if ($end === 0)
+			{
+				return array_slice($items, $start);
+			}
+			else
+			{
+				return array_slice($items, $start, $end);
+			}
+		}
+		else
+		{
+			return array();
+		}
+	}
+
+	/**
+	 * Set the favicon handler
+	 *
+	 * @deprecated Use your own favicon handling instead
+	 */
+	public function set_favicon_handler($page = false, $qs = 'i')
+	{
+		$level = defined('E_USER_DEPRECATED') ? E_USER_DEPRECATED : E_USER_WARNING;
+		trigger_error('Favicon handling has been removed, please use your own handling', $level);
+		return false;
+	}
+
+	/**
+	 * Get the favicon for the current feed
+	 *
+	 * @deprecated Use your own favicon handling instead
+	 */
+	public function get_favicon()
+	{
+		$level = defined('E_USER_DEPRECATED') ? E_USER_DEPRECATED : E_USER_WARNING;
+		trigger_error('Favicon handling has been removed, please use your own handling', $level);
+
+		if (($url = $this->get_link()) !== null)
+		{
+			return 'http://g.etfv.co/' . urlencode($url);
+		}
+
+		return false;
+	}
+
+	/**
+	 * Magic method handler
+	 *
+	 * @param string $method Method name
+	 * @param array $args Arguments to the method
+	 * @return mixed
+	 */
+	public function __call($method, $args)
+	{
+		if (strpos($method, 'subscribe_') === 0)
+		{
+			$level = defined('E_USER_DEPRECATED') ? E_USER_DEPRECATED : E_USER_WARNING;
+			trigger_error('subscribe_*() has been deprecated, implement the callback yourself', $level);
+			return '';
+		}
+		if ($method === 'enable_xml_dump')
+		{
+			$level = defined('E_USER_DEPRECATED') ? E_USER_DEPRECATED : E_USER_WARNING;
+			trigger_error('enable_xml_dump() has been deprecated, use get_raw_data() instead', $level);
+			return false;
+		}
+
+		$class = get_class($this);
+		$trace = debug_backtrace();
+		$file = $trace[0]['file'];
+		$line = $trace[0]['line'];
+		trigger_error("Call to undefined method $class::$method() in $file on line $line", E_USER_ERROR);
+	}
+
+	/**
+	 * Sorting callback for items
+	 *
+	 * @access private
+	 * @param SimplePie $a
+	 * @param SimplePie $b
+	 * @return boolean
+	 */
+	public static function sort_items($a, $b)
+	{
+		return $a->get_date('U')
