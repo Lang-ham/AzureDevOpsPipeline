@@ -3027,4 +3027,68 @@ class SimplePie
 	 */
 	public static function sort_items($a, $b)
 	{
-		return $a->get_date('U')
+		return $a->get_date('U') <= $b->get_date('U');
+	}
+
+	/**
+	 * Merge items from several feeds into one
+	 *
+	 * If you're merging multiple feeds together, they need to all have dates
+	 * for the items or else SimplePie will refuse to sort them.
+	 *
+	 * @link http://simplepie.org/wiki/tutorial/sort_multiple_feeds_by_time_and_date#if_feeds_require_separate_per-feed_settings
+	 * @param array $urls List of SimplePie feed objects to merge
+	 * @param int $start Starting item
+	 * @param int $end Number of items to return
+	 * @param int $limit Maximum number of items per feed
+	 * @return array
+	 */
+	public static function merge_items($urls, $start = 0, $end = 0, $limit = 0)
+	{
+		if (is_array($urls) && sizeof($urls) > 0)
+		{
+			$items = array();
+			foreach ($urls as $arg)
+			{
+				if ($arg instanceof SimplePie)
+				{
+					$items = array_merge($items, $arg->get_items(0, $limit));
+				}
+				else
+				{
+					trigger_error('Arguments must be SimplePie objects', E_USER_WARNING);
+				}
+			}
+
+			$do_sort = true;
+			foreach ($items as $item)
+			{
+				if (!$item->get_date('U'))
+				{
+					$do_sort = false;
+					break;
+				}
+			}
+			$item = null;
+			if ($do_sort)
+			{
+				usort($items, array(get_class($urls[0]), 'sort_items'));
+			}
+
+			if ($end === 0)
+			{
+				return array_slice($items, $start);
+			}
+			else
+			{
+				return array_slice($items, $start, $end);
+			}
+		}
+		else
+		{
+			trigger_error('Cannot merge zero SimplePie objects', E_USER_WARNING);
+			return array();
+		}
+	}
+}
+endif;
