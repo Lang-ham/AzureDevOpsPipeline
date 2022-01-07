@@ -875,4 +875,312 @@ class SMTP
      * @return boolean
      */
     public function sendAndMail($from)
-   
+    {
+        return $this->sendCommand('SAML', "SAML FROM:$from", 250);
+    }
+
+    /**
+     * Send an SMTP VRFY command.
+     * @param string $name The name to verify
+     * @access public
+     * @return boolean
+     */
+    public function verify($name)
+    {
+        return $this->sendCommand('VRFY', "VRFY $name", array(250, 251));
+    }
+
+    /**
+     * Send an SMTP NOOP command.
+     * Used to keep keep-alives alive, doesn't actually do anything
+     * @access public
+     * @return boolean
+     */
+    public function noop()
+    {
+        return $this->sendCommand('NOOP', 'NOOP', 250);
+    }
+
+    /**
+     * Send an SMTP TURN command.
+     * This is an optional command for SMTP that this class does not support.
+     * This method is here to make the RFC821 Definition complete for this class
+     * and _may_ be implemented in future
+     * Implements from rfc 821: TURN <CRLF>
+     * @access public
+     * @return boolean
+     */
+    public function turn()
+    {
+        $this->setError('The SMTP TURN command is not implemented');
+        $this->edebug('SMTP NOTICE: ' . $this->error['error'], self::DEBUG_CLIENT);
+        return false;
+    }
+
+    /**
+     * Send raw data to the server.
+     * @param string $data The data to send
+     * @access public
+     * @return integer|boolean The number of bytes sent to the server or false on error
+     */
+    public function client_send($data)
+    {
+        $this->edebug("CLIENT -> SERVER: $data", self::DEBUG_CLIENT);
+        return fwrite($this->smtp_conn, $data);
+    }
+
+    /**
+     * Get the latest error.
+     * @access public
+     * @return array
+     */
+    public function getError()
+    {
+        return $this->error;
+    }
+
+    /**
+     * Get SMTP extensions available on the server
+     * @access public
+     * @return array|null
+     */
+    public function getServerExtList()
+    {
+        return $this->server_caps;
+    }
+
+    /**
+     * A multipurpose method
+     * The method works in three ways, dependent on argument value and current state
+     *   1. HELO/EHLO was not sent - returns null and set up $this->error
+     *   2. HELO was sent
+     *     $name = 'HELO': returns server name
+     *     $name = 'EHLO': returns boolean false
+     *     $name = any string: returns null and set up $this->error
+     *   3. EHLO was sent
+     *     $name = 'HELO'|'EHLO': returns server name
+     *     $name = any string: if extension $name exists, returns boolean True
+     *       or its options. Otherwise returns boolean False
+     * In other words, one can use this method to detect 3 conditions:
+     *  - null returned: handshake was not or we don't know about ext (refer to $this->error)
+     *  - false returned: the requested feature exactly not exists
+     *  - positive value returned: the requested feature exists
+     * @param string $name Name of SMTP extension or 'HELO'|'EHLO'
+     * @return mixed
+     */
+    public function getServerExt($name)
+    {
+        if (!$this->server_caps) {
+            $this->setError('No HELO/EHLO was sent');
+            return null;
+        }
+
+        // the tight logic knot ;)
+        if (!array_key_exists($name, $this->server_caps)) {
+            if ($name == 'HELO') {
+                return $this->server_caps['EHLO'];
+            }
+            if ($name == 'EHLO' || array_key_exists('EHLO', $this->server_caps)) {
+                return false;
+            }
+            $this->setError('HELO handshake was used. Client knows nothing about server extensions');
+            return null;
+        }
+
+        return $this->server_caps[$name];
+    }
+
+    /**
+     * Get the last reply from the server.
+     * @access public
+     * @return string
+     */
+    public function getLastReply()
+    {
+        return $this->last_reply;
+    }
+
+    /**
+     * Read the SMTP server's response.
+     * Either before eof or socket timeout occurs on the operation.
+     * With SMTP we can tell if we have more lines to read if the
+     * 4th character is '-' symbol. If it is a space then we don't
+     * need to read anything else.
+     * @access protected
+     * @return string
+     */
+    protected function get_lines()
+    {
+        // If the connection is bad, give up straight away
+        if (!is_resource($this->smtp_conn)) {
+            return '';
+        }
+        $data = '';
+        $endtime = 0;
+        stream_set_timeout($this->smtp_conn, $this->Timeout);
+        if ($this->Timelimit > 0) {
+            $endtime = time() + $this->Timelimit;
+        }
+        while (is_resource($this->smtp_conn) && !feof($this->smtp_conn)) {
+            $str = @fgets($this->smtp_conn, 515);
+            $this->edebug("SMTP -> get_lines(): \$data is \"$data\"", self::DEBUG_LOWLEVEL);
+            $this->edebug("SMTP -> get_lines(): \$str is  \"$str\"", self::DEBUG_LOWLEVEL);
+            $data .= $str;
+            // If 4th character is a space, we are done reading, break the loop, micro-optimisation over strlen
+            if ((isset($str[3]) and $str[3] == ' ')) {
+                break;
+            }
+            // Timed-out? Log and break
+            $info = stream_get_meta_data($this->smtp_conn);
+            if ($info['timed_out']) {
+                $this->edebug(
+                    'SMTP -> get_lines(): timed-out (' . $this->Timeout . ' sec)',
+                    self::DEBUG_LOWLEVEL
+                );
+                break;
+            }
+            // Now check if reads took too long
+            if ($endtime and time() > $endtime) {
+                $this->edebug(
+                    'SMTP -> get_lines(): timelimit reached ('.
+                    $this->Timelimit . ' sec)',
+                    self::DEBUG_LOWLEVEL
+                );
+                break;
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Enable or disable VERP address generation.
+     * @param boolean $enabled
+     */
+    public function setVerp($enabled = false)
+    {
+        $this->do_verp = $enabled;
+    }
+
+    /**
+     * Get VERP address generation mode.
+     * @return boolean
+     */
+    public function getVerp()
+    {
+        return $this->do_verp;
+    }
+
+    /**
+     * Set error messages and codes.
+     * @param string $message The error message
+     * @param string $detail Further detail on the error
+     * @param string $smtp_code An associated SMTP error code
+     * @param string $smtp_code_ex Extended SMTP code
+     */
+    protected function setError($message, $detail = '', $smtp_code = '', $smtp_code_ex = '')
+    {
+        $this->error = array(
+            'error' => $message,
+            'detail' => $detail,
+            'smtp_code' => $smtp_code,
+            'smtp_code_ex' => $smtp_code_ex
+        );
+    }
+
+    /**
+     * Set debug output method.
+     * @param string|callable $method The name of the mechanism to use for debugging output, or a callable to handle it.
+     */
+    public function setDebugOutput($method = 'echo')
+    {
+        $this->Debugoutput = $method;
+    }
+
+    /**
+     * Get debug output method.
+     * @return string
+     */
+    public function getDebugOutput()
+    {
+        return $this->Debugoutput;
+    }
+
+    /**
+     * Set debug output level.
+     * @param integer $level
+     */
+    public function setDebugLevel($level = 0)
+    {
+        $this->do_debug = $level;
+    }
+
+    /**
+     * Get debug output level.
+     * @return integer
+     */
+    public function getDebugLevel()
+    {
+        return $this->do_debug;
+    }
+
+    /**
+     * Set SMTP timeout.
+     * @param integer $timeout
+     */
+    public function setTimeout($timeout = 0)
+    {
+        $this->Timeout = $timeout;
+    }
+
+    /**
+     * Get SMTP timeout.
+     * @return integer
+     */
+    public function getTimeout()
+    {
+        return $this->Timeout;
+    }
+
+    /**
+     * Reports an error number and string.
+     * @param integer $errno The error number returned by PHP.
+     * @param string $errmsg The error message returned by PHP.
+     */
+    protected function errorHandler($errno, $errmsg)
+    {
+        $notice = 'Connection: Failed to connect to server.';
+        $this->setError(
+            $notice,
+            $errno,
+            $errmsg
+        );
+        $this->edebug(
+            $notice . ' Error number ' . $errno . '. "Error notice: ' . $errmsg,
+            self::DEBUG_CONNECTION
+        );
+    }
+
+	/**
+	 * Will return the ID of the last smtp transaction based on a list of patterns provided
+	 * in SMTP::$smtp_transaction_id_patterns.
+	 * If no reply has been received yet, it will return null.
+	 * If no pattern has been matched, it will return false.
+	 * @return bool|null|string
+	 */
+	public function getLastTransactionID()
+	{
+		$reply = $this->getLastReply();
+
+		if (empty($reply)) {
+			return null;
+		}
+
+		foreach($this->smtp_transaction_id_patterns as $smtp_transaction_id_pattern) {
+			if(preg_match($smtp_transaction_id_pattern, $reply, $matches)) {
+				return $matches[1];
+			}
+		}
+
+		return false;
+    }
+}
