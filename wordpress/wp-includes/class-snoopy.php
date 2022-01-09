@@ -376,4 +376,374 @@ class Snoopy
 				}
 				else
 				{
-					$path 
+					$path = $URI_PARTS["path"].($URI_PARTS["query"] ? "?".$URI_PARTS["query"] : "");
+					// no proxy, send only the path
+					$this->_httpsrequest($path, $URI, $this->_submit_method, $this->_submit_type, $postdata);
+				}
+
+				if($this->_redirectaddr)
+				{
+					/* url was redirected, check if we've hit the max depth */
+					if($this->maxredirs > $this->_redirectdepth)
+					{
+						if(!preg_match("|^".$URI_PARTS["scheme"]."://|", $this->_redirectaddr))
+							$this->_redirectaddr = $this->_expandlinks($this->_redirectaddr,$URI_PARTS["scheme"]."://".$URI_PARTS["host"]);
+
+						// only follow redirect if it's on this site, or offsiteok is true
+						if(preg_match("|^http://".preg_quote($this->host)."|i",$this->_redirectaddr) || $this->offsiteok)
+						{
+							/* follow the redirect */
+							$this->_redirectdepth++;
+							$this->lastredirectaddr=$this->_redirectaddr;
+							if( strpos( $this->_redirectaddr, "?" ) > 0 )
+								$this->fetch($this->_redirectaddr); // the redirect has changed the request method from post to get
+							else
+								$this->submit($this->_redirectaddr,$formvars, $formfiles);
+						}
+					}
+				}
+
+				if($this->_framedepth < $this->maxframes && count($this->_frameurls) > 0)
+				{
+					$frameurls = $this->_frameurls;
+					$this->_frameurls = array();
+
+					while(list(,$frameurl) = each($frameurls))
+					{
+						if($this->_framedepth < $this->maxframes)
+						{
+							$this->fetch($frameurl);
+							$this->_framedepth++;
+						}
+						else
+							break;
+					}
+				}
+				return true;
+				break;
+
+			default:
+				// not a valid protocol
+				$this->error	=	'Invalid protocol "'.$URI_PARTS["scheme"].'"\n';
+				return false;
+				break;
+		}
+		return true;
+	}
+
+/*======================================================================*\
+	Function:	fetchlinks
+	Purpose:	fetch the links from a web page
+	Input:		$URI	where you are fetching from
+	Output:		$this->results	an array of the URLs
+\*======================================================================*/
+
+	function fetchlinks($URI)
+	{
+		if ($this->fetch($URI))
+		{
+			if($this->lastredirectaddr)
+				$URI = $this->lastredirectaddr;
+			if(is_array($this->results))
+			{
+				for($x=0;$x<count($this->results);$x++)
+					$this->results[$x] = $this->_striplinks($this->results[$x]);
+			}
+			else
+				$this->results = $this->_striplinks($this->results);
+
+			if($this->expandlinks)
+				$this->results = $this->_expandlinks($this->results, $URI);
+			return true;
+		}
+		else
+			return false;
+	}
+
+/*======================================================================*\
+	Function:	fetchform
+	Purpose:	fetch the form elements from a web page
+	Input:		$URI	where you are fetching from
+	Output:		$this->results	the resulting html form
+\*======================================================================*/
+
+	function fetchform($URI)
+	{
+
+		if ($this->fetch($URI))
+		{
+
+			if(is_array($this->results))
+			{
+				for($x=0;$x<count($this->results);$x++)
+					$this->results[$x] = $this->_stripform($this->results[$x]);
+			}
+			else
+				$this->results = $this->_stripform($this->results);
+
+			return true;
+		}
+		else
+			return false;
+	}
+
+
+/*======================================================================*\
+	Function:	fetchtext
+	Purpose:	fetch the text from a web page, stripping the links
+	Input:		$URI	where you are fetching from
+	Output:		$this->results	the text from the web page
+\*======================================================================*/
+
+	function fetchtext($URI)
+	{
+		if($this->fetch($URI))
+		{
+			if(is_array($this->results))
+			{
+				for($x=0;$x<count($this->results);$x++)
+					$this->results[$x] = $this->_striptext($this->results[$x]);
+			}
+			else
+				$this->results = $this->_striptext($this->results);
+			return true;
+		}
+		else
+			return false;
+	}
+
+/*======================================================================*\
+	Function:	submitlinks
+	Purpose:	grab links from a form submission
+	Input:		$URI	where you are submitting from
+	Output:		$this->results	an array of the links from the post
+\*======================================================================*/
+
+	function submitlinks($URI, $formvars="", $formfiles="")
+	{
+		if($this->submit($URI,$formvars, $formfiles))
+		{
+			if($this->lastredirectaddr)
+				$URI = $this->lastredirectaddr;
+			if(is_array($this->results))
+			{
+				for($x=0;$x<count($this->results);$x++)
+				{
+					$this->results[$x] = $this->_striplinks($this->results[$x]);
+					if($this->expandlinks)
+						$this->results[$x] = $this->_expandlinks($this->results[$x],$URI);
+				}
+			}
+			else
+			{
+				$this->results = $this->_striplinks($this->results);
+				if($this->expandlinks)
+					$this->results = $this->_expandlinks($this->results,$URI);
+			}
+			return true;
+		}
+		else
+			return false;
+	}
+
+/*======================================================================*\
+	Function:	submittext
+	Purpose:	grab text from a form submission
+	Input:		$URI	where you are submitting from
+	Output:		$this->results	the text from the web page
+\*======================================================================*/
+
+	function submittext($URI, $formvars = "", $formfiles = "")
+	{
+		if($this->submit($URI,$formvars, $formfiles))
+		{
+			if($this->lastredirectaddr)
+				$URI = $this->lastredirectaddr;
+			if(is_array($this->results))
+			{
+				for($x=0;$x<count($this->results);$x++)
+				{
+					$this->results[$x] = $this->_striptext($this->results[$x]);
+					if($this->expandlinks)
+						$this->results[$x] = $this->_expandlinks($this->results[$x],$URI);
+				}
+			}
+			else
+			{
+				$this->results = $this->_striptext($this->results);
+				if($this->expandlinks)
+					$this->results = $this->_expandlinks($this->results,$URI);
+			}
+			return true;
+		}
+		else
+			return false;
+	}
+
+
+
+/*======================================================================*\
+	Function:	set_submit_multipart
+	Purpose:	Set the form submission content type to
+				multipart/form-data
+\*======================================================================*/
+	function set_submit_multipart()
+	{
+		$this->_submit_type = "multipart/form-data";
+	}
+
+
+/*======================================================================*\
+	Function:	set_submit_normal
+	Purpose:	Set the form submission content type to
+				application/x-www-form-urlencoded
+\*======================================================================*/
+	function set_submit_normal()
+	{
+		$this->_submit_type = "application/x-www-form-urlencoded";
+	}
+
+
+
+
+/*======================================================================*\
+	Private functions
+\*======================================================================*/
+
+
+/*======================================================================*\
+	Function:	_striplinks
+	Purpose:	strip the hyperlinks from an html document
+	Input:		$document	document to strip.
+	Output:		$match		an array of the links
+\*======================================================================*/
+
+	function _striplinks($document)
+	{
+		preg_match_all("'<\s*a\s.*?href\s*=\s*			# find <a href=
+						([\"\'])?					# find single or double quote
+						(?(1) (.*?)\\1 | ([^\s\>]+))		# if quote found, match up to next matching
+													# quote, otherwise match up to next space
+						'isx",$document,$links);
+
+
+		// catenate the non-empty matches from the conditional subpattern
+
+		while(list($key,$val) = each($links[2]))
+		{
+			if(!empty($val))
+				$match[] = $val;
+		}
+
+		while(list($key,$val) = each($links[3]))
+		{
+			if(!empty($val))
+				$match[] = $val;
+		}
+
+		// return the links
+		return $match;
+	}
+
+/*======================================================================*\
+	Function:	_stripform
+	Purpose:	strip the form elements from an html document
+	Input:		$document	document to strip.
+	Output:		$match		an array of the links
+\*======================================================================*/
+
+	function _stripform($document)
+	{
+		preg_match_all("'<\/?(FORM|INPUT|SELECT|TEXTAREA|(OPTION))[^<>]*>(?(2)(.*(?=<\/?(option|select)[^<>]*>[\r\n]*)|(?=[\r\n]*))|(?=[\r\n]*))'Usi",$document,$elements);
+
+		// catenate the matches
+		$match = implode("\r\n",$elements[0]);
+
+		// return the links
+		return $match;
+	}
+
+
+
+/*======================================================================*\
+	Function:	_striptext
+	Purpose:	strip the text from an html document
+	Input:		$document	document to strip.
+	Output:		$text		the resulting text
+\*======================================================================*/
+
+	function _striptext($document)
+	{
+
+		// I didn't use preg eval (//e) since that is only available in PHP 4.0.
+		// so, list your entities one by one here. I included some of the
+		// more common ones.
+
+		$search = array("'<script[^>]*?>.*?</script>'si",	// strip out javascript
+						"'<[\/\!]*?[^<>]*?>'si",			// strip out html tags
+						"'([\r\n])[\s]+'",					// strip out white space
+						"'&(quot|#34|#034|#x22);'i",		// replace html entities
+						"'&(amp|#38|#038|#x26);'i",			// added hexadecimal values
+						"'&(lt|#60|#060|#x3c);'i",
+						"'&(gt|#62|#062|#x3e);'i",
+						"'&(nbsp|#160|#xa0);'i",
+						"'&(iexcl|#161);'i",
+						"'&(cent|#162);'i",
+						"'&(pound|#163);'i",
+						"'&(copy|#169);'i",
+						"'&(reg|#174);'i",
+						"'&(deg|#176);'i",
+						"'&(#39|#039|#x27);'",
+						"'&(euro|#8364);'i",				// europe
+						"'&a(uml|UML);'",					// german
+						"'&o(uml|UML);'",
+						"'&u(uml|UML);'",
+						"'&A(uml|UML);'",
+						"'&O(uml|UML);'",
+						"'&U(uml|UML);'",
+						"'&szlig;'i",
+						);
+		$replace = array(	"",
+							"",
+							"\\1",
+							"\"",
+							"&",
+							"<",
+							">",
+							" ",
+							chr(161),
+							chr(162),
+							chr(163),
+							chr(169),
+							chr(174),
+							chr(176),
+							chr(39),
+							chr(128),
+							chr(0xE4), // ANSI &auml;
+							chr(0xF6), // ANSI &ouml;
+							chr(0xFC), // ANSI &uuml;
+							chr(0xC4), // ANSI &Auml;
+							chr(0xD6), // ANSI &Ouml;
+							chr(0xDC), // ANSI &Uuml;
+							chr(0xDF), // ANSI &szlig;
+						);
+
+		$text = preg_replace($search,$replace,$document);
+
+		return $text;
+	}
+
+/*======================================================================*\
+	Function:	_expandlinks
+	Purpose:	expand each link into a fully qualified URL
+	Input:		$links			the links to qualify
+				$URI			the full URI to get the base from
+	Output:		$expandedLinks	the expanded links
+\*======================================================================*/
+
+	function _expandlinks($links,$URI)
+	{
+
+		preg_match("/^[^\?]+/",$URI,$match);
+
+		$match = preg_replace("|/[^\/\.]+\.[^\/\.]+$|","",$match[0]);
