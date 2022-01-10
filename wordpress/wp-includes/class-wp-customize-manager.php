@@ -332,4 +332,287 @@ final class WP_Customize_Manager {
 		require_once( ABSPATH . WPINC . '/customize/class-wp-customize-header-image-setting.php' );
 		require_once( ABSPATH . WPINC . '/customize/class-wp-customize-background-image-setting.php' );
 		require_once( ABSPATH . WPINC . '/customize/class-wp-customize-nav-menu-item-setting.php' );
-		require_on
+		require_once( ABSPATH . WPINC . '/customize/class-wp-customize-nav-menu-setting.php' );
+
+		/**
+		 * Filters the core Customizer components to load.
+		 *
+		 * This allows Core components to be excluded from being instantiated by
+		 * filtering them out of the array. Note that this filter generally runs
+		 * during the {@see 'plugins_loaded'} action, so it cannot be added
+		 * in a theme.
+		 *
+		 * @since 4.4.0
+		 *
+		 * @see WP_Customize_Manager::__construct()
+		 *
+		 * @param array                $components List of core components to load.
+		 * @param WP_Customize_Manager $this       WP_Customize_Manager instance.
+		 */
+		$components = apply_filters( 'customize_loaded_components', $this->components, $this );
+
+		require_once( ABSPATH . WPINC . '/customize/class-wp-customize-selective-refresh.php' );
+		$this->selective_refresh = new WP_Customize_Selective_Refresh( $this );
+
+		if ( in_array( 'widgets', $components, true ) ) {
+			require_once( ABSPATH . WPINC . '/class-wp-customize-widgets.php' );
+			$this->widgets = new WP_Customize_Widgets( $this );
+		}
+
+		if ( in_array( 'nav_menus', $components, true ) ) {
+			require_once( ABSPATH . WPINC . '/class-wp-customize-nav-menus.php' );
+			$this->nav_menus = new WP_Customize_Nav_Menus( $this );
+		}
+
+		add_action( 'setup_theme', array( $this, 'setup_theme' ) );
+		add_action( 'wp_loaded',   array( $this, 'wp_loaded' ) );
+
+		// Do not spawn cron (especially the alternate cron) while running the Customizer.
+		remove_action( 'init', 'wp_cron' );
+
+		// Do not run update checks when rendering the controls.
+		remove_action( 'admin_init', '_maybe_update_core' );
+		remove_action( 'admin_init', '_maybe_update_plugins' );
+		remove_action( 'admin_init', '_maybe_update_themes' );
+
+		add_action( 'wp_ajax_customize_save',                     array( $this, 'save' ) );
+		add_action( 'wp_ajax_customize_trash',                    array( $this, 'handle_changeset_trash_request' ) );
+		add_action( 'wp_ajax_customize_refresh_nonces',           array( $this, 'refresh_nonces' ) );
+		add_action( 'wp_ajax_customize_load_themes',              array( $this, 'handle_load_themes_request' ) );
+		add_filter( 'heartbeat_settings',                         array( $this, 'add_customize_screen_to_heartbeat_settings' ) );
+		add_filter( 'heartbeat_received',                         array( $this, 'check_changeset_lock_with_heartbeat' ), 10, 3 );
+		add_action( 'wp_ajax_customize_override_changeset_lock',  array( $this, 'handle_override_changeset_lock_request' ) );
+		add_action( 'wp_ajax_customize_dismiss_autosave_or_lock', array( $this, 'handle_dismiss_autosave_or_lock_request' ) );
+
+		add_action( 'customize_register',                 array( $this, 'register_controls' ) );
+		add_action( 'customize_register',                 array( $this, 'register_dynamic_settings' ), 11 ); // allow code to create settings first
+		add_action( 'customize_controls_init',            array( $this, 'prepare_controls' ) );
+		add_action( 'customize_controls_enqueue_scripts', array( $this, 'enqueue_control_scripts' ) );
+
+		// Render Common, Panel, Section, and Control templates.
+		add_action( 'customize_controls_print_footer_scripts', array( $this, 'render_panel_templates' ), 1 );
+		add_action( 'customize_controls_print_footer_scripts', array( $this, 'render_section_templates' ), 1 );
+		add_action( 'customize_controls_print_footer_scripts', array( $this, 'render_control_templates' ), 1 );
+
+		// Export header video settings with the partial response.
+		add_filter( 'customize_render_partials_response', array( $this, 'export_header_video_settings' ), 10, 3 );
+
+		// Export the settings to JS via the _wpCustomizeSettings variable.
+		add_action( 'customize_controls_print_footer_scripts', array( $this, 'customize_pane_settings' ), 1000 );
+
+		// Add theme update notices.
+		if ( current_user_can( 'install_themes' ) || current_user_can( 'update_themes' ) ) {
+			require_once ABSPATH . '/wp-admin/includes/update.php';
+			add_action( 'customize_controls_print_footer_scripts', 'wp_print_admin_notice_templates' );
+		}
+	}
+
+	/**
+	 * Return true if it's an Ajax request.
+	 *
+	 * @since 3.4.0
+	 * @since 4.2.0 Added `$action` param.
+	 *
+	 * @param string|null $action Whether the supplied Ajax action is being run.
+	 * @return bool True if it's an Ajax request, false otherwise.
+	 */
+	public function doing_ajax( $action = null ) {
+		if ( ! wp_doing_ajax() ) {
+			return false;
+		}
+
+		if ( ! $action ) {
+			return true;
+		} else {
+			/*
+			 * Note: we can't just use doing_action( "wp_ajax_{$action}" ) because we need
+			 * to check before admin-ajax.php gets to that point.
+			 */
+			return isset( $_REQUEST['action'] ) && wp_unslash( $_REQUEST['action'] ) === $action;
+		}
+	}
+
+	/**
+	 * Custom wp_die wrapper. Returns either the standard message for UI
+	 * or the Ajax message.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param mixed $ajax_message Ajax return
+	 * @param mixed $message UI message
+	 */
+	protected function wp_die( $ajax_message, $message = null ) {
+		if ( $this->doing_ajax() ) {
+			wp_die( $ajax_message );
+		}
+
+		if ( ! $message ) {
+			$message = __( 'Cheatin&#8217; uh?' );
+		}
+
+		if ( $this->messenger_channel ) {
+			ob_start();
+			wp_enqueue_scripts();
+			wp_print_scripts( array( 'customize-base' ) );
+
+			$settings = array(
+				'messengerArgs' => array(
+					'channel' => $this->messenger_channel,
+					'url' => wp_customize_url(),
+				),
+				'error' => $ajax_message,
+			);
+			?>
+			<script>
+			( function( api, settings ) {
+				var preview = new api.Messenger( settings.messengerArgs );
+				preview.send( 'iframe-loading-error', settings.error );
+			} )( wp.customize, <?php echo wp_json_encode( $settings ) ?> );
+			</script>
+			<?php
+			$message .= ob_get_clean();
+		}
+
+		wp_die( $message );
+	}
+
+	/**
+	 * Return the Ajax wp_die() handler if it's a customized request.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0
+	 *
+	 * @return callable Die handler.
+	 */
+	public function wp_die_handler() {
+		_deprecated_function( __METHOD__, '4.7.0' );
+
+		if ( $this->doing_ajax() || isset( $_POST['customized'] ) ) {
+			return '_ajax_wp_die_handler';
+		}
+
+		return '_default_wp_die_handler';
+	}
+
+	/**
+	 * Start preview and customize theme.
+	 *
+	 * Check if customize query variable exist. Init filters to filter the current theme.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @global string $pagenow
+	 */
+	public function setup_theme() {
+		global $pagenow;
+
+		// Check permissions for customize.php access since this method is called before customize.php can run any code,
+		if ( 'customize.php' === $pagenow && ! current_user_can( 'customize' ) ) {
+			if ( ! is_user_logged_in() ) {
+				auth_redirect();
+			} else {
+				wp_die(
+					'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
+					'<p>' . __( 'Sorry, you are not allowed to customize this site.' ) . '</p>',
+					403
+				);
+			}
+			return;
+		}
+
+		// If a changeset was provided is invalid.
+		if ( isset( $this->_changeset_uuid ) && false !== $this->_changeset_uuid && ! wp_is_uuid( $this->_changeset_uuid ) ) {
+			$this->wp_die( -1, __( 'Invalid changeset UUID' ) );
+		}
+
+		/*
+		 * Clear incoming post data if the user lacks a CSRF token (nonce). Note that the customizer
+		 * application will inject the customize_preview_nonce query parameter into all Ajax requests.
+		 * For similar behavior elsewhere in WordPress, see rest_cookie_check_errors() which logs out
+		 * a user when a valid nonce isn't present.
+		 */
+		$has_post_data_nonce = (
+			check_ajax_referer( 'preview-customize_' . $this->get_stylesheet(), 'nonce', false )
+			||
+			check_ajax_referer( 'save-customize_' . $this->get_stylesheet(), 'nonce', false )
+			||
+			check_ajax_referer( 'preview-customize_' . $this->get_stylesheet(), 'customize_preview_nonce', false )
+		);
+		if ( ! current_user_can( 'customize' ) || ! $has_post_data_nonce ) {
+			unset( $_POST['customized'] );
+			unset( $_REQUEST['customized'] );
+		}
+
+		/*
+		 * If unauthenticated then require a valid changeset UUID to load the preview.
+		 * In this way, the UUID serves as a secret key. If the messenger channel is present,
+		 * then send unauthenticated code to prompt re-auth.
+		 */
+		if ( ! current_user_can( 'customize' ) && ! $this->changeset_post_id() ) {
+			$this->wp_die( $this->messenger_channel ? 0 : -1, __( 'Non-existent changeset UUID.' ) );
+		}
+
+		if ( ! headers_sent() ) {
+			send_origin_headers();
+		}
+
+		// Hide the admin bar if we're embedded in the customizer iframe.
+		if ( $this->messenger_channel ) {
+			show_admin_bar( false );
+		}
+
+		if ( $this->is_theme_active() ) {
+			// Once the theme is loaded, we'll validate it.
+			add_action( 'after_setup_theme', array( $this, 'after_setup_theme' ) );
+		} else {
+			// If the requested theme is not the active theme and the user doesn't have the
+			// switch_themes cap, bail.
+			if ( ! current_user_can( 'switch_themes' ) ) {
+				$this->wp_die( -1, __( 'Sorry, you are not allowed to edit theme options on this site.' ) );
+			}
+
+			// If the theme has errors while loading, bail.
+			if ( $this->theme()->errors() ) {
+				$this->wp_die( -1, $this->theme()->errors()->get_error_message() );
+			}
+
+			// If the theme isn't allowed per multisite settings, bail.
+			if ( ! $this->theme()->is_allowed() ) {
+				$this->wp_die( -1, __( 'The requested theme does not exist.' ) );
+			}
+		}
+
+		// Make sure changeset UUID is established immediately after the theme is loaded.
+		add_action( 'after_setup_theme', array( $this, 'establish_loaded_changeset' ), 5 );
+
+		/*
+		 * Import theme starter content for fresh installations when landing in the customizer.
+		 * Import starter content at after_setup_theme:100 so that any
+		 * add_theme_support( 'starter-content' ) calls will have been made.
+		 */
+		if ( get_option( 'fresh_site' ) && 'customize.php' === $pagenow ) {
+			add_action( 'after_setup_theme', array( $this, 'import_theme_starter_content' ), 100 );
+		}
+
+		$this->start_previewing_theme();
+	}
+
+	/**
+	 * Establish the loaded changeset.
+	 *
+	 * This method runs right at after_setup_theme and applies the 'customize_changeset_branching' filter to determine
+	 * whether concurrent changesets are allowed. Then if the Customizer is not initialized with a `changeset_uuid` param,
+	 * this method will determine which UUID should be used. If changeset branching is disabled, then the most saved
+	 * changeset will be loaded by default. Otherwise, if there are no existing saved changesets or if changeset branching is
+	 * enabled, then a new UUID will be generated.
+	 *
+	 * @since 4.9.0
+	 * @global string $pagenow
+	 */
+	public function establish_loaded_changeset() {
+		global $pagenow;
+
+		if ( empty( $this->_changeset_uuid ) ) {
+			$changeset_uuid = null;
+
+			if ( ! $this->branchin
