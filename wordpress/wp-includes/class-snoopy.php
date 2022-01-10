@@ -747,3 +747,352 @@ class Snoopy
 		preg_match("/^[^\?]+/",$URI,$match);
 
 		$match = preg_replace("|/[^\/\.]+\.[^\/\.]+$|","",$match[0]);
+		$match = preg_replace("|/$|","",$match);
+		$match_part = parse_url($match);
+		$match_root =
+		$match_part["scheme"]."://".$match_part["host"];
+
+		$search = array( 	"|^http://".preg_quote($this->host)."|i",
+							"|^(\/)|i",
+							"|^(?!http://)(?!mailto:)|i",
+							"|/\./|",
+							"|/[^\/]+/\.\./|"
+						);
+
+		$replace = array(	"",
+							$match_root."/",
+							$match."/",
+							"/",
+							"/"
+						);
+
+		$expandedLinks = preg_replace($search,$replace,$links);
+
+		return $expandedLinks;
+	}
+
+/*======================================================================*\
+	Function:	_httprequest
+	Purpose:	go get the http data from the server
+	Input:		$url		the url to fetch
+				$fp			the current open file pointer
+				$URI		the full URI
+				$body		body contents to send if any (POST)
+	Output:
+\*======================================================================*/
+
+	function _httprequest($url,$fp,$URI,$http_method,$content_type="",$body="")
+	{
+		$cookie_headers = '';
+		if($this->passcookies && $this->_redirectaddr)
+			$this->setcookies();
+
+		$URI_PARTS = parse_url($URI);
+		if(empty($url))
+			$url = "/";
+		$headers = $http_method." ".$url." ".$this->_httpversion."\r\n";
+		if(!empty($this->agent))
+			$headers .= "User-Agent: ".$this->agent."\r\n";
+		if(!empty($this->host) && !isset($this->rawheaders['Host'])) {
+			$headers .= "Host: ".$this->host;
+			if(!empty($this->port) && $this->port != 80)
+				$headers .= ":".$this->port;
+			$headers .= "\r\n";
+		}
+		if(!empty($this->accept))
+			$headers .= "Accept: ".$this->accept."\r\n";
+		if(!empty($this->referer))
+			$headers .= "Referer: ".$this->referer."\r\n";
+		if(!empty($this->cookies))
+		{
+			if(!is_array($this->cookies))
+				$this->cookies = (array)$this->cookies;
+
+			reset($this->cookies);
+			if ( count($this->cookies) > 0 ) {
+				$cookie_headers .= 'Cookie: ';
+				foreach ( $this->cookies as $cookieKey => $cookieVal ) {
+				$cookie_headers .= $cookieKey."=".urlencode($cookieVal)."; ";
+				}
+				$headers .= substr($cookie_headers,0,-2) . "\r\n";
+			}
+		}
+		if(!empty($this->rawheaders))
+		{
+			if(!is_array($this->rawheaders))
+				$this->rawheaders = (array)$this->rawheaders;
+			while(list($headerKey,$headerVal) = each($this->rawheaders))
+				$headers .= $headerKey.": ".$headerVal."\r\n";
+		}
+		if(!empty($content_type)) {
+			$headers .= "Content-type: $content_type";
+			if ($content_type == "multipart/form-data")
+				$headers .= "; boundary=".$this->_mime_boundary;
+			$headers .= "\r\n";
+		}
+		if(!empty($body))
+			$headers .= "Content-length: ".strlen($body)."\r\n";
+		if(!empty($this->user) || !empty($this->pass))
+			$headers .= "Authorization: Basic ".base64_encode($this->user.":".$this->pass)."\r\n";
+
+		//add proxy auth headers
+		if(!empty($this->proxy_user))
+			$headers .= 'Proxy-Authorization: ' . 'Basic ' . base64_encode($this->proxy_user . ':' . $this->proxy_pass)."\r\n";
+
+
+		$headers .= "\r\n";
+
+		// set the read timeout if needed
+		if ($this->read_timeout > 0)
+			socket_set_timeout($fp, $this->read_timeout);
+		$this->timed_out = false;
+
+		fwrite($fp,$headers.$body,strlen($headers.$body));
+
+		$this->_redirectaddr = false;
+		unset($this->headers);
+
+		while($currentHeader = fgets($fp,$this->_maxlinelen))
+		{
+			if ($this->read_timeout > 0 && $this->_check_timeout($fp))
+			{
+				$this->status=-100;
+				return false;
+			}
+
+			if($currentHeader == "\r\n")
+				break;
+
+			// if a header begins with Location: or URI:, set the redirect
+			if(preg_match("/^(Location:|URI:)/i",$currentHeader))
+			{
+				// get URL portion of the redirect
+				preg_match("/^(Location:|URI:)[ ]+(.*)/i",chop($currentHeader),$matches);
+				// look for :// in the Location header to see if hostname is included
+				if(!preg_match("|\:\/\/|",$matches[2]))
+				{
+					// no host in the path, so prepend
+					$this->_redirectaddr = $URI_PARTS["scheme"]."://".$this->host.":".$this->port;
+					// eliminate double slash
+					if(!preg_match("|^/|",$matches[2]))
+							$this->_redirectaddr .= "/".$matches[2];
+					else
+							$this->_redirectaddr .= $matches[2];
+				}
+				else
+					$this->_redirectaddr = $matches[2];
+			}
+
+			if(preg_match("|^HTTP/|",$currentHeader))
+			{
+                if(preg_match("|^HTTP/[^\s]*\s(.*?)\s|",$currentHeader, $status))
+				{
+					$this->status= $status[1];
+                }
+				$this->response_code = $currentHeader;
+			}
+
+			$this->headers[] = $currentHeader;
+		}
+
+		$results = '';
+		do {
+    		$_data = fread($fp, $this->maxlength);
+    		if (strlen($_data) == 0) {
+        		break;
+    		}
+    		$results .= $_data;
+		} while(true);
+
+		if ($this->read_timeout > 0 && $this->_check_timeout($fp))
+		{
+			$this->status=-100;
+			return false;
+		}
+
+		// check if there is a redirect meta tag
+
+		if(preg_match("'<meta[\s]*http-equiv[^>]*?content[\s]*=[\s]*[\"\']?\d+;[\s]*URL[\s]*=[\s]*([^\"\']*?)[\"\']?>'i",$results,$match))
+
+		{
+			$this->_redirectaddr = $this->_expandlinks($match[1],$URI);
+		}
+
+		// have we hit our frame depth and is there frame src to fetch?
+		if(($this->_framedepth < $this->maxframes) && preg_match_all("'<frame\s+.*src[\s]*=[\'\"]?([^\'\"\>]+)'i",$results,$match))
+		{
+			$this->results[] = $results;
+			for($x=0; $x<count($match[1]); $x++)
+				$this->_frameurls[] = $this->_expandlinks($match[1][$x],$URI_PARTS["scheme"]."://".$this->host);
+		}
+		// have we already fetched framed content?
+		elseif(is_array($this->results))
+			$this->results[] = $results;
+		// no framed content
+		else
+			$this->results = $results;
+
+		return true;
+	}
+
+/*======================================================================*\
+	Function:	_httpsrequest
+	Purpose:	go get the https data from the server using curl
+	Input:		$url		the url to fetch
+				$URI		the full URI
+				$body		body contents to send if any (POST)
+	Output:
+\*======================================================================*/
+
+	function _httpsrequest($url,$URI,$http_method,$content_type="",$body="")
+	{
+		if($this->passcookies && $this->_redirectaddr)
+			$this->setcookies();
+
+		$headers = array();
+
+		$URI_PARTS = parse_url($URI);
+		if(empty($url))
+			$url = "/";
+		// GET ... header not needed for curl
+		//$headers[] = $http_method." ".$url." ".$this->_httpversion;
+		if(!empty($this->agent))
+			$headers[] = "User-Agent: ".$this->agent;
+		if(!empty($this->host))
+			if(!empty($this->port))
+				$headers[] = "Host: ".$this->host.":".$this->port;
+			else
+				$headers[] = "Host: ".$this->host;
+		if(!empty($this->accept))
+			$headers[] = "Accept: ".$this->accept;
+		if(!empty($this->referer))
+			$headers[] = "Referer: ".$this->referer;
+		if(!empty($this->cookies))
+		{
+			if(!is_array($this->cookies))
+				$this->cookies = (array)$this->cookies;
+
+			reset($this->cookies);
+			if ( count($this->cookies) > 0 ) {
+				$cookie_str = 'Cookie: ';
+				foreach ( $this->cookies as $cookieKey => $cookieVal ) {
+				$cookie_str .= $cookieKey."=".urlencode($cookieVal)."; ";
+				}
+				$headers[] = substr($cookie_str,0,-2);
+			}
+		}
+		if(!empty($this->rawheaders))
+		{
+			if(!is_array($this->rawheaders))
+				$this->rawheaders = (array)$this->rawheaders;
+			while(list($headerKey,$headerVal) = each($this->rawheaders))
+				$headers[] = $headerKey.": ".$headerVal;
+		}
+		if(!empty($content_type)) {
+			if ($content_type == "multipart/form-data")
+				$headers[] = "Content-type: $content_type; boundary=".$this->_mime_boundary;
+			else
+				$headers[] = "Content-type: $content_type";
+		}
+		if(!empty($body))
+			$headers[] = "Content-length: ".strlen($body);
+		if(!empty($this->user) || !empty($this->pass))
+			$headers[] = "Authorization: BASIC ".base64_encode($this->user.":".$this->pass);
+
+		$headerfile = tempnam( $this->temp_dir, "sno" );
+		$cmdline_params = '-k -D ' . escapeshellarg( $headerfile );
+
+		foreach ( $headers as $header ) {
+			$cmdline_params .= ' -H ' . escapeshellarg( $header );
+		}
+
+		if ( ! empty( $body ) ) {
+			$cmdline_params .= ' -d ' . escapeshellarg( $body );
+		}
+
+		if ( $this->read_timeout > 0 ) {
+			$cmdline_params .= ' -m ' . escapeshellarg( $this->read_timeout );
+		}
+
+
+		exec( $this->curl_path . ' ' . $cmdline_params . ' ' . escapeshellarg( $URI ), $results, $return );
+
+		if($return)
+		{
+			$this->error = "Error: cURL could not retrieve the document, error $return.";
+			return false;
+		}
+
+
+		$results = implode("\r\n",$results);
+
+		$result_headers = file("$headerfile");
+
+		$this->_redirectaddr = false;
+		unset($this->headers);
+
+		for($currentHeader = 0; $currentHeader < count($result_headers); $currentHeader++)
+		{
+
+			// if a header begins with Location: or URI:, set the redirect
+			if(preg_match("/^(Location: |URI: )/i",$result_headers[$currentHeader]))
+			{
+				// get URL portion of the redirect
+				preg_match("/^(Location: |URI:)\s+(.*)/",chop($result_headers[$currentHeader]),$matches);
+				// look for :// in the Location header to see if hostname is included
+				if(!preg_match("|\:\/\/|",$matches[2]))
+				{
+					// no host in the path, so prepend
+					$this->_redirectaddr = $URI_PARTS["scheme"]."://".$this->host.":".$this->port;
+					// eliminate double slash
+					if(!preg_match("|^/|",$matches[2]))
+							$this->_redirectaddr .= "/".$matches[2];
+					else
+							$this->_redirectaddr .= $matches[2];
+				}
+				else
+					$this->_redirectaddr = $matches[2];
+			}
+
+			if(preg_match("|^HTTP/|",$result_headers[$currentHeader]))
+				$this->response_code = $result_headers[$currentHeader];
+
+			$this->headers[] = $result_headers[$currentHeader];
+		}
+
+		// check if there is a redirect meta tag
+
+		if(preg_match("'<meta[\s]*http-equiv[^>]*?content[\s]*=[\s]*[\"\']?\d+;[\s]*URL[\s]*=[\s]*([^\"\']*?)[\"\']?>'i",$results,$match))
+		{
+			$this->_redirectaddr = $this->_expandlinks($match[1],$URI);
+		}
+
+		// have we hit our frame depth and is there frame src to fetch?
+		if(($this->_framedepth < $this->maxframes) && preg_match_all("'<frame\s+.*src[\s]*=[\'\"]?([^\'\"\>]+)'i",$results,$match))
+		{
+			$this->results[] = $results;
+			for($x=0; $x<count($match[1]); $x++)
+				$this->_frameurls[] = $this->_expandlinks($match[1][$x],$URI_PARTS["scheme"]."://".$this->host);
+		}
+		// have we already fetched framed content?
+		elseif(is_array($this->results))
+			$this->results[] = $results;
+		// no framed content
+		else
+			$this->results = $results;
+
+		unlink("$headerfile");
+
+		return true;
+	}
+
+/*======================================================================*\
+	Function:	setcookies()
+	Purpose:	set cookies for a redirection
+\*======================================================================*/
+
+	function setcookies()
+	{
+		for($x=0; $x<count($this->headers); $x++)
+		{
+		if
