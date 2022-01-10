@@ -1095,4 +1095,165 @@ class Snoopy
 	{
 		for($x=0; $x<count($this->headers); $x++)
 		{
-		if
+		if(preg_match('/^set-cookie:[\s]+([^=]+)=([^;]+)/i', $this->headers[$x],$match))
+			$this->cookies[$match[1]] = urldecode($match[2]);
+		}
+	}
+
+
+/*======================================================================*\
+	Function:	_check_timeout
+	Purpose:	checks whether timeout has occurred
+	Input:		$fp	file pointer
+\*======================================================================*/
+
+	function _check_timeout($fp)
+	{
+		if ($this->read_timeout > 0) {
+			$fp_status = socket_get_status($fp);
+			if ($fp_status["timed_out"]) {
+				$this->timed_out = true;
+				return true;
+			}
+		}
+		return false;
+	}
+
+/*======================================================================*\
+	Function:	_connect
+	Purpose:	make a socket connection
+	Input:		$fp	file pointer
+\*======================================================================*/
+
+	function _connect(&$fp)
+	{
+		if(!empty($this->proxy_host) && !empty($this->proxy_port))
+			{
+				$this->_isproxy = true;
+
+				$host = $this->proxy_host;
+				$port = $this->proxy_port;
+			}
+		else
+		{
+			$host = $this->host;
+			$port = $this->port;
+		}
+
+		$this->status = 0;
+
+		if($fp = fsockopen(
+					$host,
+					$port,
+					$errno,
+					$errstr,
+					$this->_fp_timeout
+					))
+		{
+			// socket connection succeeded
+
+			return true;
+		}
+		else
+		{
+			// socket connection failed
+			$this->status = $errno;
+			switch($errno)
+			{
+				case -3:
+					$this->error="socket creation failed (-3)";
+				case -4:
+					$this->error="dns lookup failure (-4)";
+				case -5:
+					$this->error="connection refused or timed out (-5)";
+				default:
+					$this->error="connection failed (".$errno.")";
+			}
+			return false;
+		}
+	}
+/*======================================================================*\
+	Function:	_disconnect
+	Purpose:	disconnect a socket connection
+	Input:		$fp	file pointer
+\*======================================================================*/
+
+	function _disconnect($fp)
+	{
+		return(fclose($fp));
+	}
+
+
+/*======================================================================*\
+	Function:	_prepare_post_body
+	Purpose:	Prepare post body according to encoding type
+	Input:		$formvars  - form variables
+				$formfiles - form upload files
+	Output:		post body
+\*======================================================================*/
+
+	function _prepare_post_body($formvars, $formfiles)
+	{
+		settype($formvars, "array");
+		settype($formfiles, "array");
+		$postdata = '';
+
+		if (count($formvars) == 0 && count($formfiles) == 0)
+			return;
+
+		switch ($this->_submit_type) {
+			case "application/x-www-form-urlencoded":
+				reset($formvars);
+				while(list($key,$val) = each($formvars)) {
+					if (is_array($val) || is_object($val)) {
+						while (list($cur_key, $cur_val) = each($val)) {
+							$postdata .= urlencode($key)."[]=".urlencode($cur_val)."&";
+						}
+					} else
+						$postdata .= urlencode($key)."=".urlencode($val)."&";
+				}
+				break;
+
+			case "multipart/form-data":
+				$this->_mime_boundary = "Snoopy".md5(uniqid(microtime()));
+
+				reset($formvars);
+				while(list($key,$val) = each($formvars)) {
+					if (is_array($val) || is_object($val)) {
+						while (list($cur_key, $cur_val) = each($val)) {
+							$postdata .= "--".$this->_mime_boundary."\r\n";
+							$postdata .= "Content-Disposition: form-data; name=\"$key\[\]\"\r\n\r\n";
+							$postdata .= "$cur_val\r\n";
+						}
+					} else {
+						$postdata .= "--".$this->_mime_boundary."\r\n";
+						$postdata .= "Content-Disposition: form-data; name=\"$key\"\r\n\r\n";
+						$postdata .= "$val\r\n";
+					}
+				}
+
+				reset($formfiles);
+				while (list($field_name, $file_names) = each($formfiles)) {
+					settype($file_names, "array");
+					while (list(, $file_name) = each($file_names)) {
+						if (!is_readable($file_name)) continue;
+
+						$fp = fopen($file_name, "r");
+						$file_content = fread($fp, filesize($file_name));
+						fclose($fp);
+						$base_name = basename($file_name);
+
+						$postdata .= "--".$this->_mime_boundary."\r\n";
+						$postdata .= "Content-Disposition: form-data; name=\"$field_name\"; filename=\"$base_name\"\r\n\r\n";
+						$postdata .= "$file_content\r\n";
+					}
+				}
+				$postdata .= "--".$this->_mime_boundary."--\r\n";
+				break;
+		}
+
+		return $postdata;
+	}
+}
+endif;
+?>
