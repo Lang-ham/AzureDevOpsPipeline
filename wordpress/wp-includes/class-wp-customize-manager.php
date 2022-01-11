@@ -615,4 +615,374 @@ final class WP_Customize_Manager {
 		if ( empty( $this->_changeset_uuid ) ) {
 			$changeset_uuid = null;
 
-			if ( ! $this->branchin
+			if ( ! $this->branching() && $this->is_theme_active() ) {
+				$unpublished_changeset_posts = $this->get_changeset_posts( array(
+					'post_status' => array_diff( get_post_stati(), array( 'auto-draft', 'publish', 'trash', 'inherit', 'private' ) ),
+					'exclude_restore_dismissed' => false,
+					'author' => 'any',
+					'posts_per_page' => 1,
+					'order' => 'DESC',
+					'orderby' => 'date',
+				) );
+				$unpublished_changeset_post = array_shift( $unpublished_changeset_posts );
+				if ( ! empty( $unpublished_changeset_post ) && wp_is_uuid( $unpublished_changeset_post->post_name ) ) {
+					$changeset_uuid = $unpublished_changeset_post->post_name;
+				}
+			}
+
+			// If no changeset UUID has been set yet, then generate a new one.
+			if ( empty( $changeset_uuid ) ) {
+				$changeset_uuid = wp_generate_uuid4();
+			}
+
+			$this->_changeset_uuid = $changeset_uuid;
+		}
+
+		if ( is_admin() && 'customize.php' === $pagenow ) {
+			$this->set_changeset_lock( $this->changeset_post_id() );
+		}
+	}
+
+	/**
+	 * Callback to validate a theme once it is loaded
+	 *
+	 * @since 3.4.0
+	 */
+	public function after_setup_theme() {
+		$doing_ajax_or_is_customized = ( $this->doing_ajax() || isset( $_POST['customized'] ) );
+		if ( ! $doing_ajax_or_is_customized && ! validate_current_theme() ) {
+			wp_redirect( 'themes.php?broken=true' );
+			exit;
+		}
+	}
+
+	/**
+	 * If the theme to be previewed isn't the active theme, add filter callbacks
+	 * to swap it out at runtime.
+	 *
+	 * @since 3.4.0
+	 */
+	public function start_previewing_theme() {
+		// Bail if we're already previewing.
+		if ( $this->is_preview() ) {
+			return;
+		}
+
+		$this->previewing = true;
+
+		if ( ! $this->is_theme_active() ) {
+			add_filter( 'template', array( $this, 'get_template' ) );
+			add_filter( 'stylesheet', array( $this, 'get_stylesheet' ) );
+			add_filter( 'pre_option_current_theme', array( $this, 'current_theme' ) );
+
+			// @link: https://core.trac.wordpress.org/ticket/20027
+			add_filter( 'pre_option_stylesheet', array( $this, 'get_stylesheet' ) );
+			add_filter( 'pre_option_template', array( $this, 'get_template' ) );
+
+			// Handle custom theme roots.
+			add_filter( 'pre_option_stylesheet_root', array( $this, 'get_stylesheet_root' ) );
+			add_filter( 'pre_option_template_root', array( $this, 'get_template_root' ) );
+		}
+
+		/**
+		 * Fires once the Customizer theme preview has started.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param WP_Customize_Manager $this WP_Customize_Manager instance.
+		 */
+		do_action( 'start_previewing_theme', $this );
+	}
+
+	/**
+	 * Stop previewing the selected theme.
+	 *
+	 * Removes filters to change the current theme.
+	 *
+	 * @since 3.4.0
+	 */
+	public function stop_previewing_theme() {
+		if ( ! $this->is_preview() ) {
+			return;
+		}
+
+		$this->previewing = false;
+
+		if ( ! $this->is_theme_active() ) {
+			remove_filter( 'template', array( $this, 'get_template' ) );
+			remove_filter( 'stylesheet', array( $this, 'get_stylesheet' ) );
+			remove_filter( 'pre_option_current_theme', array( $this, 'current_theme' ) );
+
+			// @link: https://core.trac.wordpress.org/ticket/20027
+			remove_filter( 'pre_option_stylesheet', array( $this, 'get_stylesheet' ) );
+			remove_filter( 'pre_option_template', array( $this, 'get_template' ) );
+
+			// Handle custom theme roots.
+			remove_filter( 'pre_option_stylesheet_root', array( $this, 'get_stylesheet_root' ) );
+			remove_filter( 'pre_option_template_root', array( $this, 'get_template_root' ) );
+		}
+
+		/**
+		 * Fires once the Customizer theme preview has stopped.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param WP_Customize_Manager $this WP_Customize_Manager instance.
+		 */
+		do_action( 'stop_previewing_theme', $this );
+	}
+
+	/**
+	 * Gets whether settings are or will be previewed.
+	 *
+	 * @since 4.9.0
+	 * @see WP_Customize_Setting::preview()
+	 *
+	 * @return bool
+	 */
+	public function settings_previewed() {
+		return $this->settings_previewed;
+	}
+
+	/**
+	 * Gets whether data from a changeset's autosaved revision should be loaded if it exists.
+	 *
+	 * @since 4.9.0
+	 * @see WP_Customize_Manager::changeset_data()
+	 *
+	 * @return bool Is using autosaved changeset revision.
+	 */
+	public function autosaved() {
+		return $this->autosaved;
+	}
+
+	/**
+	 * Whether the changeset branching is allowed.
+	 *
+	 * @since 4.9.0
+	 * @see WP_Customize_Manager::establish_loaded_changeset()
+	 *
+	 * @return bool Is changeset branching.
+	 */
+	public function branching() {
+
+		/**
+		 * Filters whether or not changeset branching is allowed.
+		 *
+		 * By default in core, when changeset branching is not allowed, changesets will operate
+		 * linearly in that only one saved changeset will exist at a time (with a 'draft' or
+		 * 'future' status). This makes the Customizer operate in a way that is similar to going to
+		 * "edit" to one existing post: all users will be making changes to the same post, and autosave
+		 * revisions will be made for that post.
+		 *
+		 * By contrast, when changeset branching is allowed, then the model is like users going
+		 * to "add new" for a page and each user makes changes independently of each other since
+		 * they are all operating on their own separate pages, each getting their own separate
+		 * initial auto-drafts and then once initially saved, autosave revisions on top of that
+		 * user's specific post.
+		 *
+		 * Since linear changesets are deemed to be more suitable for the majority of WordPress users,
+		 * they are the default. For WordPress sites that have heavy site management in the Customizer
+		 * by multiple users then branching changesets should be enabled by means of this filter.
+		 *
+		 * @since 4.9.0
+		 *
+		 * @param bool                 $allow_branching Whether branching is allowed. If `false`, the default,
+		 *                                              then only one saved changeset exists at a time.
+		 * @param WP_Customize_Manager $wp_customize    Manager instance.
+		 */
+		$this->branching = apply_filters( 'customize_changeset_branching', $this->branching, $this );
+
+		return $this->branching;
+	}
+
+	/**
+	 * Get the changeset UUID.
+	 *
+	 * @since 4.7.0
+	 * @see WP_Customize_Manager::establish_loaded_changeset()
+	 *
+	 * @return string UUID.
+	 */
+	public function changeset_uuid() {
+		if ( empty( $this->_changeset_uuid ) ) {
+			$this->establish_loaded_changeset();
+		}
+		return $this->_changeset_uuid;
+	}
+
+	/**
+	 * Get the theme being customized.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return WP_Theme
+	 */
+	public function theme() {
+		if ( ! $this->theme ) {
+			$this->theme = wp_get_theme();
+		}
+		return $this->theme;
+	}
+
+	/**
+	 * Get the registered settings.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return array
+	 */
+	public function settings() {
+		return $this->settings;
+	}
+
+	/**
+	 * Get the registered controls.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return array
+	 */
+	public function controls() {
+		return $this->controls;
+	}
+
+	/**
+	 * Get the registered containers.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @return array
+	 */
+	public function containers() {
+		return $this->containers;
+	}
+
+	/**
+	 * Get the registered sections.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return array
+	 */
+	public function sections() {
+		return $this->sections;
+	}
+
+	/**
+	 * Get the registered panels.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @return array Panels.
+	 */
+	public function panels() {
+		return $this->panels;
+	}
+
+	/**
+	 * Checks if the current theme is active.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return bool
+	 */
+	public function is_theme_active() {
+		return $this->get_stylesheet() == $this->original_stylesheet;
+	}
+
+	/**
+	 * Register styles/scripts and initialize the preview of each setting
+	 *
+	 * @since 3.4.0
+	 */
+	public function wp_loaded() {
+
+		// Unconditionally register core types for panels, sections, and controls in case plugin unhooks all customize_register actions.
+		$this->register_panel_type( 'WP_Customize_Panel' );
+		$this->register_panel_type( 'WP_Customize_Themes_Panel' );
+		$this->register_section_type( 'WP_Customize_Section' );
+		$this->register_section_type( 'WP_Customize_Sidebar_Section' );
+		$this->register_section_type( 'WP_Customize_Themes_Section' );
+		$this->register_control_type( 'WP_Customize_Color_Control' );
+		$this->register_control_type( 'WP_Customize_Media_Control' );
+		$this->register_control_type( 'WP_Customize_Upload_Control' );
+		$this->register_control_type( 'WP_Customize_Image_Control' );
+		$this->register_control_type( 'WP_Customize_Background_Image_Control' );
+		$this->register_control_type( 'WP_Customize_Background_Position_Control' );
+		$this->register_control_type( 'WP_Customize_Cropped_Image_Control' );
+		$this->register_control_type( 'WP_Customize_Site_Icon_Control' );
+		$this->register_control_type( 'WP_Customize_Theme_Control' );
+		$this->register_control_type( 'WP_Customize_Code_Editor_Control' );
+		$this->register_control_type( 'WP_Customize_Date_Time_Control' );
+
+		/**
+		 * Fires once WordPress has loaded, allowing scripts and styles to be initialized.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param WP_Customize_Manager $this WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_register', $this );
+
+		if ( $this->settings_previewed() ) {
+			foreach ( $this->settings as $setting ) {
+				$setting->preview();
+			}
+		}
+
+		if ( $this->is_preview() && ! is_admin() ) {
+			$this->customize_preview_init();
+		}
+	}
+
+	/**
+	 * Prevents Ajax requests from following redirects when previewing a theme
+	 * by issuing a 200 response instead of a 30x.
+	 *
+	 * Instead, the JS will sniff out the location header.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0
+	 *
+	 * @param int $status Status.
+	 * @return int
+	 */
+	public function wp_redirect_status( $status ) {
+		_deprecated_function( __FUNCTION__, '4.7.0' );
+
+		if ( $this->is_preview() && ! is_admin() ) {
+			return 200;
+		}
+
+		return $status;
+	}
+
+	/**
+	 * Find the changeset post ID for a given changeset UUID.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string $uuid Changeset UUID.
+	 * @return int|null Returns post ID on success and null on failure.
+	 */
+	public function find_changeset_post_id( $uuid ) {
+		$cache_group = 'customize_changeset_post';
+		$changeset_post_id = wp_cache_get( $uuid, $cache_group );
+		if ( $changeset_post_id && 'customize_changeset' === get_post_type( $changeset_post_id ) ) {
+			return $changeset_post_id;
+		}
+
+		$changeset_post_query = new WP_Query( array(
+			'post_type' => 'customize_changeset',
+			'post_status' => get_post_stati(),
+			'name' => $uuid,
+			'posts_per_page' => 1,
+			'no_found_rows' => true,
+			'cache_results' => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+			'lazy_load_term_meta' => false,
+		) );
+		if ( ! empty( $changeset_post_query->posts ) ) {
+			// Note: 'fi
