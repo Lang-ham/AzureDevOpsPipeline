@@ -985,4 +985,301 @@ final class WP_Customize_Manager {
 			'lazy_load_term_meta' => false,
 		) );
 		if ( ! empty( $changeset_post_query->posts ) ) {
-			// Note: 'fi
+			// Note: 'fields'=>'ids' is not being used in order to cache the post object as it will be needed.
+			$changeset_post_id = $changeset_post_query->posts[0]->ID;
+			wp_cache_set( $uuid, $changeset_post_id, $cache_group );
+			return $changeset_post_id;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get changeset posts.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array $args {
+	 *     Args to pass into `get_posts()` to query changesets.
+	 *
+	 *     @type int    $posts_per_page             Number of posts to return. Defaults to -1 (all posts).
+	 *     @type int    $author                     Post author. Defaults to current user.
+	 *     @type string $post_status                Status of changeset. Defaults to 'auto-draft'.
+	 *     @type bool   $exclude_restore_dismissed  Whether to exclude changeset auto-drafts that have been dismissed. Defaults to true.
+	 * }
+	 * @return WP_Post[] Auto-draft changesets.
+	 */
+	protected function get_changeset_posts( $args = array() ) {
+		$default_args = array(
+			'exclude_restore_dismissed' => true,
+			'posts_per_page' => -1,
+			'post_type' => 'customize_changeset',
+			'post_status' => 'auto-draft',
+			'order' => 'DESC',
+			'orderby' => 'date',
+			'no_found_rows' => true,
+			'cache_results' => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+			'lazy_load_term_meta' => false,
+		);
+		if ( get_current_user_id() ) {
+			$default_args['author'] = get_current_user_id();
+		}
+		$args = array_merge( $default_args, $args );
+
+		if ( ! empty( $args['exclude_restore_dismissed'] ) ) {
+			unset( $args['exclude_restore_dismissed'] );
+			$args['meta_query'] = array(
+				array(
+					'key' => '_customize_restore_dismissed',
+					'compare' => 'NOT EXISTS',
+				),
+			);
+		}
+
+		return get_posts( $args );
+	}
+
+	/**
+	 * Dismiss all of the current user's auto-drafts (other than the present one).
+	 *
+	 * @since 4.9.0
+	 * @return int The number of auto-drafts that were dismissed.
+	 */
+	protected function dismiss_user_auto_draft_changesets() {
+		$changeset_autodraft_posts = $this->get_changeset_posts( array(
+			'post_status' => 'auto-draft',
+			'exclude_restore_dismissed' => true,
+			'posts_per_page' => -1,
+		) );
+		$dismissed = 0;
+		foreach ( $changeset_autodraft_posts as $autosave_autodraft_post ) {
+			if ( $autosave_autodraft_post->ID === $this->changeset_post_id() ) {
+				continue;
+			}
+			if ( update_post_meta( $autosave_autodraft_post->ID, '_customize_restore_dismissed', true ) ) {
+				$dismissed++;
+			}
+		}
+		return $dismissed;
+	}
+
+	/**
+	 * Get the changeset post id for the loaded changeset.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return int|null Post ID on success or null if there is no post yet saved.
+	 */
+	public function changeset_post_id() {
+		if ( ! isset( $this->_changeset_post_id ) ) {
+			$post_id = $this->find_changeset_post_id( $this->changeset_uuid() );
+			if ( ! $post_id ) {
+				$post_id = false;
+			}
+			$this->_changeset_post_id = $post_id;
+		}
+		if ( false === $this->_changeset_post_id ) {
+			return null;
+		}
+		return $this->_changeset_post_id;
+	}
+
+	/**
+	 * Get the data stored in a changeset post.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param int $post_id Changeset post ID.
+	 * @return array|WP_Error Changeset data or WP_Error on error.
+	 */
+	protected function get_changeset_post_data( $post_id ) {
+		if ( ! $post_id ) {
+			return new WP_Error( 'empty_post_id' );
+		}
+		$changeset_post = get_post( $post_id );
+		if ( ! $changeset_post ) {
+			return new WP_Error( 'missing_post' );
+		}
+		if ( 'revision' === $changeset_post->post_type ) {
+			if ( 'customize_changeset' !== get_post_type( $changeset_post->post_parent ) ) {
+				return new WP_Error( 'wrong_post_type' );
+			}
+		} elseif ( 'customize_changeset' !== $changeset_post->post_type ) {
+			return new WP_Error( 'wrong_post_type' );
+		}
+		$changeset_data = json_decode( $changeset_post->post_content, true );
+		if ( function_exists( 'json_last_error' ) && json_last_error() ) {
+			return new WP_Error( 'json_parse_error', '', json_last_error() );
+		}
+		if ( ! is_array( $changeset_data ) ) {
+			return new WP_Error( 'expected_array' );
+		}
+		return $changeset_data;
+	}
+
+	/**
+	 * Get changeset data.
+	 *
+	 * @since 4.7.0
+	 * @since 4.9.0 This will return the changeset's data with a user's autosave revision merged on top, if one exists and $autosaved is true.
+	 *
+	 * @return array Changeset data.
+	 */
+	public function changeset_data() {
+		if ( isset( $this->_changeset_data ) ) {
+			return $this->_changeset_data;
+		}
+		$changeset_post_id = $this->changeset_post_id();
+		if ( ! $changeset_post_id ) {
+			$this->_changeset_data = array();
+		} else {
+			if ( $this->autosaved() && is_user_logged_in() ) {
+				$autosave_post = wp_get_post_autosave( $changeset_post_id, get_current_user_id() );
+				if ( $autosave_post ) {
+					$data = $this->get_changeset_post_data( $autosave_post->ID );
+					if ( ! is_wp_error( $data ) ) {
+						$this->_changeset_data = $data;
+					}
+				}
+			}
+
+			// Load data from the changeset if it was not loaded from an autosave.
+			if ( ! isset( $this->_changeset_data ) ) {
+				$data = $this->get_changeset_post_data( $changeset_post_id );
+				if ( ! is_wp_error( $data ) ) {
+					$this->_changeset_data = $data;
+				} else {
+					$this->_changeset_data = array();
+				}
+			}
+		}
+		return $this->_changeset_data;
+	}
+
+	/**
+	 * Starter content setting IDs.
+	 *
+	 * @since 4.7.0
+	 * @var array
+	 */
+	protected $pending_starter_content_settings_ids = array();
+
+	/**
+	 * Import theme starter content into the customized state.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $starter_content Starter content. Defaults to `get_theme_starter_content()`.
+	 */
+	function import_theme_starter_content( $starter_content = array() ) {
+		if ( empty( $starter_content ) ) {
+			$starter_content = get_theme_starter_content();
+		}
+
+		$changeset_data = array();
+		if ( $this->changeset_post_id() ) {
+			/*
+			 * Don't re-import starter content into a changeset saved persistently.
+			 * This will need to be revisited in the future once theme switching
+			 * is allowed with drafted/scheduled changesets, since switching to
+			 * another theme could result in more starter content being applied.
+			 * However, when doing an explicit save it is currently possible for
+			 * nav menus and nav menu items specifically to lose their starter_content
+			 * flags, thus resulting in duplicates being created since they fail
+			 * to get re-used. See #40146.
+			 */
+			if ( 'auto-draft' !== get_post_status( $this->changeset_post_id() ) ) {
+				return;
+			}
+
+			$changeset_data = $this->get_changeset_post_data( $this->changeset_post_id() );
+		}
+
+		$sidebars_widgets = isset( $starter_content['widgets'] ) && ! empty( $this->widgets ) ? $starter_content['widgets'] : array();
+		$attachments = isset( $starter_content['attachments'] ) && ! empty( $this->nav_menus ) ? $starter_content['attachments'] : array();
+		$posts = isset( $starter_content['posts'] ) && ! empty( $this->nav_menus ) ? $starter_content['posts'] : array();
+		$options = isset( $starter_content['options'] ) ? $starter_content['options'] : array();
+		$nav_menus = isset( $starter_content['nav_menus'] ) && ! empty( $this->nav_menus ) ? $starter_content['nav_menus'] : array();
+		$theme_mods = isset( $starter_content['theme_mods'] ) ? $starter_content['theme_mods'] : array();
+
+		// Widgets.
+		$max_widget_numbers = array();
+		foreach ( $sidebars_widgets as $sidebar_id => $widgets ) {
+			$sidebar_widget_ids = array();
+			foreach ( $widgets as $widget ) {
+				list( $id_base, $instance ) = $widget;
+
+				if ( ! isset( $max_widget_numbers[ $id_base ] ) ) {
+
+					// When $settings is an array-like object, get an intrinsic array for use with array_keys().
+					$settings = get_option( "widget_{$id_base}", array() );
+					if ( $settings instanceof ArrayObject || $settings instanceof ArrayIterator ) {
+						$settings = $settings->getArrayCopy();
+					}
+
+					// Find the max widget number for this type.
+					$widget_numbers = array_keys( $settings );
+					if ( count( $widget_numbers ) > 0 ) {
+						$widget_numbers[] = 1;
+						$max_widget_numbers[ $id_base ] = call_user_func_array( 'max', $widget_numbers );
+					} else {
+						$max_widget_numbers[ $id_base ] = 1;
+					}
+				}
+				$max_widget_numbers[ $id_base ] += 1;
+
+				$widget_id = sprintf( '%s-%d', $id_base, $max_widget_numbers[ $id_base ] );
+				$setting_id = sprintf( 'widget_%s[%d]', $id_base, $max_widget_numbers[ $id_base ] );
+
+				$setting_value = $this->widgets->sanitize_widget_js_instance( $instance );
+				if ( empty( $changeset_data[ $setting_id ] ) || ! empty( $changeset_data[ $setting_id ]['starter_content'] ) ) {
+					$this->set_post_value( $setting_id, $setting_value );
+					$this->pending_starter_content_settings_ids[] = $setting_id;
+				}
+				$sidebar_widget_ids[] = $widget_id;
+			}
+
+			$setting_id = sprintf( 'sidebars_widgets[%s]', $sidebar_id );
+			if ( empty( $changeset_data[ $setting_id ] ) || ! empty( $changeset_data[ $setting_id ]['starter_content'] ) ) {
+				$this->set_post_value( $setting_id, $sidebar_widget_ids );
+				$this->pending_starter_content_settings_ids[] = $setting_id;
+			}
+		}
+
+		$starter_content_auto_draft_post_ids = array();
+		if ( ! empty( $changeset_data['nav_menus_created_posts']['value'] ) ) {
+			$starter_content_auto_draft_post_ids = array_merge( $starter_content_auto_draft_post_ids, $changeset_data['nav_menus_created_posts']['value'] );
+		}
+
+		// Make an index of all the posts needed and what their slugs are.
+		$needed_posts = array();
+		$attachments = $this->prepare_starter_content_attachments( $attachments );
+		foreach ( $attachments as $attachment ) {
+			$key = 'attachment:' . $attachment['post_name'];
+			$needed_posts[ $key ] = true;
+		}
+		foreach ( array_keys( $posts ) as $post_symbol ) {
+			if ( empty( $posts[ $post_symbol ]['post_name'] ) && empty( $posts[ $post_symbol ]['post_title'] ) ) {
+				unset( $posts[ $post_symbol ] );
+				continue;
+			}
+			if ( empty( $posts[ $post_symbol ]['post_name'] ) ) {
+				$posts[ $post_symbol ]['post_name'] = sanitize_title( $posts[ $post_symbol ]['post_title'] );
+			}
+			if ( empty( $posts[ $post_symbol ]['post_type'] ) ) {
+				$posts[ $post_symbol ]['post_type'] = 'post';
+			}
+			$needed_posts[ $posts[ $post_symbol ]['post_type'] . ':' . $posts[ $post_symbol ]['post_name'] ] = true;
+		}
+		$all_post_slugs = array_merge(
+			wp_list_pluck( $attachments, 'post_name' ),
+			wp_list_pluck( $posts, 'post_name' )
+		);
+
+		/*
+		 * Obtain all post types referenced in starter content to use in query.
+		 * This is needed because 'any' will not account for post types not yet registered.
+		 */
+		$post_types = array_filter( ar
