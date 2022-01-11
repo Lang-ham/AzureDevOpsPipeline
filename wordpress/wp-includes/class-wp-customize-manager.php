@@ -1282,4 +1282,271 @@ final class WP_Customize_Manager {
 		 * Obtain all post types referenced in starter content to use in query.
 		 * This is needed because 'any' will not account for post types not yet registered.
 		 */
-		$post_types = array_filter( ar
+		$post_types = array_filter( array_merge( array( 'attachment' ), wp_list_pluck( $posts, 'post_type' ) ) );
+
+		// Re-use auto-draft starter content posts referenced in the current customized state.
+		$existing_starter_content_posts = array();
+		if ( ! empty( $starter_content_auto_draft_post_ids ) ) {
+			$existing_posts_query = new WP_Query( array(
+				'post__in' => $starter_content_auto_draft_post_ids,
+				'post_status' => 'auto-draft',
+				'post_type' => $post_types,
+				'posts_per_page' => -1,
+			) );
+			foreach ( $existing_posts_query->posts as $existing_post ) {
+				$post_name = $existing_post->post_name;
+				if ( empty( $post_name ) ) {
+					$post_name = get_post_meta( $existing_post->ID, '_customize_draft_post_name', true );
+				}
+				$existing_starter_content_posts[ $existing_post->post_type . ':' . $post_name ] = $existing_post;
+			}
+		}
+
+		// Re-use non-auto-draft posts.
+		if ( ! empty( $all_post_slugs ) ) {
+			$existing_posts_query = new WP_Query( array(
+				'post_name__in' => $all_post_slugs,
+				'post_status' => array_diff( get_post_stati(), array( 'auto-draft' ) ),
+				'post_type' => 'any',
+				'posts_per_page' => -1,
+			) );
+			foreach ( $existing_posts_query->posts as $existing_post ) {
+				$key = $existing_post->post_type . ':' . $existing_post->post_name;
+				if ( isset( $needed_posts[ $key ] ) && ! isset( $existing_starter_content_posts[ $key ] ) ) {
+					$existing_starter_content_posts[ $key ] = $existing_post;
+				}
+			}
+		}
+
+		// Attachments are technically posts but handled differently.
+		if ( ! empty( $attachments ) ) {
+
+			$attachment_ids = array();
+
+			foreach ( $attachments as $symbol => $attachment ) {
+				$file_array = array(
+					'name' => $attachment['file_name'],
+				);
+				$file_path = $attachment['file_path'];
+				$attachment_id = null;
+				$attached_file = null;
+				if ( isset( $existing_starter_content_posts[ 'attachment:' . $attachment['post_name'] ] ) ) {
+					$attachment_post = $existing_starter_content_posts[ 'attachment:' . $attachment['post_name'] ];
+					$attachment_id = $attachment_post->ID;
+					$attached_file = get_attached_file( $attachment_id );
+					if ( empty( $attached_file ) || ! file_exists( $attached_file ) ) {
+						$attachment_id = null;
+						$attached_file = null;
+					} elseif ( $this->get_stylesheet() !== get_post_meta( $attachment_post->ID, '_starter_content_theme', true ) ) {
+
+						// Re-generate attachment metadata since it was previously generated for a different theme.
+						$metadata = wp_generate_attachment_metadata( $attachment_post->ID, $attached_file );
+						wp_update_attachment_metadata( $attachment_id, $metadata );
+						update_post_meta( $attachment_id, '_starter_content_theme', $this->get_stylesheet() );
+					}
+				}
+
+				// Insert the attachment auto-draft because it doesn't yet exist or the attached file is gone.
+				if ( ! $attachment_id ) {
+
+					// Copy file to temp location so that original file won't get deleted from theme after sideloading.
+					$temp_file_name = wp_tempnam( basename( $file_path ) );
+					if ( $temp_file_name && copy( $file_path, $temp_file_name ) ) {
+						$file_array['tmp_name'] = $temp_file_name;
+					}
+					if ( empty( $file_array['tmp_name'] ) ) {
+						continue;
+					}
+
+					$attachment_post_data = array_merge(
+						wp_array_slice_assoc( $attachment, array( 'post_title', 'post_content', 'post_excerpt' ) ),
+						array(
+							'post_status' => 'auto-draft', // So attachment will be garbage collected in a week if changeset is never published.
+						)
+					);
+
+					// In PHP < 5.6 filesize() returns 0 for the temp files unless we clear the file status cache.
+					// Technically, PHP < 5.6.0 || < 5.5.13 || < 5.4.29 but no need to be so targeted.
+					// See https://bugs.php.net/bug.php?id=65701
+					if ( version_compare( PHP_VERSION, '5.6', '<' ) ) {
+						clearstatcache();
+					}
+
+					$attachment_id = media_handle_sideload( $file_array, 0, null, $attachment_post_data );
+					if ( is_wp_error( $attachment_id ) ) {
+						continue;
+					}
+					update_post_meta( $attachment_id, '_starter_content_theme', $this->get_stylesheet() );
+					update_post_meta( $attachment_id, '_customize_draft_post_name', $attachment['post_name'] );
+				}
+
+				$attachment_ids[ $symbol ] = $attachment_id;
+			}
+			$starter_content_auto_draft_post_ids = array_merge( $starter_content_auto_draft_post_ids, array_values( $attachment_ids ) );
+		}
+
+		// Posts & pages.
+		if ( ! empty( $posts ) ) {
+			foreach ( array_keys( $posts ) as $post_symbol ) {
+				if ( empty( $posts[ $post_symbol ]['post_type'] ) || empty( $posts[ $post_symbol ]['post_name'] ) ) {
+					continue;
+				}
+				$post_type = $posts[ $post_symbol ]['post_type'];
+				if ( ! empty( $posts[ $post_symbol ]['post_name'] ) ) {
+					$post_name = $posts[ $post_symbol ]['post_name'];
+				} elseif ( ! empty( $posts[ $post_symbol ]['post_title'] ) ) {
+					$post_name = sanitize_title( $posts[ $post_symbol ]['post_title'] );
+				} else {
+					continue;
+				}
+
+				// Use existing auto-draft post if one already exists with the same type and name.
+				if ( isset( $existing_starter_content_posts[ $post_type . ':' . $post_name ] ) ) {
+					$posts[ $post_symbol ]['ID'] = $existing_starter_content_posts[ $post_type . ':' . $post_name ]->ID;
+					continue;
+				}
+
+				// Translate the featured image symbol.
+				if ( ! empty( $posts[ $post_symbol ]['thumbnail'] )
+					&& preg_match( '/^{{(?P<symbol>.+)}}$/', $posts[ $post_symbol ]['thumbnail'], $matches )
+					&& isset( $attachment_ids[ $matches['symbol'] ] ) ) {
+					$posts[ $post_symbol ]['meta_input']['_thumbnail_id'] = $attachment_ids[ $matches['symbol'] ];
+				}
+
+				if ( ! empty( $posts[ $post_symbol ]['template'] ) ) {
+					$posts[ $post_symbol ]['meta_input']['_wp_page_template'] = $posts[ $post_symbol ]['template'];
+				}
+
+				$r = $this->nav_menus->insert_auto_draft_post( $posts[ $post_symbol ] );
+				if ( $r instanceof WP_Post ) {
+					$posts[ $post_symbol ]['ID'] = $r->ID;
+				}
+			}
+
+			$starter_content_auto_draft_post_ids = array_merge( $starter_content_auto_draft_post_ids, wp_list_pluck( $posts, 'ID' ) );
+		}
+
+		// The nav_menus_created_posts setting is why nav_menus component is dependency for adding posts.
+		if ( ! empty( $this->nav_menus ) && ! empty( $starter_content_auto_draft_post_ids ) ) {
+			$setting_id = 'nav_menus_created_posts';
+			$this->set_post_value( $setting_id, array_unique( array_values( $starter_content_auto_draft_post_ids ) ) );
+			$this->pending_starter_content_settings_ids[] = $setting_id;
+		}
+
+		// Nav menus.
+		$placeholder_id = -1;
+		$reused_nav_menu_setting_ids = array();
+		foreach ( $nav_menus as $nav_menu_location => $nav_menu ) {
+
+			$nav_menu_term_id = null;
+			$nav_menu_setting_id = null;
+			$matches = array();
+
+			// Look for an existing placeholder menu with starter content to re-use.
+			foreach ( $changeset_data as $setting_id => $setting_params ) {
+				$can_reuse = (
+					! empty( $setting_params['starter_content'] )
+					&&
+					! in_array( $setting_id, $reused_nav_menu_setting_ids, true )
+					&&
+					preg_match( '#^nav_menu\[(?P<nav_menu_id>-?\d+)\]$#', $setting_id, $matches )
+				);
+				if ( $can_reuse ) {
+					$nav_menu_term_id = intval( $matches['nav_menu_id'] );
+					$nav_menu_setting_id = $setting_id;
+					$reused_nav_menu_setting_ids[] = $setting_id;
+					break;
+				}
+			}
+
+			if ( ! $nav_menu_term_id ) {
+				while ( isset( $changeset_data[ sprintf( 'nav_menu[%d]', $placeholder_id ) ] ) ) {
+					$placeholder_id--;
+				}
+				$nav_menu_term_id = $placeholder_id;
+				$nav_menu_setting_id = sprintf( 'nav_menu[%d]', $placeholder_id );
+			}
+
+			$this->set_post_value( $nav_menu_setting_id, array(
+				'name' => isset( $nav_menu['name'] ) ? $nav_menu['name'] : $nav_menu_location,
+			) );
+			$this->pending_starter_content_settings_ids[] = $nav_menu_setting_id;
+
+			// @todo Add support for menu_item_parent.
+			$position = 0;
+			foreach ( $nav_menu['items'] as $nav_menu_item ) {
+				$nav_menu_item_setting_id = sprintf( 'nav_menu_item[%d]', $placeholder_id-- );
+				if ( ! isset( $nav_menu_item['position'] ) ) {
+					$nav_menu_item['position'] = $position++;
+				}
+				$nav_menu_item['nav_menu_term_id'] = $nav_menu_term_id;
+
+				if ( isset( $nav_menu_item['object_id'] ) ) {
+					if ( 'post_type' === $nav_menu_item['type'] && preg_match( '/^{{(?P<symbol>.+)}}$/', $nav_menu_item['object_id'], $matches ) && isset( $posts[ $matches['symbol'] ] ) ) {
+						$nav_menu_item['object_id'] = $posts[ $matches['symbol'] ]['ID'];
+						if ( empty( $nav_menu_item['title'] ) ) {
+							$original_object = get_post( $nav_menu_item['object_id'] );
+							$nav_menu_item['title'] = $original_object->post_title;
+						}
+					} else {
+						continue;
+					}
+				} else {
+					$nav_menu_item['object_id'] = 0;
+				}
+
+				if ( empty( $changeset_data[ $nav_menu_item_setting_id ] ) || ! empty( $changeset_data[ $nav_menu_item_setting_id ]['starter_content'] ) ) {
+					$this->set_post_value( $nav_menu_item_setting_id, $nav_menu_item );
+					$this->pending_starter_content_settings_ids[] = $nav_menu_item_setting_id;
+				}
+			}
+
+			$setting_id = sprintf( 'nav_menu_locations[%s]', $nav_menu_location );
+			if ( empty( $changeset_data[ $setting_id ] ) || ! empty( $changeset_data[ $setting_id ]['starter_content'] ) ) {
+				$this->set_post_value( $setting_id, $nav_menu_term_id );
+				$this->pending_starter_content_settings_ids[] = $setting_id;
+			}
+		}
+
+		// Options.
+		foreach ( $options as $name => $value ) {
+			if ( preg_match( '/^{{(?P<symbol>.+)}}$/', $value, $matches ) ) {
+				if ( isset( $posts[ $matches['symbol'] ] ) ) {
+					$value = $posts[ $matches['symbol'] ]['ID'];
+				} elseif ( isset( $attachment_ids[ $matches['symbol'] ] ) ) {
+					$value = $attachment_ids[ $matches['symbol'] ];
+				} else {
+					continue;
+				}
+			}
+
+			if ( empty( $changeset_data[ $name ] ) || ! empty( $changeset_data[ $name ]['starter_content'] ) ) {
+				$this->set_post_value( $name, $value );
+				$this->pending_starter_content_settings_ids[] = $name;
+			}
+		}
+
+		// Theme mods.
+		foreach ( $theme_mods as $name => $value ) {
+			if ( preg_match( '/^{{(?P<symbol>.+)}}$/', $value, $matches ) ) {
+				if ( isset( $posts[ $matches['symbol'] ] ) ) {
+					$value = $posts[ $matches['symbol'] ]['ID'];
+				} elseif ( isset( $attachment_ids[ $matches['symbol'] ] ) ) {
+					$value = $attachment_ids[ $matches['symbol'] ];
+				} else {
+					continue;
+				}
+			}
+
+			// Handle header image as special case since setting has a legacy format.
+			if ( 'header_image' === $name ) {
+				$name = 'header_image_data';
+				$metadata = wp_get_attachment_metadata( $value );
+				if ( empty( $metadata ) ) {
+					continue;
+				}
+				$value = array(
+					'attachment_id' => $value,
+					'url' => wp_get_attachment_url( $value ),
+					'height' => $metadata['height'],
+		
