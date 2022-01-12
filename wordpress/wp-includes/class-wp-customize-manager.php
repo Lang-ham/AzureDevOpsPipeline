@@ -2216,4 +2216,320 @@ final class WP_Customize_Manager {
 	/**
 	 * Retrieve the stylesheet root of the previewed theme.
 	 *
-	 * @since 3.4
+	 * @since 3.4.0
+	 *
+	 * @return string Theme root.
+	 */
+	public function get_stylesheet_root() {
+		return get_raw_theme_root( $this->get_stylesheet(), true );
+	}
+
+	/**
+	 * Filters the current theme and return the name of the previewed theme.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param $current_theme {@internal Parameter is not used}
+	 * @return string Theme name.
+	 */
+	public function current_theme( $current_theme ) {
+		return $this->theme()->display('Name');
+	}
+
+	/**
+	 * Validates setting values.
+	 *
+	 * Validation is skipped for unregistered settings or for values that are
+	 * already null since they will be skipped anyway. Sanitization is applied
+	 * to values that pass validation, and values that become null or `WP_Error`
+	 * after sanitizing are marked invalid.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @see WP_REST_Request::has_valid_params()
+	 * @see WP_Customize_Setting::validate()
+	 *
+	 * @param array $setting_values Mapping of setting IDs to values to validate and sanitize.
+	 * @param array $options {
+	 *     Options.
+	 *
+	 *     @type bool $validate_existence  Whether a setting's existence will be checked.
+	 *     @type bool $validate_capability Whether the setting capability will be checked.
+	 * }
+	 * @return array Mapping of setting IDs to return value of validate method calls, either `true` or `WP_Error`.
+	 */
+	public function validate_setting_values( $setting_values, $options = array() ) {
+		$options = wp_parse_args( $options, array(
+			'validate_capability' => false,
+			'validate_existence' => false,
+		) );
+
+		$validities = array();
+		foreach ( $setting_values as $setting_id => $unsanitized_value ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( ! $setting ) {
+				if ( $options['validate_existence'] ) {
+					$validities[ $setting_id ] = new WP_Error( 'unrecognized', __( 'Setting does not exist or is unrecognized.' ) );
+				}
+				continue;
+			}
+			if ( $options['validate_capability'] && ! current_user_can( $setting->capability ) ) {
+				$validity = new WP_Error( 'unauthorized', __( 'Unauthorized to modify setting due to capability.' ) );
+			} else {
+				if ( is_null( $unsanitized_value ) ) {
+					continue;
+				}
+				$validity = $setting->validate( $unsanitized_value );
+			}
+			if ( ! is_wp_error( $validity ) ) {
+				/** This filter is documented in wp-includes/class-wp-customize-setting.php */
+				$late_validity = apply_filters( "customize_validate_{$setting->id}", new WP_Error(), $unsanitized_value, $setting );
+				if ( ! empty( $late_validity->errors ) ) {
+					$validity = $late_validity;
+				}
+			}
+			if ( ! is_wp_error( $validity ) ) {
+				$value = $setting->sanitize( $unsanitized_value );
+				if ( is_null( $value ) ) {
+					$validity = false;
+				} elseif ( is_wp_error( $value ) ) {
+					$validity = $value;
+				}
+			}
+			if ( false === $validity ) {
+				$validity = new WP_Error( 'invalid_value', __( 'Invalid value.' ) );
+			}
+			$validities[ $setting_id ] = $validity;
+		}
+		return $validities;
+	}
+
+	/**
+	 * Prepares setting validity for exporting to the client (JS).
+	 *
+	 * Converts `WP_Error` instance into array suitable for passing into the
+	 * `wp.customize.Notification` JS model.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param true|WP_Error $validity Setting validity.
+	 * @return true|array If `$validity` was a WP_Error, the error codes will be array-mapped
+	 *                    to their respective `message` and `data` to pass into the
+	 *                    `wp.customize.Notification` JS model.
+	 */
+	public function prepare_setting_validity_for_js( $validity ) {
+		if ( is_wp_error( $validity ) ) {
+			$notification = array();
+			foreach ( $validity->errors as $error_code => $error_messages ) {
+				$notification[ $error_code ] = array(
+					'message' => join( ' ', $error_messages ),
+					'data' => $validity->get_error_data( $error_code ),
+				);
+			}
+			return $notification;
+		} else {
+			return true;
+		}
+	}
+
+	/**
+	 * Handle customize_save WP Ajax request to save/update a changeset.
+	 *
+	 * @since 3.4.0
+	 * @since 4.7.0 The semantics of this method have changed to update a changeset, optionally to also change the status and other attributes.
+	 */
+	public function save() {
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( 'unauthenticated' );
+		}
+
+		if ( ! $this->is_preview() ) {
+			wp_send_json_error( 'not_preview' );
+		}
+
+		$action = 'save-customize_' . $this->get_stylesheet();
+		if ( ! check_ajax_referer( $action, 'nonce', false ) ) {
+			wp_send_json_error( 'invalid_nonce' );
+		}
+
+		$changeset_post_id = $this->changeset_post_id();
+		$is_new_changeset = empty( $changeset_post_id );
+		if ( $is_new_changeset ) {
+			if ( ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->create_posts ) ) {
+				wp_send_json_error( 'cannot_create_changeset_post' );
+			}
+		} else {
+			if ( ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->edit_post, $changeset_post_id ) ) {
+				wp_send_json_error( 'cannot_edit_changeset_post' );
+			}
+		}
+
+		if ( ! empty( $_POST['customize_changeset_data'] ) ) {
+			$input_changeset_data = json_decode( wp_unslash( $_POST['customize_changeset_data'] ), true );
+			if ( ! is_array( $input_changeset_data ) ) {
+				wp_send_json_error( 'invalid_customize_changeset_data' );
+			}
+		} else {
+			$input_changeset_data = array();
+		}
+
+		// Validate title.
+		$changeset_title = null;
+		if ( isset( $_POST['customize_changeset_title'] ) ) {
+			$changeset_title = sanitize_text_field( wp_unslash( $_POST['customize_changeset_title'] ) );
+		}
+
+		// Validate changeset status param.
+		$is_publish = null;
+		$changeset_status = null;
+		if ( isset( $_POST['customize_changeset_status'] ) ) {
+			$changeset_status = wp_unslash( $_POST['customize_changeset_status'] );
+			if ( ! get_post_status_object( $changeset_status ) || ! in_array( $changeset_status, array( 'draft', 'pending', 'publish', 'future' ), true ) ) {
+				wp_send_json_error( 'bad_customize_changeset_status', 400 );
+			}
+			$is_publish = ( 'publish' === $changeset_status || 'future' === $changeset_status );
+			if ( $is_publish && ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->publish_posts ) ) {
+				wp_send_json_error( 'changeset_publish_unauthorized', 403 );
+			}
+		}
+
+		/*
+		 * Validate changeset date param. Date is assumed to be in local time for
+		 * the WP if in MySQL format (YYYY-MM-DD HH:MM:SS). Otherwise, the date
+		 * is parsed with strtotime() so that ISO date format may be supplied
+		 * or a string like "+10 minutes".
+		 */
+		$changeset_date_gmt = null;
+		if ( isset( $_POST['customize_changeset_date'] ) ) {
+			$changeset_date = wp_unslash( $_POST['customize_changeset_date'] );
+			if ( preg_match( '/^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/', $changeset_date ) ) {
+				$mm = substr( $changeset_date, 5, 2 );
+				$jj = substr( $changeset_date, 8, 2 );
+				$aa = substr( $changeset_date, 0, 4 );
+				$valid_date = wp_checkdate( $mm, $jj, $aa, $changeset_date );
+				if ( ! $valid_date ) {
+					wp_send_json_error( 'bad_customize_changeset_date', 400 );
+				}
+				$changeset_date_gmt = get_gmt_from_date( $changeset_date );
+			} else {
+				$timestamp = strtotime( $changeset_date );
+				if ( ! $timestamp ) {
+					wp_send_json_error( 'bad_customize_changeset_date', 400 );
+				}
+				$changeset_date_gmt = gmdate( 'Y-m-d H:i:s', $timestamp );
+			}
+		}
+
+		$lock_user_id = null;
+		$autosave = ! empty( $_POST['customize_changeset_autosave'] );
+		if ( ! $is_new_changeset ) {
+			$lock_user_id = wp_check_post_lock( $this->changeset_post_id() );
+		}
+
+		// Force request to autosave when changeset is locked.
+		if ( $lock_user_id && ! $autosave ) {
+			$autosave = true;
+			$changeset_status = null;
+			$changeset_date_gmt = null;
+		}
+
+		if ( $autosave && ! defined( 'DOING_AUTOSAVE' ) ) { // Back-compat.
+			define( 'DOING_AUTOSAVE', true );
+		}
+
+		$autosaved = false;
+		$r = $this->save_changeset_post( array(
+			'status' => $changeset_status,
+			'title' => $changeset_title,
+			'date_gmt' => $changeset_date_gmt,
+			'data' => $input_changeset_data,
+			'autosave' => $autosave,
+		) );
+		if ( $autosave && ! is_wp_error( $r ) ) {
+			$autosaved = true;
+		}
+
+		// If the changeset was locked and an autosave request wasn't itself an error, then now explicitly return with a failure.
+		if ( $lock_user_id && ! is_wp_error( $r ) ) {
+			$r = new WP_Error(
+				'changeset_locked',
+				__( 'Changeset is being edited by other user.' ),
+				array(
+					'lock_user' => $this->get_lock_user_data( $lock_user_id ),
+				)
+			);
+		}
+
+		if ( is_wp_error( $r ) ) {
+			$response = array(
+				'message' => $r->get_error_message(),
+				'code' => $r->get_error_code(),
+			);
+			if ( is_array( $r->get_error_data() ) ) {
+				$response = array_merge( $response, $r->get_error_data() );
+			} else {
+				$response['data'] = $r->get_error_data();
+			}
+		} else {
+			$response = $r;
+			$changeset_post = get_post( $this->changeset_post_id() );
+
+			// Dismiss all other auto-draft changeset posts for this user (they serve like autosave revisions), as there should only be one.
+			if ( $is_new_changeset ) {
+				$this->dismiss_user_auto_draft_changesets();
+			}
+
+			// Note that if the changeset status was publish, then it will get set to trash if revisions are not supported.
+			$response['changeset_status'] = $changeset_post->post_status;
+			if ( $is_publish && 'trash' === $response['changeset_status'] ) {
+				$response['changeset_status'] = 'publish';
+			}
+
+			if ( 'publish' !== $response['changeset_status'] ) {
+				$this->set_changeset_lock( $changeset_post->ID );
+			}
+
+			if ( 'future' === $response['changeset_status'] ) {
+				$response['changeset_date'] = $changeset_post->post_date;
+			}
+
+			if ( 'publish' === $response['changeset_status'] || 'trash' === $response['changeset_status'] ) {
+				$response['next_changeset_uuid'] = wp_generate_uuid4();
+			}
+		}
+
+		if ( $autosave ) {
+			$response['autosaved'] = $autosaved;
+		}
+
+		if ( isset( $response['setting_validities'] ) ) {
+			$response['setting_validities'] = array_map( array( $this, 'prepare_setting_validity_for_js' ), $response['setting_validities'] );
+		}
+
+		/**
+		 * Filters response data for a successful customize_save Ajax request.
+		 *
+		 * This filter does not apply if there was a nonce or authentication failure.
+		 *
+		 * @since 4.2.0
+		 *
+		 * @param array                $response Additional information passed back to the 'saved'
+		 *                                       event on `wp.customize`.
+		 * @param WP_Customize_Manager $this     WP_Customize_Manager instance.
+		 */
+		$response = apply_filters( 'customize_save_response', $response, $this );
+
+		if ( is_wp_error( $r ) ) {
+			wp_send_json_error( $response );
+		} else {
+			wp_send_json_success( $response );
+		}
+	}
+
+	/**
+	 * Save the post for the loaded changeset.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $args {
+	 *     Args for changeset post.
