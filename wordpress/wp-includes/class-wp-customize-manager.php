@@ -1846,4 +1846,374 @@ final class WP_Customize_Manager {
 		 * that the user's session has expired and they need to re-authenticate.
 		 */
 		if ( $this->messenger_channel && ! current_user_can( 'customize' ) ) {
-			$this->wp_die( -1, __( 'Unauthorized. You may remove th
+			$this->wp_die( -1, __( 'Unauthorized. You may remove the customize_messenger_channel param to preview as frontend.' ) );
+			return;
+		}
+
+		$this->prepare_controls();
+
+		add_filter( 'wp_redirect', array( $this, 'add_state_query_params' ) );
+
+		wp_enqueue_script( 'customize-preview' );
+		wp_enqueue_style( 'customize-preview' );
+		add_action( 'wp_head', array( $this, 'customize_preview_loading_style' ) );
+		add_action( 'wp_head', array( $this, 'remove_frameless_preview_messenger_channel' ) );
+		add_action( 'wp_footer', array( $this, 'customize_preview_settings' ), 20 );
+		add_filter( 'get_edit_post_link', '__return_empty_string' );
+
+		/**
+		 * Fires once the Customizer preview has initialized and JavaScript
+		 * settings have been printed.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param WP_Customize_Manager $this WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_preview_init', $this );
+	}
+
+	/**
+	 * Filter the X-Frame-Options and Content-Security-Policy headers to ensure frontend can load in customizer.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $headers Headers.
+	 * @return array Headers.
+	 */
+	public function filter_iframe_security_headers( $headers ) {
+		$customize_url = admin_url( 'customize.php' );
+		$headers['X-Frame-Options'] = 'ALLOW-FROM ' . $customize_url;
+		$headers['Content-Security-Policy'] = 'frame-ancestors ' . preg_replace( '#^(\w+://[^/]+).+?$#', '$1', $customize_url );
+		return $headers;
+	}
+
+	/**
+	 * Add customize state query params to a given URL if preview is allowed.
+	 *
+	 * @since 4.7.0
+	 * @see wp_redirect()
+	 * @see WP_Customize_Manager::get_allowed_url()
+	 *
+	 * @param string $url URL.
+	 * @return string URL.
+	 */
+	public function add_state_query_params( $url ) {
+		$parsed_original_url = wp_parse_url( $url );
+		$is_allowed = false;
+		foreach ( $this->get_allowed_urls() as $allowed_url ) {
+			$parsed_allowed_url = wp_parse_url( $allowed_url );
+			$is_allowed = (
+				$parsed_allowed_url['scheme'] === $parsed_original_url['scheme']
+				&&
+				$parsed_allowed_url['host'] === $parsed_original_url['host']
+				&&
+				0 === strpos( $parsed_original_url['path'], $parsed_allowed_url['path'] )
+			);
+			if ( $is_allowed ) {
+				break;
+			}
+		}
+
+		if ( $is_allowed ) {
+			$query_params = array(
+				'customize_changeset_uuid' => $this->changeset_uuid(),
+			);
+			if ( ! $this->is_theme_active() ) {
+				$query_params['customize_theme'] = $this->get_stylesheet();
+			}
+			if ( $this->messenger_channel ) {
+				$query_params['customize_messenger_channel'] = $this->messenger_channel;
+			}
+			$url = add_query_arg( $query_params, $url );
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Prevent sending a 404 status when returning the response for the customize
+	 * preview, since it causes the jQuery Ajax to fail. Send 200 instead.
+	 *
+	 * @since 4.0.0
+	 * @deprecated 4.7.0
+	 */
+	public function customize_preview_override_404_status() {
+		_deprecated_function( __METHOD__, '4.7.0' );
+	}
+
+	/**
+	 * Print base element for preview frame.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0
+	 */
+	public function customize_preview_base() {
+		_deprecated_function( __METHOD__, '4.7.0' );
+	}
+
+	/**
+	 * Print a workaround to handle HTML5 tags in IE < 9.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0 Customizer no longer supports IE8, so all supported browsers recognize HTML5.
+	 */
+	public function customize_preview_html5() {
+		_deprecated_function( __FUNCTION__, '4.7.0' );
+	}
+
+	/**
+	 * Print CSS for loading indicators for the Customizer preview.
+	 *
+	 * @since 4.2.0
+	 */
+	public function customize_preview_loading_style() {
+		?><style>
+			body.wp-customizer-unloading {
+				opacity: 0.25;
+				cursor: progress !important;
+				-webkit-transition: opacity 0.5s;
+				transition: opacity 0.5s;
+			}
+			body.wp-customizer-unloading * {
+				pointer-events: none !important;
+			}
+			form.customize-unpreviewable,
+			form.customize-unpreviewable input,
+			form.customize-unpreviewable select,
+			form.customize-unpreviewable button,
+			a.customize-unpreviewable,
+			area.customize-unpreviewable {
+				cursor: not-allowed !important;
+			}
+		</style><?php
+	}
+
+	/**
+	 * Remove customize_messenger_channel query parameter from the preview window when it is not in an iframe.
+	 *
+	 * This ensures that the admin bar will be shown. It also ensures that link navigation will
+	 * work as expected since the parent frame is not being sent the URL to navigate to.
+	 *
+	 * @since 4.7.0
+	 */
+	public function remove_frameless_preview_messenger_channel() {
+		if ( ! $this->messenger_channel ) {
+			return;
+		}
+		?>
+		<script>
+		( function() {
+			var urlParser, oldQueryParams, newQueryParams, i;
+			if ( parent !== window ) {
+				return;
+			}
+			urlParser = document.createElement( 'a' );
+			urlParser.href = location.href;
+			oldQueryParams = urlParser.search.substr( 1 ).split( /&/ );
+			newQueryParams = [];
+			for ( i = 0; i < oldQueryParams.length; i += 1 ) {
+				if ( ! /^customize_messenger_channel=/.test( oldQueryParams[ i ] ) ) {
+					newQueryParams.push( oldQueryParams[ i ] );
+				}
+			}
+			urlParser.search = newQueryParams.join( '&' );
+			if ( urlParser.search !== location.search ) {
+				location.replace( urlParser.href );
+			}
+		} )();
+		</script>
+		<?php
+	}
+
+	/**
+	 * Print JavaScript settings for preview frame.
+	 *
+	 * @since 3.4.0
+	 */
+	public function customize_preview_settings() {
+		$post_values = $this->unsanitized_post_values( array( 'exclude_changeset' => true ) );
+		$setting_validities = $this->validate_setting_values( $post_values );
+		$exported_setting_validities = array_map( array( $this, 'prepare_setting_validity_for_js' ), $setting_validities );
+
+		// Note that the REQUEST_URI is not passed into home_url() since this breaks subdirectory installations.
+		$self_url = empty( $_SERVER['REQUEST_URI'] ) ? home_url( '/' ) : esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+		$state_query_params = array(
+			'customize_theme',
+			'customize_changeset_uuid',
+			'customize_messenger_channel',
+		);
+		$self_url = remove_query_arg( $state_query_params, $self_url );
+
+		$allowed_urls = $this->get_allowed_urls();
+		$allowed_hosts = array();
+		foreach ( $allowed_urls as $allowed_url ) {
+			$parsed = wp_parse_url( $allowed_url );
+			if ( empty( $parsed['host'] ) ) {
+				continue;
+			}
+			$host = $parsed['host'];
+			if ( ! empty( $parsed['port'] ) ) {
+				$host .= ':' . $parsed['port'];
+			}
+			$allowed_hosts[] = $host;
+		}
+
+		$switched_locale = switch_to_locale( get_user_locale() );
+		$l10n = array(
+			'shiftClickToEdit' => __( 'Shift-click to edit this element.' ),
+			'linkUnpreviewable' => __( 'This link is not live-previewable.' ),
+			'formUnpreviewable' => __( 'This form is not live-previewable.' ),
+		);
+		if ( $switched_locale ) {
+			restore_previous_locale();
+		}
+
+		$settings = array(
+			'changeset' => array(
+				'uuid' => $this->changeset_uuid(),
+				'autosaved' => $this->autosaved(),
+			),
+			'timeouts' => array(
+				'selectiveRefresh' => 250,
+				'keepAliveSend' => 1000,
+			),
+			'theme' => array(
+				'stylesheet' => $this->get_stylesheet(),
+				'active'     => $this->is_theme_active(),
+			),
+			'url' => array(
+				'self' => $self_url,
+				'allowed' => array_map( 'esc_url_raw', $this->get_allowed_urls() ),
+				'allowedHosts' => array_unique( $allowed_hosts ),
+				'isCrossDomain' => $this->is_cross_domain(),
+			),
+			'channel' => $this->messenger_channel,
+			'activePanels' => array(),
+			'activeSections' => array(),
+			'activeControls' => array(),
+			'settingValidities' => $exported_setting_validities,
+			'nonce' => current_user_can( 'customize' ) ? $this->get_nonces() : array(),
+			'l10n' => $l10n,
+			'_dirty' => array_keys( $post_values ),
+		);
+
+		foreach ( $this->panels as $panel_id => $panel ) {
+			if ( $panel->check_capabilities() ) {
+				$settings['activePanels'][ $panel_id ] = $panel->active();
+				foreach ( $panel->sections as $section_id => $section ) {
+					if ( $section->check_capabilities() ) {
+						$settings['activeSections'][ $section_id ] = $section->active();
+					}
+				}
+			}
+		}
+		foreach ( $this->sections as $id => $section ) {
+			if ( $section->check_capabilities() ) {
+				$settings['activeSections'][ $id ] = $section->active();
+			}
+		}
+		foreach ( $this->controls as $id => $control ) {
+			if ( $control->check_capabilities() ) {
+				$settings['activeControls'][ $id ] = $control->active();
+			}
+		}
+
+		?>
+		<script type="text/javascript">
+			var _wpCustomizeSettings = <?php echo wp_json_encode( $settings ); ?>;
+			_wpCustomizeSettings.values = {};
+			(function( v ) {
+				<?php
+				/*
+				 * Serialize settings separately from the initial _wpCustomizeSettings
+				 * serialization in order to avoid a peak memory usage spike.
+				 * @todo We may not even need to export the values at all since the pane syncs them anyway.
+				 */
+				foreach ( $this->settings as $id => $setting ) {
+					if ( $setting->check_capabilities() ) {
+						printf(
+							"v[%s] = %s;\n",
+							wp_json_encode( $id ),
+							wp_json_encode( $setting->js_value() )
+						);
+					}
+				}
+				?>
+			})( _wpCustomizeSettings.values );
+		</script>
+		<?php
+	}
+
+	/**
+	 * Prints a signature so we can ensure the Customizer was properly executed.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0
+	 */
+	public function customize_preview_signature() {
+		_deprecated_function( __METHOD__, '4.7.0' );
+	}
+
+	/**
+	 * Removes the signature in case we experience a case where the Customizer was not properly executed.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0
+	 *
+	 * @param mixed $return Value passed through for {@see 'wp_die_handler'} filter.
+	 * @return mixed Value passed through for {@see 'wp_die_handler'} filter.
+	 */
+	public function remove_preview_signature( $return = null ) {
+		_deprecated_function( __METHOD__, '4.7.0' );
+
+		return $return;
+	}
+
+	/**
+	 * Is it a theme preview?
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return bool True if it's a preview, false if not.
+	 */
+	public function is_preview() {
+		return (bool) $this->previewing;
+	}
+
+	/**
+	 * Retrieve the template name of the previewed theme.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return string Template name.
+	 */
+	public function get_template() {
+		return $this->theme()->get_template();
+	}
+
+	/**
+	 * Retrieve the stylesheet name of the previewed theme.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return string Stylesheet name.
+	 */
+	public function get_stylesheet() {
+		return $this->theme()->get_stylesheet();
+	}
+
+	/**
+	 * Retrieve the template root of the previewed theme.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @return string Theme root.
+	 */
+	public function get_template_root() {
+		return get_raw_theme_root( $this->get_template(), true );
+	}
+
+	/**
+	 * Retrieve the stylesheet root of the previewed theme.
+	 *
+	 * @since 3.4
