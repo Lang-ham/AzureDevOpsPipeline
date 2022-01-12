@@ -1549,4 +1549,301 @@ final class WP_Customize_Manager {
 					'attachment_id' => $value,
 					'url' => wp_get_attachment_url( $value ),
 					'height' => $metadata['height'],
-		
+					'width' => $metadata['width'],
+				);
+			} elseif ( 'background_image' === $name ) {
+				$value = wp_get_attachment_url( $value );
+			}
+
+			if ( empty( $changeset_data[ $name ] ) || ! empty( $changeset_data[ $name ]['starter_content'] ) ) {
+				$this->set_post_value( $name, $value );
+				$this->pending_starter_content_settings_ids[] = $name;
+			}
+		}
+
+		if ( ! empty( $this->pending_starter_content_settings_ids ) ) {
+			if ( did_action( 'customize_register' ) ) {
+				$this->_save_starter_content_changeset();
+			} else {
+				add_action( 'customize_register', array( $this, '_save_starter_content_changeset' ), 1000 );
+			}
+		}
+	}
+
+	/**
+	 * Prepare starter content attachments.
+	 *
+	 * Ensure that the attachments are valid and that they have slugs and file name/path.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $attachments Attachments.
+	 * @return array Prepared attachments.
+	 */
+	protected function prepare_starter_content_attachments( $attachments ) {
+		$prepared_attachments = array();
+		if ( empty( $attachments ) ) {
+			return $prepared_attachments;
+		}
+
+		// Such is The WordPress Way.
+		require_once( ABSPATH . 'wp-admin/includes/file.php' );
+		require_once( ABSPATH . 'wp-admin/includes/media.php' );
+		require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+		foreach ( $attachments as $symbol => $attachment ) {
+
+			// A file is required and URLs to files are not currently allowed.
+			if ( empty( $attachment['file'] ) || preg_match( '#^https?://$#', $attachment['file'] ) ) {
+				continue;
+			}
+
+			$file_path = null;
+			if ( file_exists( $attachment['file'] ) ) {
+				$file_path = $attachment['file']; // Could be absolute path to file in plugin.
+			} elseif ( is_child_theme() && file_exists( get_stylesheet_directory() . '/' . $attachment['file'] ) ) {
+				$file_path = get_stylesheet_directory() . '/' . $attachment['file'];
+			} elseif ( file_exists( get_template_directory() . '/' . $attachment['file'] ) ) {
+				$file_path = get_template_directory() . '/' . $attachment['file'];
+			} else {
+				continue;
+			}
+			$file_name = basename( $attachment['file'] );
+
+			// Skip file types that are not recognized.
+			$checked_filetype = wp_check_filetype( $file_name );
+			if ( empty( $checked_filetype['type'] ) ) {
+				continue;
+			}
+
+			// Ensure post_name is set since not automatically derived from post_title for new auto-draft posts.
+			if ( empty( $attachment['post_name'] ) ) {
+				if ( ! empty( $attachment['post_title'] ) ) {
+					$attachment['post_name'] = sanitize_title( $attachment['post_title'] );
+				} else {
+					$attachment['post_name'] = sanitize_title( preg_replace( '/\.\w+$/', '', $file_name ) );
+				}
+			}
+
+			$attachment['file_name'] = $file_name;
+			$attachment['file_path'] = $file_path;
+			$prepared_attachments[ $symbol ] = $attachment;
+		}
+		return $prepared_attachments;
+	}
+
+	/**
+	 * Save starter content changeset.
+	 *
+	 * @since 4.7.0
+	 */
+	public function _save_starter_content_changeset() {
+
+		if ( empty( $this->pending_starter_content_settings_ids ) ) {
+			return;
+		}
+
+		$this->save_changeset_post( array(
+			'data' => array_fill_keys( $this->pending_starter_content_settings_ids, array( 'starter_content' => true ) ),
+			'starter_content' => true,
+		) );
+		$this->saved_starter_content_changeset = true;
+
+		$this->pending_starter_content_settings_ids = array();
+	}
+
+	/**
+	 * Get dirty pre-sanitized setting values in the current customized state.
+	 *
+	 * The returned array consists of a merge of three sources:
+	 * 1. If the theme is not currently active, then the base array is any stashed
+	 *    theme mods that were modified previously but never published.
+	 * 2. The values from the current changeset, if it exists.
+	 * 3. If the user can customize, the values parsed from the incoming
+	 *    `$_POST['customized']` JSON data.
+	 * 4. Any programmatically-set post values via `WP_Customize_Manager::set_post_value()`.
+	 *
+	 * The name "unsanitized_post_values" is a carry-over from when the customized
+	 * state was exclusively sourced from `$_POST['customized']`. Nevertheless,
+	 * the value returned will come from the current changeset post and from the
+	 * incoming post data.
+	 *
+	 * @since 4.1.1
+	 * @since 4.7.0 Added $args param and merging with changeset values and stashed theme mods.
+	 *
+	 * @param array $args {
+	 *     Args.
+	 *
+	 *     @type bool $exclude_changeset Whether the changeset values should also be excluded. Defaults to false.
+	 *     @type bool $exclude_post_data Whether the post input values should also be excluded. Defaults to false when lacking the customize capability.
+	 * }
+	 * @return array
+	 */
+	public function unsanitized_post_values( $args = array() ) {
+		$args = array_merge(
+			array(
+				'exclude_changeset' => false,
+				'exclude_post_data' => ! current_user_can( 'customize' ),
+			),
+			$args
+		);
+
+		$values = array();
+
+		// Let default values be from the stashed theme mods if doing a theme switch and if no changeset is present.
+		if ( ! $this->is_theme_active() ) {
+			$stashed_theme_mods = get_option( 'customize_stashed_theme_mods' );
+			$stylesheet = $this->get_stylesheet();
+			if ( isset( $stashed_theme_mods[ $stylesheet ] ) ) {
+				$values = array_merge( $values, wp_list_pluck( $stashed_theme_mods[ $stylesheet ], 'value' ) );
+			}
+		}
+
+		if ( ! $args['exclude_changeset'] ) {
+			foreach ( $this->changeset_data() as $setting_id => $setting_params ) {
+				if ( ! array_key_exists( 'value', $setting_params ) ) {
+					continue;
+				}
+				if ( isset( $setting_params['type'] ) && 'theme_mod' === $setting_params['type'] ) {
+
+					// Ensure that theme mods values are only used if they were saved under the current theme.
+					$namespace_pattern = '/^(?P<stylesheet>.+?)::(?P<setting_id>.+)$/';
+					if ( preg_match( $namespace_pattern, $setting_id, $matches ) && $this->get_stylesheet() === $matches['stylesheet'] ) {
+						$values[ $matches['setting_id'] ] = $setting_params['value'];
+					}
+				} else {
+					$values[ $setting_id ] = $setting_params['value'];
+				}
+			}
+		}
+
+		if ( ! $args['exclude_post_data'] ) {
+			if ( ! isset( $this->_post_values ) ) {
+				if ( isset( $_POST['customized'] ) ) {
+					$post_values = json_decode( wp_unslash( $_POST['customized'] ), true );
+				} else {
+					$post_values = array();
+				}
+				if ( is_array( $post_values ) ) {
+					$this->_post_values = $post_values;
+				} else {
+					$this->_post_values = array();
+				}
+			}
+			$values = array_merge( $values, $this->_post_values );
+		}
+		return $values;
+	}
+
+	/**
+	 * Returns the sanitized value for a given setting from the current customized state.
+	 *
+	 * The name "post_value" is a carry-over from when the customized state was exclusively
+	 * sourced from `$_POST['customized']`. Nevertheless, the value returned will come
+	 * from the current changeset post and from the incoming post data.
+	 *
+	 * @since 3.4.0
+	 * @since 4.1.1 Introduced the `$default` parameter.
+	 * @since 4.6.0 `$default` is now returned early when the setting post value is invalid.
+	 *
+	 * @see WP_REST_Server::dispatch()
+	 * @see WP_REST_Request::sanitize_params()
+	 * @see WP_REST_Request::has_valid_params()
+	 *
+	 * @param WP_Customize_Setting $setting A WP_Customize_Setting derived object.
+	 * @param mixed                $default Value returned $setting has no post value (added in 4.2.0)
+	 *                                      or the post value is invalid (added in 4.6.0).
+	 * @return string|mixed $post_value Sanitized value or the $default provided.
+	 */
+	public function post_value( $setting, $default = null ) {
+		$post_values = $this->unsanitized_post_values();
+		if ( ! array_key_exists( $setting->id, $post_values ) ) {
+			return $default;
+		}
+		$value = $post_values[ $setting->id ];
+		$valid = $setting->validate( $value );
+		if ( is_wp_error( $valid ) ) {
+			return $default;
+		}
+		$value = $setting->sanitize( $value );
+		if ( is_null( $value ) || is_wp_error( $value ) ) {
+			return $default;
+		}
+		return $value;
+	}
+
+	/**
+	 * Override a setting's value in the current customized state.
+	 *
+	 * The name "post_value" is a carry-over from when the customized state was
+	 * exclusively sourced from `$_POST['customized']`.
+	 *
+	 * @since 4.2.0
+	 *
+	 * @param string $setting_id ID for the WP_Customize_Setting instance.
+	 * @param mixed  $value      Post value.
+	 */
+	public function set_post_value( $setting_id, $value ) {
+		$this->unsanitized_post_values(); // Populate _post_values from $_POST['customized'].
+		$this->_post_values[ $setting_id ] = $value;
+
+		/**
+		 * Announce when a specific setting's unsanitized post value has been set.
+		 *
+		 * Fires when the WP_Customize_Manager::set_post_value() method is called.
+		 *
+		 * The dynamic portion of the hook name, `$setting_id`, refers to the setting ID.
+		 *
+		 * @since 4.4.0
+		 *
+		 * @param mixed                $value Unsanitized setting post value.
+		 * @param WP_Customize_Manager $this  WP_Customize_Manager instance.
+		 */
+		do_action( "customize_post_value_set_{$setting_id}", $value, $this );
+
+		/**
+		 * Announce when any setting's unsanitized post value has been set.
+		 *
+		 * Fires when the WP_Customize_Manager::set_post_value() method is called.
+		 *
+		 * This is useful for `WP_Customize_Setting` instances to watch
+		 * in order to update a cached previewed value.
+		 *
+		 * @since 4.4.0
+		 *
+		 * @param string               $setting_id Setting ID.
+		 * @param mixed                $value      Unsanitized setting post value.
+		 * @param WP_Customize_Manager $this       WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_post_value_set', $setting_id, $value, $this );
+	}
+
+	/**
+	 * Print JavaScript settings.
+	 *
+	 * @since 3.4.0
+	 */
+	public function customize_preview_init() {
+
+		/*
+		 * Now that Customizer previews are loaded into iframes via GET requests
+		 * and natural URLs with transaction UUIDs added, we need to ensure that
+		 * the responses are never cached by proxies. In practice, this will not
+		 * be needed if the user is logged-in anyway. But if anonymous access is
+		 * allowed then the auth cookies would not be sent and WordPress would
+		 * not send no-cache headers by default.
+		 */
+		if ( ! headers_sent() ) {
+			nocache_headers();
+			header( 'X-Robots: noindex, nofollow, noarchive' );
+		}
+		add_action( 'wp_head', 'wp_no_robots' );
+		add_filter( 'wp_headers', array( $this, 'filter_iframe_security_headers' ) );
+
+		/*
+		 * If preview is being served inside the customizer preview iframe, and
+		 * if the user doesn't have customize capability, then it is assumed
+		 * that the user's session has expired and they need to re-authenticate.
+		 */
+		if ( $this->messenger_channel && ! current_user_can( 'customize' ) ) {
+			$this->wp_die( -1, __( 'Unauthorized. You may remove th
