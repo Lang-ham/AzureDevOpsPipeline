@@ -2533,3 +2533,268 @@ final class WP_Customize_Manager {
 	 *
 	 * @param array $args {
 	 *     Args for changeset post.
+	 *
+	 *     @type array  $data            Optional additional changeset data. Values will be merged on top of any existing post values.
+	 *     @type string $status          Post status. Optional. If supplied, the save will be transactional and a post revision will be allowed.
+	 *     @type string $title           Post title. Optional.
+	 *     @type string $date_gmt        Date in GMT. Optional.
+	 *     @type int    $user_id         ID for user who is saving the changeset. Optional, defaults to the current user ID.
+	 *     @type bool   $starter_content Whether the data is starter content. If false (default), then $starter_content will be cleared for any $data being saved.
+	 *     @type bool   $autosave        Whether this is a request to create an autosave revision.
+	 * }
+	 *
+	 * @return array|WP_Error Returns array on success and WP_Error with array data on error.
+	 */
+	function save_changeset_post( $args = array() ) {
+
+		$args = array_merge(
+			array(
+				'status' => null,
+				'title' => null,
+				'data' => array(),
+				'date_gmt' => null,
+				'user_id' => get_current_user_id(),
+				'starter_content' => false,
+				'autosave' => false,
+			),
+			$args
+		);
+
+		$changeset_post_id = $this->changeset_post_id();
+		$existing_changeset_data = array();
+		if ( $changeset_post_id ) {
+			$existing_status = get_post_status( $changeset_post_id );
+			if ( 'publish' === $existing_status || 'trash' === $existing_status ) {
+				return new WP_Error(
+					'changeset_already_published',
+					__( 'The previous set of changes has already been published. Please try saving your current set of changes again.' ),
+					array(
+						'next_changeset_uuid' => wp_generate_uuid4(),
+					)
+				);
+			}
+
+			$existing_changeset_data = $this->get_changeset_post_data( $changeset_post_id );
+			if ( is_wp_error( $existing_changeset_data ) ) {
+				return $existing_changeset_data;
+			}
+		}
+
+		// Fail if attempting to publish but publish hook is missing.
+		if ( 'publish' === $args['status'] && false === has_action( 'transition_post_status', '_wp_customize_publish_changeset' ) ) {
+			return new WP_Error( 'missing_publish_callback' );
+		}
+
+		// Validate date.
+		$now = gmdate( 'Y-m-d H:i:59' );
+		if ( $args['date_gmt'] ) {
+			$is_future_dated = ( mysql2date( 'U', $args['date_gmt'], false ) > mysql2date( 'U', $now, false ) );
+			if ( ! $is_future_dated ) {
+				return new WP_Error( 'not_future_date', __( 'You must supply a future date to schedule.' ) ); // Only future dates are allowed.
+			}
+
+			if ( ! $this->is_theme_active() && ( 'future' === $args['status'] || $is_future_dated ) ) {
+				return new WP_Error( 'cannot_schedule_theme_switches' ); // This should be allowed in the future, when theme is a regular setting.
+			}
+			$will_remain_auto_draft = ( ! $args['status'] && ( ! $changeset_post_id || 'auto-draft' === get_post_status( $changeset_post_id ) ) );
+			if ( $will_remain_auto_draft ) {
+				return new WP_Error( 'cannot_supply_date_for_auto_draft_changeset' );
+			}
+		} elseif ( $changeset_post_id && 'future' === $args['status'] ) {
+
+			// Fail if the new status is future but the existing post's date is not in the future.
+			$changeset_post = get_post( $changeset_post_id );
+			if ( mysql2date( 'U', $changeset_post->post_date_gmt, false ) <= mysql2date( 'U', $now, false ) ) {
+				return new WP_Error( 'not_future_date', __( 'You must supply a future date to schedule.' ) );
+			}
+		}
+
+		if ( ! empty( $is_future_dated ) && 'publish' === $args['status'] ) {
+			$args['status'] = 'future';
+		}
+
+		// Validate autosave param. See _wp_post_revision_fields() for why these fields are disallowed.
+		if ( $args['autosave'] ) {
+			if ( $args['date_gmt'] ) {
+				return new WP_Error( 'illegal_autosave_with_date_gmt' );
+			} elseif ( $args['status'] ) {
+				return new WP_Error( 'illegal_autosave_with_status' );
+			} elseif ( $args['user_id'] && get_current_user_id() !== $args['user_id'] ) {
+				return new WP_Error( 'illegal_autosave_with_non_current_user' );
+			}
+		}
+
+		// The request was made via wp.customize.previewer.save().
+		$update_transactionally = (bool) $args['status'];
+		$allow_revision = (bool) $args['status'];
+
+		// Amend post values with any supplied data.
+		foreach ( $args['data'] as $setting_id => $setting_params ) {
+			if ( is_array( $setting_params ) && array_key_exists( 'value', $setting_params ) ) {
+				$this->set_post_value( $setting_id, $setting_params['value'] ); // Add to post values so that they can be validated and sanitized.
+			}
+		}
+
+		// Note that in addition to post data, this will include any stashed theme mods.
+		$post_values = $this->unsanitized_post_values( array(
+			'exclude_changeset' => true,
+			'exclude_post_data' => false,
+		) );
+		$this->add_dynamic_settings( array_keys( $post_values ) ); // Ensure settings get created even if they lack an input value.
+
+		/*
+		 * Get list of IDs for settings that have values different from what is currently
+		 * saved in the changeset. By skipping any values that are already the same, the
+		 * subset of changed settings can be passed into validate_setting_values to prevent
+		 * an underprivileged modifying a single setting for which they have the capability
+		 * from being blocked from saving. This also prevents a user from touching of the
+		 * previous saved settings and overriding the associated user_id if they made no change.
+		 */
+		$changed_setting_ids = array();
+		foreach ( $post_values as $setting_id => $setting_value ) {
+			$setting = $this->get_setting( $setting_id );
+
+			if ( $setting && 'theme_mod' === $setting->type ) {
+				$prefixed_setting_id = $this->get_stylesheet() . '::' . $setting->id;
+			} else {
+				$prefixed_setting_id = $setting_id;
+			}
+
+			$is_value_changed = (
+				! isset( $existing_changeset_data[ $prefixed_setting_id ] )
+				||
+				! array_key_exists( 'value', $existing_changeset_data[ $prefixed_setting_id ] )
+				||
+				$existing_changeset_data[ $prefixed_setting_id ]['value'] !== $setting_value
+			);
+			if ( $is_value_changed ) {
+				$changed_setting_ids[] = $setting_id;
+			}
+		}
+
+		/**
+		 * Fires before save validation happens.
+		 *
+		 * Plugins can add just-in-time {@see 'customize_validate_{$this->ID}'} filters
+		 * at this point to catch any settings registered after `customize_register`.
+		 * The dynamic portion of the hook name, `$this->ID` refers to the setting ID.
+		 *
+		 * @since 4.6.0
+		 *
+		 * @param WP_Customize_Manager $this WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_save_validation_before', $this );
+
+		// Validate settings.
+		$validated_values = array_merge(
+			array_fill_keys( array_keys( $args['data'] ), null ), // Make sure existence/capability checks are done on value-less setting updates.
+			$post_values
+		);
+		$setting_validities = $this->validate_setting_values( $validated_values, array(
+			'validate_capability' => true,
+			'validate_existence' => true,
+		) );
+		$invalid_setting_count = count( array_filter( $setting_validities, 'is_wp_error' ) );
+
+		/*
+		 * Short-circuit if there are invalid settings the update is transactional.
+		 * A changeset update is transactional when a status is supplied in the request.
+		 */
+		if ( $update_transactionally && $invalid_setting_count > 0 ) {
+			$response = array(
+				'setting_validities' => $setting_validities,
+				/* translators: %s: number of invalid settings */
+				'message' => sprintf( _n( 'Unable to save due to %s invalid setting.', 'Unable to save due to %s invalid settings.', $invalid_setting_count ), number_format_i18n( $invalid_setting_count ) ),
+			);
+			return new WP_Error( 'transaction_fail', '', $response );
+		}
+
+		// Obtain/merge data for changeset.
+		$original_changeset_data = $this->get_changeset_post_data( $changeset_post_id );
+		$data = $original_changeset_data;
+		if ( is_wp_error( $data ) ) {
+			$data = array();
+		}
+
+		// Ensure that all post values are included in the changeset data.
+		foreach ( $post_values as $setting_id => $post_value ) {
+			if ( ! isset( $args['data'][ $setting_id ] ) ) {
+				$args['data'][ $setting_id ] = array();
+			}
+			if ( ! isset( $args['data'][ $setting_id ]['value'] ) ) {
+				$args['data'][ $setting_id ]['value'] = $post_value;
+			}
+		}
+
+		foreach ( $args['data'] as $setting_id => $setting_params ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( ! $setting || ! $setting->check_capabilities() ) {
+				continue;
+			}
+
+			// Skip updating changeset for invalid setting values.
+			if ( isset( $setting_validities[ $setting_id ] ) && is_wp_error( $setting_validities[ $setting_id ] ) ) {
+				continue;
+			}
+
+			$changeset_setting_id = $setting_id;
+			if ( 'theme_mod' === $setting->type ) {
+				$changeset_setting_id = sprintf( '%s::%s', $this->get_stylesheet(), $setting_id );
+			}
+
+			if ( null === $setting_params ) {
+				// Remove setting from changeset entirely.
+				unset( $data[ $changeset_setting_id ] );
+			} else {
+
+				if ( ! isset( $data[ $changeset_setting_id ] ) ) {
+					$data[ $changeset_setting_id ] = array();
+				}
+
+				// Merge any additional setting params that have been supplied with the existing params.
+				$merged_setting_params = array_merge( $data[ $changeset_setting_id ], $setting_params );
+
+				// Skip updating setting params if unchanged (ensuring the user_id is not overwritten).
+				if ( $data[ $changeset_setting_id ] === $merged_setting_params ) {
+					continue;
+				}
+
+				$data[ $changeset_setting_id ] = array_merge(
+					$merged_setting_params,
+					array(
+						'type' => $setting->type,
+						'user_id' => $args['user_id'],
+						'date_modified_gmt' => current_time( 'mysql', true ),
+					)
+				);
+
+				// Clear starter_content flag in data if changeset is not explicitly being updated for starter content.
+				if ( empty( $args['starter_content'] ) ) {
+					unset( $data[ $changeset_setting_id ]['starter_content'] );
+				}
+			}
+		}
+
+		$filter_context = array(
+			'uuid' => $this->changeset_uuid(),
+			'title' => $args['title'],
+			'status' => $args['status'],
+			'date_gmt' => $args['date_gmt'],
+			'post_id' => $changeset_post_id,
+			'previous_data' => is_wp_error( $original_changeset_data ) ? array() : $original_changeset_data,
+			'manager' => $this,
+		);
+
+		/**
+		 * Filters the settings' data that will be persisted into the changeset.
+		 *
+		 * Plugins may amend additional data (such as additional meta for settings) into the changeset with this filter.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param array $data Updated changeset data, mapping setting IDs to arrays containing a $value item and optionally other metadata.
+		 * @param array $context {
+		 *     Filter context.
+		 *
+		 *     @type string               $uuid          Changeset UUID.
+		 *     @type string               $title         Requested title for the changeset post
