@@ -3080,4 +3080,335 @@ final class WP_Customize_Manager {
 	 * @param int  $changeset_post_id Changeset post id.
 	 * @param bool $take_over Take over the changeset, default is false.
 	 */
-	public function set_change
+	public function set_changeset_lock( $changeset_post_id, $take_over = false ) {
+		if ( $changeset_post_id ) {
+			$can_override = ! (bool) get_post_meta( $changeset_post_id, '_edit_lock', true );
+
+			if ( $take_over ) {
+				$can_override = true;
+			}
+
+			if ( $can_override ) {
+				$lock = sprintf( '%s:%s', time(), get_current_user_id() );
+				update_post_meta( $changeset_post_id, '_edit_lock', $lock );
+			} else {
+				$this->refresh_changeset_lock( $changeset_post_id );
+			}
+		}
+	}
+
+	/**
+	 * Refreshes changeset lock with the current time if current user edited the changeset before.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param int $changeset_post_id Changeset post id.
+	 */
+	public function refresh_changeset_lock( $changeset_post_id ) {
+		if ( ! $changeset_post_id ) {
+			return;
+		}
+		$lock = get_post_meta( $changeset_post_id, '_edit_lock', true );
+		$lock = explode( ':', $lock );
+
+		if ( $lock && ! empty( $lock[1] ) ) {
+			$user_id = intval( $lock[1] );
+			$current_user_id = get_current_user_id();
+			if ( $user_id === $current_user_id ) {
+				$lock = sprintf( '%s:%s', time(), $user_id );
+				update_post_meta( $changeset_post_id, '_edit_lock', $lock );
+			}
+		}
+	}
+
+	/**
+	 * Filter heartbeat settings for the Customizer.
+	 *
+	 * @since 4.9.0
+	 * @param array $settings Current settings to filter.
+	 * @return array Heartbeat settings.
+	 */
+	public function add_customize_screen_to_heartbeat_settings( $settings ) {
+		global $pagenow;
+		if ( 'customize.php' === $pagenow ) {
+			$settings['screenId'] = 'customize';
+		}
+		return $settings;
+	}
+
+	/**
+	 * Get lock user data.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param int $user_id User ID.
+	 * @return array|null User data formatted for client.
+	 */
+	protected function get_lock_user_data( $user_id ) {
+		if ( ! $user_id ) {
+			return null;
+		}
+		$lock_user = get_userdata( $user_id );
+		if ( ! $lock_user ) {
+			return null;
+		}
+		return array(
+			'id' => $lock_user->ID,
+			'name' => $lock_user->display_name,
+			'avatar' => get_avatar_url( $lock_user->ID, array( 'size' => 128 ) ),
+		);
+	}
+
+	/**
+	 * Check locked changeset with heartbeat API.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array  $response  The Heartbeat response.
+	 * @param array  $data      The $_POST data sent.
+	 * @param string $screen_id The screen id.
+	 * @return array The Heartbeat response.
+	 */
+	public function check_changeset_lock_with_heartbeat( $response, $data, $screen_id ) {
+		if ( isset( $data['changeset_uuid'] ) ) {
+			$changeset_post_id = $this->find_changeset_post_id( $data['changeset_uuid'] );
+		} else {
+			$changeset_post_id = $this->changeset_post_id();
+		}
+
+		if (
+			array_key_exists( 'check_changeset_lock', $data )
+			&& 'customize' === $screen_id
+			&& $changeset_post_id
+			&& current_user_can( get_post_type_object( 'customize_changeset' )->cap->edit_post, $changeset_post_id )
+		) {
+			$lock_user_id = wp_check_post_lock( $changeset_post_id );
+
+			if ( $lock_user_id ) {
+				$response['customize_changeset_lock_user'] = $this->get_lock_user_data( $lock_user_id );
+			} else {
+
+				// Refreshing time will ensure that the user is sitting on customizer and has not closed the customizer tab.
+				$this->refresh_changeset_lock( $changeset_post_id );
+			}
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Removes changeset lock when take over request is sent via Ajax.
+	 *
+	 * @since 4.9.0
+	 */
+	public function handle_override_changeset_lock_request() {
+		if ( ! $this->is_preview() ) {
+			wp_send_json_error( 'not_preview', 400 );
+		}
+
+		if ( ! check_ajax_referer( 'customize_override_changeset_lock', 'nonce', false ) ) {
+			wp_send_json_error( array(
+				'code' => 'invalid_nonce',
+				'message' => __( 'Security check failed.' ),
+			) );
+		}
+
+		$changeset_post_id = $this->changeset_post_id();
+
+		if ( empty( $changeset_post_id ) ) {
+			wp_send_json_error( array(
+				'code' => 'no_changeset_found_to_take_over',
+				'message' => __( 'No changeset found to take over' ),
+			) );
+		}
+
+		if ( ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->edit_post, $changeset_post_id ) ) {
+			wp_send_json_error( array(
+				'code' => 'cannot_remove_changeset_lock',
+				'message' => __( 'Sorry, you are not allowed to take over.' ),
+			) );
+		}
+
+		$this->set_changeset_lock( $changeset_post_id, true );
+
+		wp_send_json_success( 'changeset_taken_over' );
+	}
+
+	/**
+	 * Whether a changeset revision should be made.
+	 *
+	 * @since 4.7.0
+	 * @var bool
+	 */
+	protected $store_changeset_revision;
+
+	/**
+	 * Filters whether a changeset has changed to create a new revision.
+	 *
+	 * Note that this will not be called while a changeset post remains in auto-draft status.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param bool    $post_has_changed Whether the post has changed.
+	 * @param WP_Post $last_revision    The last revision post object.
+	 * @param WP_Post $post             The post object.
+	 *
+	 * @return bool Whether a revision should be made.
+	 */
+	public function _filter_revision_post_has_changed( $post_has_changed, $last_revision, $post ) {
+		unset( $last_revision );
+		if ( 'customize_changeset' === $post->post_type ) {
+			$post_has_changed = $this->store_changeset_revision;
+		}
+		return $post_has_changed;
+	}
+
+	/**
+	 * Publish changeset values.
+	 *
+	 * This will the values contained in a changeset, even changesets that do not
+	 * correspond to current manager instance. This is called by
+	 * `_wp_customize_publish_changeset()` when a customize_changeset post is
+	 * transitioned to the `publish` status. As such, this method should not be
+	 * called directly and instead `wp_publish_post()` should be used.
+	 *
+	 * Please note that if the settings in the changeset are for a non-activated
+	 * theme, the theme must first be switched to (via `switch_theme()`) before
+	 * invoking this method.
+	 *
+	 * @since 4.7.0
+	 * @see _wp_customize_publish_changeset()
+	 * @global wpdb $wpdb
+	 *
+	 * @param int $changeset_post_id ID for customize_changeset post. Defaults to the changeset for the current manager instance.
+	 * @return true|WP_Error True or error info.
+	 */
+	public function _publish_changeset_values( $changeset_post_id ) {
+		global $wpdb;
+
+		$publishing_changeset_data = $this->get_changeset_post_data( $changeset_post_id );
+		if ( is_wp_error( $publishing_changeset_data ) ) {
+			return $publishing_changeset_data;
+		}
+
+		$changeset_post = get_post( $changeset_post_id );
+
+		/*
+		 * Temporarily override the changeset context so that it will be read
+		 * in calls to unsanitized_post_values() and so that it will be available
+		 * on the $wp_customize object passed to hooks during the save logic.
+		 */
+		$previous_changeset_post_id = $this->_changeset_post_id;
+		$this->_changeset_post_id   = $changeset_post_id;
+		$previous_changeset_uuid    = $this->_changeset_uuid;
+		$this->_changeset_uuid      = $changeset_post->post_name;
+		$previous_changeset_data    = $this->_changeset_data;
+		$this->_changeset_data      = $publishing_changeset_data;
+
+		// Parse changeset data to identify theme mod settings and user IDs associated with settings to be saved.
+		$setting_user_ids = array();
+		$theme_mod_settings = array();
+		$namespace_pattern = '/^(?P<stylesheet>.+?)::(?P<setting_id>.+)$/';
+		$matches = array();
+		foreach ( $this->_changeset_data as $raw_setting_id => $setting_params ) {
+			$actual_setting_id = null;
+			$is_theme_mod_setting = (
+				isset( $setting_params['value'] )
+				&&
+				isset( $setting_params['type'] )
+				&&
+				'theme_mod' === $setting_params['type']
+				&&
+				preg_match( $namespace_pattern, $raw_setting_id, $matches )
+			);
+			if ( $is_theme_mod_setting ) {
+				if ( ! isset( $theme_mod_settings[ $matches['stylesheet'] ] ) ) {
+					$theme_mod_settings[ $matches['stylesheet'] ] = array();
+				}
+				$theme_mod_settings[ $matches['stylesheet'] ][ $matches['setting_id'] ] = $setting_params;
+
+				if ( $this->get_stylesheet() === $matches['stylesheet'] ) {
+					$actual_setting_id = $matches['setting_id'];
+				}
+			} else {
+				$actual_setting_id = $raw_setting_id;
+			}
+
+			// Keep track of the user IDs for settings actually for this theme.
+			if ( $actual_setting_id && isset( $setting_params['user_id'] ) ) {
+				$setting_user_ids[ $actual_setting_id ] = $setting_params['user_id'];
+			}
+		}
+
+		$changeset_setting_values = $this->unsanitized_post_values( array(
+			'exclude_post_data' => true,
+			'exclude_changeset' => false,
+		) );
+		$changeset_setting_ids = array_keys( $changeset_setting_values );
+		$this->add_dynamic_settings( $changeset_setting_ids );
+
+		/**
+		 * Fires once the theme has switched in the Customizer, but before settings
+		 * have been saved.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param WP_Customize_Manager $manager WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_save', $this );
+
+		/*
+		 * Ensure that all settings will allow themselves to be saved. Note that
+		 * this is safe because the setting would have checked the capability
+		 * when the setting value was written into the changeset. So this is why
+		 * an additional capability check is not required here.
+		 */
+		$original_setting_capabilities = array();
+		foreach ( $changeset_setting_ids as $setting_id ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( $setting && ! isset( $setting_user_ids[ $setting_id ] ) ) {
+				$original_setting_capabilities[ $setting->id ] = $setting->capability;
+				$setting->capability = 'exist';
+			}
+		}
+
+		$original_user_id = get_current_user_id();
+		foreach ( $changeset_setting_ids as $setting_id ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( $setting ) {
+				/*
+				 * Set the current user to match the user who saved the value into
+				 * the changeset so that any filters that apply during the save
+				 * process will respect the original user's capabilities. This
+				 * will ensure, for example, that KSES won't strip unsafe HTML
+				 * when a scheduled changeset publishes via WP Cron.
+				 */
+				if ( isset( $setting_user_ids[ $setting_id ] ) ) {
+					wp_set_current_user( $setting_user_ids[ $setting_id ] );
+				} else {
+					wp_set_current_user( $original_user_id );
+				}
+
+				$setting->save();
+			}
+		}
+		wp_set_current_user( $original_user_id );
+
+		// Update the stashed theme mod settings, removing the active theme's stashed settings, if activated.
+		if ( did_action( 'switch_theme' ) ) {
+			$other_theme_mod_settings = $theme_mod_settings;
+			unset( $other_theme_mod_settings[ $this->get_stylesheet() ] );
+			$this->update_stashed_theme_mod_settings( $other_theme_mod_settings );
+		}
+
+		/**
+		 * Fires after Customize settings have been saved.
+		 *
+		 * @since 3.6.0
+		 *
+		 * @param WP_Customize_Manager $manager WP_Customize_Manager instance.
+		 */
+		do_action( 'customize_save_after', $this );
+
+		// Restore original capabilities.
+		foreach ( $original_setting_capabilities as $setting_id => $
