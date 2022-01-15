@@ -2797,4 +2797,287 @@ final class WP_Customize_Manager {
 		 *     Filter context.
 		 *
 		 *     @type string               $uuid          Changeset UUID.
-		 *     @type string               $title         Requested title for the changeset post
+		 *     @type string               $title         Requested title for the changeset post.
+		 *     @type string               $status        Requested status for the changeset post.
+		 *     @type string               $date_gmt      Requested date for the changeset post in MySQL format and GMT timezone.
+		 *     @type int|false            $post_id       Post ID for the changeset, or false if it doesn't exist yet.
+		 *     @type array                $previous_data Previous data contained in the changeset.
+		 *     @type WP_Customize_Manager $manager       Manager instance.
+		 * }
+		 */
+		$data = apply_filters( 'customize_changeset_save_data', $data, $filter_context );
+
+		// Switch theme if publishing changes now.
+		if ( 'publish' === $args['status'] && ! $this->is_theme_active() ) {
+			// Temporarily stop previewing the theme to allow switch_themes() to operate properly.
+			$this->stop_previewing_theme();
+			switch_theme( $this->get_stylesheet() );
+			update_option( 'theme_switched_via_customizer', true );
+			$this->start_previewing_theme();
+		}
+
+		// Gather the data for wp_insert_post()/wp_update_post().
+		$json_options = 0;
+		if ( defined( 'JSON_UNESCAPED_SLASHES' ) ) {
+			$json_options |= JSON_UNESCAPED_SLASHES; // Introduced in PHP 5.4. This is only to improve readability as slashes needn't be escaped in storage.
+		}
+		$json_options |= JSON_PRETTY_PRINT; // Also introduced in PHP 5.4, but WP defines constant for back compat. See WP Trac #30139.
+		$post_array = array(
+			'post_content' => wp_json_encode( $data, $json_options ),
+		);
+		if ( $args['title'] ) {
+			$post_array['post_title'] = $args['title'];
+		}
+		if ( $changeset_post_id ) {
+			$post_array['ID'] = $changeset_post_id;
+		} else {
+			$post_array['post_type'] = 'customize_changeset';
+			$post_array['post_name'] = $this->changeset_uuid();
+			$post_array['post_status'] = 'auto-draft';
+		}
+		if ( $args['status'] ) {
+			$post_array['post_status'] = $args['status'];
+		}
+
+		// Reset post date to now if we are publishing, otherwise pass post_date_gmt and translate for post_date.
+		if ( 'publish' === $args['status'] ) {
+			$post_array['post_date_gmt'] = '0000-00-00 00:00:00';
+			$post_array['post_date'] = '0000-00-00 00:00:00';
+		} elseif ( $args['date_gmt'] ) {
+			$post_array['post_date_gmt'] = $args['date_gmt'];
+			$post_array['post_date'] = get_date_from_gmt( $args['date_gmt'] );
+		} elseif ( $changeset_post_id && 'auto-draft' === get_post_status( $changeset_post_id ) ) {
+			/*
+			 * Keep bumping the date for the auto-draft whenever it is modified;
+			 * this extends its life, preserving it from garbage-collection via
+			 * wp_delete_auto_drafts().
+			 */
+			$post_array['post_date'] = current_time( 'mysql' );
+			$post_array['post_date_gmt'] = '';
+		}
+
+		$this->store_changeset_revision = $allow_revision;
+		add_filter( 'wp_save_post_revision_post_has_changed', array( $this, '_filter_revision_post_has_changed' ), 5, 3 );
+
+		// Update the changeset post. The publish_customize_changeset action will cause the settings in the changeset to be saved via WP_Customize_Setting::save().
+		$has_kses = ( false !== has_filter( 'content_save_pre', 'wp_filter_post_kses' ) );
+		if ( $has_kses ) {
+			kses_remove_filters(); // Prevent KSES from corrupting JSON in post_content.
+		}
+
+		// Note that updating a post with publish status will trigger WP_Customize_Manager::publish_changeset_values().
+		if ( $changeset_post_id ) {
+			if ( $args['autosave'] && 'auto-draft' !== get_post_status( $changeset_post_id ) ) {
+				// See _wp_translate_postdata() for why this is required as it will use the edit_post meta capability.
+				add_filter( 'map_meta_cap', array( $this, 'grant_edit_post_capability_for_changeset' ), 10, 4 );
+				$post_array['post_ID'] = $post_array['ID'];
+				$post_array['post_type'] = 'customize_changeset';
+				$r = wp_create_post_autosave( wp_slash( $post_array ) );
+				remove_filter( 'map_meta_cap', array( $this, 'grant_edit_post_capability_for_changeset' ), 10 );
+			} else {
+				$post_array['edit_date'] = true; // Prevent date clearing.
+				$r = wp_update_post( wp_slash( $post_array ), true );
+
+				// Delete autosave revision for user when the changeset is updated.
+				if ( ! empty( $args['user_id'] ) ) {
+					$autosave_draft = wp_get_post_autosave( $changeset_post_id, $args['user_id'] );
+					if ( $autosave_draft ) {
+						wp_delete_post( $autosave_draft->ID, true );
+					}
+				}
+			}
+		} else {
+			$r = wp_insert_post( wp_slash( $post_array ), true );
+			if ( ! is_wp_error( $r ) ) {
+				$this->_changeset_post_id = $r; // Update cached post ID for the loaded changeset.
+			}
+		}
+		if ( $has_kses ) {
+			kses_init_filters();
+		}
+		$this->_changeset_data = null; // Reset so WP_Customize_Manager::changeset_data() will re-populate with updated contents.
+
+		remove_filter( 'wp_save_post_revision_post_has_changed', array( $this, '_filter_revision_post_has_changed' ) );
+
+		$response = array(
+			'setting_validities' => $setting_validities,
+		);
+
+		if ( is_wp_error( $r ) ) {
+			$response['changeset_post_save_failure'] = $r->get_error_code();
+			return new WP_Error( 'changeset_post_save_failure', '', $response );
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Trash or delete a changeset post.
+	 *
+	 * The following re-formulates the logic from `wp_trash_post()` as done in
+	 * `wp_publish_post()`. The reason for bypassing `wp_trash_post()` is that it
+	 * will mutate the the `post_content` and the `post_name` when they should be
+	 * untouched.
+	 *
+	 * @since 4.9.0
+	 * @global wpdb $wpdb WordPress database abstraction object.
+	 * @see wp_trash_post()
+	 *
+	 * @param int|WP_Post $post The changeset post.
+	 * @return mixed A WP_Post object for the trashed post or an empty value on failure.
+	 */
+	public function trash_changeset_post( $post ) {
+		global $wpdb;
+
+		$post = get_post( $post );
+
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return $post;
+		}
+		$post_id = $post->ID;
+
+		if ( ! EMPTY_TRASH_DAYS ) {
+			return wp_delete_post( $post_id, true );
+		}
+
+		if ( 'trash' === get_post_status( $post ) ) {
+			return false;
+		}
+
+		/** This filter is documented in wp-includes/post.php */
+		$check = apply_filters( 'pre_trash_post', null, $post );
+		if ( null !== $check ) {
+			return $check;
+		}
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( 'wp_trash_post', $post_id );
+
+		add_post_meta( $post_id, '_wp_trash_meta_status', $post->post_status );
+		add_post_meta( $post_id, '_wp_trash_meta_time', time() );
+
+		$old_status = $post->post_status;
+		$new_status = 'trash';
+		$wpdb->update( $wpdb->posts, array( 'post_status' => $new_status ), array( 'ID' => $post->ID ) );
+		clean_post_cache( $post->ID );
+
+		$post->post_status = $new_status;
+		wp_transition_post_status( $new_status, $old_status, $post );
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( 'edit_post', $post->ID, $post );
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( "save_post_{$post->post_type}", $post->ID, $post, true );
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( 'save_post', $post->ID, $post, true );
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( 'wp_insert_post', $post->ID, $post, true );
+
+		wp_trash_post_comments( $post_id );
+
+		/** This action is documented in wp-includes/post.php */
+		do_action( 'trashed_post', $post_id );
+
+		return $post;
+	}
+
+	/**
+	 * Handle request to trash a changeset.
+	 *
+	 * @since 4.9.0
+	 */
+	public function handle_changeset_trash_request() {
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( 'unauthenticated' );
+		}
+
+		if ( ! $this->is_preview() ) {
+			wp_send_json_error( 'not_preview' );
+		}
+
+		if ( ! check_ajax_referer( 'trash_customize_changeset', 'nonce', false ) ) {
+			wp_send_json_error( array(
+				'code' => 'invalid_nonce',
+				'message' => __( 'There was an authentication problem. Please reload and try again.' ),
+			) );
+		}
+
+		$changeset_post_id = $this->changeset_post_id();
+
+		if ( ! $changeset_post_id ) {
+			wp_send_json_error( array(
+				'message' => __( 'No changes saved yet, so there is nothing to trash.' ),
+				'code' => 'non_existent_changeset',
+			) );
+			return;
+		}
+
+		if ( $changeset_post_id && ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->delete_post, $changeset_post_id ) ) {
+			wp_send_json_error( array(
+				'code' => 'changeset_trash_unauthorized',
+				'message' => __( 'Unable to trash changes.' ),
+			) );
+		}
+
+		if ( 'trash' === get_post_status( $changeset_post_id ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Changes have already been trashed.' ),
+				'code' => 'changeset_already_trashed',
+			) );
+			return;
+		}
+
+		$r = $this->trash_changeset_post( $changeset_post_id );
+		if ( ! ( $r instanceof WP_Post ) ) {
+			wp_send_json_error( array(
+				'code' => 'changeset_trash_failure',
+				'message' => __( 'Unable to trash changes.' ),
+			) );
+		}
+
+		wp_send_json_success( array(
+			'message' => __( 'Changes trashed successfully.' ),
+		) );
+	}
+
+	/**
+	 * Re-map 'edit_post' meta cap for a customize_changeset post to be the same as 'customize' maps.
+	 *
+	 * There is essentially a "meta meta" cap in play here, where 'edit_post' meta cap maps to
+	 * the 'customize' meta cap which then maps to 'edit_theme_options'. This is currently
+	 * required in core for `wp_create_post_autosave()` because it will call
+	 * `_wp_translate_postdata()` which in turn will check if a user can 'edit_post', but the
+	 * the caps for the customize_changeset post type are all mapping to the meta capability.
+	 * This should be able to be removed once #40922 is addressed in core.
+	 *
+	 * @since 4.9.0
+	 * @link https://core.trac.wordpress.org/ticket/40922
+	 * @see WP_Customize_Manager::save_changeset_post()
+	 * @see _wp_translate_postdata()
+	 *
+	 * @param array  $caps    Returns the user's actual capabilities.
+	 * @param string $cap     Capability name.
+	 * @param int    $user_id The user ID.
+	 * @param array  $args    Adds the context to the cap. Typically the object ID.
+	 * @return array Capabilities.
+	 */
+	public function grant_edit_post_capability_for_changeset( $caps, $cap, $user_id, $args ) {
+		if ( 'edit_post' === $cap && ! empty( $args[0] ) && 'customize_changeset' === get_post_type( $args[0] ) ) {
+			$post_type_obj = get_post_type_object( 'customize_changeset' );
+			$caps = map_meta_cap( $post_type_obj->cap->$cap, $user_id );
+		}
+		return $caps;
+	}
+
+	/**
+	 * Marks the changeset post as being currently edited by the current user.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param int  $changeset_post_id Changeset post id.
+	 * @param bool $take_over Take over the changeset, default is false.
+	 */
+	public function set_change
