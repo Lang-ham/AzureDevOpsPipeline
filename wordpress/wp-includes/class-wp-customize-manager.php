@@ -3411,4 +3411,302 @@ final class WP_Customize_Manager {
 		do_action( 'customize_save_after', $this );
 
 		// Restore original capabilities.
-		foreach ( $original_setting_capabilities as $setting_id => $
+		foreach ( $original_setting_capabilities as $setting_id => $capability ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( $setting ) {
+				$setting->capability = $capability;
+			}
+		}
+
+		// Restore original changeset data.
+		$this->_changeset_data    = $previous_changeset_data;
+		$this->_changeset_post_id = $previous_changeset_post_id;
+		$this->_changeset_uuid    = $previous_changeset_uuid;
+
+		/*
+		 * Convert all autosave revisions into their own auto-drafts so that users can be prompted to
+		 * restore them when a changeset is published, but they had been locked out from including
+		 * their changes in the changeset.
+		 */
+		$revisions = wp_get_post_revisions( $changeset_post_id, array( 'check_enabled' => false ) );
+		foreach ( $revisions as $revision ) {
+			if ( false !== strpos( $revision->post_name, "{$changeset_post_id}-autosave" ) ) {
+				$wpdb->update(
+					$wpdb->posts,
+					array(
+						'post_status' => 'auto-draft',
+						'post_type' => 'customize_changeset',
+						'post_name' => wp_generate_uuid4(),
+						'post_parent' => 0,
+					),
+					array(
+						'ID' => $revision->ID,
+					)
+				);
+				clean_post_cache( $revision->ID );
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Update stashed theme mod settings.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $inactive_theme_mod_settings Mapping of stylesheet to arrays of theme mod settings.
+	 * @return array|false Returns array of updated stashed theme mods or false if the update failed or there were no changes.
+	 */
+	protected function update_stashed_theme_mod_settings( $inactive_theme_mod_settings ) {
+		$stashed_theme_mod_settings = get_option( 'customize_stashed_theme_mods' );
+		if ( empty( $stashed_theme_mod_settings ) ) {
+			$stashed_theme_mod_settings = array();
+		}
+
+		// Delete any stashed theme mods for the active theme since they would have been loaded and saved upon activation.
+		unset( $stashed_theme_mod_settings[ $this->get_stylesheet() ] );
+
+		// Merge inactive theme mods with the stashed theme mod settings.
+		foreach ( $inactive_theme_mod_settings as $stylesheet => $theme_mod_settings ) {
+			if ( ! isset( $stashed_theme_mod_settings[ $stylesheet ] ) ) {
+				$stashed_theme_mod_settings[ $stylesheet ] = array();
+			}
+
+			$stashed_theme_mod_settings[ $stylesheet ] = array_merge(
+				$stashed_theme_mod_settings[ $stylesheet ],
+				$theme_mod_settings
+			);
+		}
+
+		$autoload = false;
+		$result = update_option( 'customize_stashed_theme_mods', $stashed_theme_mod_settings, $autoload );
+		if ( ! $result ) {
+			return false;
+		}
+		return $stashed_theme_mod_settings;
+	}
+
+	/**
+	 * Refresh nonces for the current preview.
+	 *
+	 * @since 4.2.0
+	 */
+	public function refresh_nonces() {
+		if ( ! $this->is_preview() ) {
+			wp_send_json_error( 'not_preview' );
+		}
+
+		wp_send_json_success( $this->get_nonces() );
+	}
+
+	/**
+	 * Delete a given auto-draft changeset or the autosave revision for a given changeset or delete changeset lock.
+	 *
+	 * @since 4.9.0
+	 */
+	public function handle_dismiss_autosave_or_lock_request() {
+		// Calls to dismiss_user_auto_draft_changesets() and wp_get_post_autosave() require non-zero get_current_user_id().
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( 'unauthenticated', 401 );
+		}
+
+		if ( ! $this->is_preview() ) {
+			wp_send_json_error( 'not_preview', 400 );
+		}
+
+		if ( ! check_ajax_referer( 'customize_dismiss_autosave_or_lock', 'nonce', false ) ) {
+			wp_send_json_error( 'invalid_nonce', 403 );
+		}
+
+		$changeset_post_id = $this->changeset_post_id();
+		$dismiss_lock = ! empty( $_POST['dismiss_lock'] );
+		$dismiss_autosave = ! empty( $_POST['dismiss_autosave'] );
+
+		if ( $dismiss_lock ) {
+			if ( empty( $changeset_post_id ) && ! $dismiss_autosave ) {
+				wp_send_json_error( 'no_changeset_to_dismiss_lock', 404 );
+			}
+			if ( ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->edit_post, $changeset_post_id ) && ! $dismiss_autosave ) {
+				wp_send_json_error( 'cannot_remove_changeset_lock', 403 );
+			}
+
+			delete_post_meta( $changeset_post_id, '_edit_lock' );
+
+			if ( ! $dismiss_autosave ) {
+				wp_send_json_success( 'changeset_lock_dismissed' );
+			}
+		}
+
+		if ( $dismiss_autosave ) {
+			if ( empty( $changeset_post_id ) || 'auto-draft' === get_post_status( $changeset_post_id ) ) {
+				$dismissed = $this->dismiss_user_auto_draft_changesets();
+				if ( $dismissed > 0 ) {
+					wp_send_json_success( 'auto_draft_dismissed' );
+				} else {
+					wp_send_json_error( 'no_auto_draft_to_delete', 404 );
+				}
+			} else {
+				$revision = wp_get_post_autosave( $changeset_post_id, get_current_user_id() );
+
+				if ( $revision ) {
+					if ( ! current_user_can( get_post_type_object( 'customize_changeset' )->cap->delete_post, $changeset_post_id ) ) {
+						wp_send_json_error( 'cannot_delete_autosave_revision', 403 );
+					}
+
+					if ( ! wp_delete_post( $revision->ID, true ) ) {
+						wp_send_json_error( 'autosave_revision_deletion_failure', 500 );
+					} else {
+						wp_send_json_success( 'autosave_revision_deleted' );
+					}
+				} else {
+					wp_send_json_error( 'no_autosave_revision_to_delete', 404 );
+				}
+			}
+		}
+
+		wp_send_json_error( 'unknown_error', 500 );
+	}
+
+	/**
+	 * Add a customize setting.
+	 *
+	 * @since 3.4.0
+	 * @since 4.5.0 Return added WP_Customize_Setting instance.
+	 *
+	 * @param WP_Customize_Setting|string $id   Customize Setting object, or ID.
+	 * @param array                       $args {
+	 *  Optional. Array of properties for the new WP_Customize_Setting. Default empty array.
+	 *
+	 *  @type string       $type                  Type of the setting. Default 'theme_mod'.
+	 *                                            Default 160.
+	 *  @type string       $capability            Capability required for the setting. Default 'edit_theme_options'
+	 *  @type string|array $theme_supports        Theme features required to support the panel. Default is none.
+	 *  @type string       $default               Default value for the setting. Default is empty string.
+	 *  @type string       $transport             Options for rendering the live preview of changes in Theme Customizer.
+	 *                                            Using 'refresh' makes the change visible by reloading the whole preview.
+	 *                                            Using 'postMessage' allows a custom JavaScript to handle live changes.
+	 *                                            @link https://developer.wordpress.org/themes/customize-api
+	 *                                            Default is 'refresh'
+	 *  @type callable     $validate_callback     Server-side validation callback for the setting's value.
+	 *  @type callable     $sanitize_callback     Callback to filter a Customize setting value in un-slashed form.
+	 *  @type callable     $sanitize_js_callback  Callback to convert a Customize PHP setting value to a value that is
+	 *                                            JSON serializable.
+	 *  @type bool         $dirty                 Whether or not the setting is initially dirty when created.
+	 * }
+	 * @return WP_Customize_Setting             The instance of the setting that was added.
+	 */
+	public function add_setting( $id, $args = array() ) {
+		if ( $id instanceof WP_Customize_Setting ) {
+			$setting = $id;
+		} else {
+			$class = 'WP_Customize_Setting';
+
+			/** This filter is documented in wp-includes/class-wp-customize-manager.php */
+			$args = apply_filters( 'customize_dynamic_setting_args', $args, $id );
+
+			/** This filter is documented in wp-includes/class-wp-customize-manager.php */
+			$class = apply_filters( 'customize_dynamic_setting_class', $class, $id, $args );
+
+			$setting = new $class( $this, $id, $args );
+		}
+
+		$this->settings[ $setting->id ] = $setting;
+		return $setting;
+	}
+
+	/**
+	 * Register any dynamically-created settings, such as those from $_POST['customized']
+	 * that have no corresponding setting created.
+	 *
+	 * This is a mechanism to "wake up" settings that have been dynamically created
+	 * on the front end and have been sent to WordPress in `$_POST['customized']`. When WP
+	 * loads, the dynamically-created settings then will get created and previewed
+	 * even though they are not directly created statically with code.
+	 *
+	 * @since 4.2.0
+	 *
+	 * @param array $setting_ids The setting IDs to add.
+	 * @return array The WP_Customize_Setting objects added.
+	 */
+	public function add_dynamic_settings( $setting_ids ) {
+		$new_settings = array();
+		foreach ( $setting_ids as $setting_id ) {
+			// Skip settings already created
+			if ( $this->get_setting( $setting_id ) ) {
+				continue;
+			}
+
+			$setting_args = false;
+			$setting_class = 'WP_Customize_Setting';
+
+			/**
+			 * Filters a dynamic setting's constructor args.
+			 *
+			 * For a dynamic setting to be registered, this filter must be employed
+			 * to override the default false value with an array of args to pass to
+			 * the WP_Customize_Setting constructor.
+			 *
+			 * @since 4.2.0
+			 *
+			 * @param false|array $setting_args The arguments to the WP_Customize_Setting constructor.
+			 * @param string      $setting_id   ID for dynamic setting, usually coming from `$_POST['customized']`.
+			 */
+			$setting_args = apply_filters( 'customize_dynamic_setting_args', $setting_args, $setting_id );
+			if ( false === $setting_args ) {
+				continue;
+			}
+
+			/**
+			 * Allow non-statically created settings to be constructed with custom WP_Customize_Setting subclass.
+			 *
+			 * @since 4.2.0
+			 *
+			 * @param string $setting_class WP_Customize_Setting or a subclass.
+			 * @param string $setting_id    ID for dynamic setting, usually coming from `$_POST['customized']`.
+			 * @param array  $setting_args  WP_Customize_Setting or a subclass.
+			 */
+			$setting_class = apply_filters( 'customize_dynamic_setting_class', $setting_class, $setting_id, $setting_args );
+
+			$setting = new $setting_class( $this, $setting_id, $setting_args );
+
+			$this->add_setting( $setting );
+			$new_settings[] = $setting;
+		}
+		return $new_settings;
+	}
+
+	/**
+	 * Retrieve a customize setting.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id Customize Setting ID.
+	 * @return WP_Customize_Setting|void The setting, if set.
+	 */
+	public function get_setting( $id ) {
+		if ( isset( $this->settings[ $id ] ) ) {
+			return $this->settings[ $id ];
+		}
+	}
+
+	/**
+	 * Remove a customize setting.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id Customize Setting ID.
+	 */
+	public function remove_setting( $id ) {
+		unset( $this->settings[ $id ] );
+	}
+
+	/**
+	 * Add a customize panel.
+	 *
+	 * @since 4.0.0
+	 * @since 4.5.0 Return added WP_Customize_Panel instance.
+	 *
+	 * @param WP_Customize_Panel|string $id   Customize Panel object, or Panel ID.
+	 * @param array                     $args {
+	 
