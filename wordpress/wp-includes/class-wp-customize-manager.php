@@ -3709,4 +3709,295 @@ final class WP_Customize_Manager {
 	 *
 	 * @param WP_Customize_Panel|string $id   Customize Panel object, or Panel ID.
 	 * @param array                     $args {
-	 
+	 *  Optional. Array of properties for the new Panel object. Default empty array.
+	 *  @type int          $priority              Priority of the panel, defining the display order of panels and sections.
+	 *                                            Default 160.
+	 *  @type string       $capability            Capability required for the panel. Default `edit_theme_options`
+	 *  @type string|array $theme_supports        Theme features required to support the panel.
+	 *  @type string       $title                 Title of the panel to show in UI.
+	 *  @type string       $description           Description to show in the UI.
+	 *  @type string       $type                  Type of the panel.
+	 *  @type callable     $active_callback       Active callback.
+	 * }
+	 * @return WP_Customize_Panel             The instance of the panel that was added.
+	 */
+	public function add_panel( $id, $args = array() ) {
+		if ( $id instanceof WP_Customize_Panel ) {
+			$panel = $id;
+		} else {
+			$panel = new WP_Customize_Panel( $this, $id, $args );
+		}
+
+		$this->panels[ $panel->id ] = $panel;
+		return $panel;
+	}
+
+	/**
+	 * Retrieve a customize panel.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $id Panel ID to get.
+	 * @return WP_Customize_Panel|void Requested panel instance, if set.
+	 */
+	public function get_panel( $id ) {
+		if ( isset( $this->panels[ $id ] ) ) {
+			return $this->panels[ $id ];
+		}
+	}
+
+	/**
+	 * Remove a customize panel.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $id Panel ID to remove.
+	 */
+	public function remove_panel( $id ) {
+		// Removing core components this way is _doing_it_wrong().
+		if ( in_array( $id, $this->components, true ) ) {
+			/* translators: 1: panel id, 2: link to 'customize_loaded_components' filter reference */
+			$message = sprintf( __( 'Removing %1$s manually will cause PHP warnings. Use the %2$s filter instead.' ),
+				$id,
+				'<a href="' . esc_url( 'https://developer.wordpress.org/reference/hooks/customize_loaded_components/' ) . '"><code>customize_loaded_components</code></a>'
+			);
+
+			_doing_it_wrong( __METHOD__, $message, '4.5.0' );
+		}
+		unset( $this->panels[ $id ] );
+	}
+
+	/**
+	 * Register a customize panel type.
+	 *
+	 * Registered types are eligible to be rendered via JS and created dynamically.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @see WP_Customize_Panel
+	 *
+	 * @param string $panel Name of a custom panel which is a subclass of WP_Customize_Panel.
+	 */
+	public function register_panel_type( $panel ) {
+		$this->registered_panel_types[] = $panel;
+	}
+
+	/**
+	 * Render JS templates for all registered panel types.
+	 *
+	 * @since 4.3.0
+	 */
+	public function render_panel_templates() {
+		foreach ( $this->registered_panel_types as $panel_type ) {
+			$panel = new $panel_type( $this, 'temp', array() );
+			$panel->print_template();
+		}
+	}
+
+	/**
+	 * Add a customize section.
+	 *
+	 * @since 3.4.0
+	 * @since 4.5.0 Return added WP_Customize_Section instance.
+	 *
+	 * @param WP_Customize_Section|string $id   Customize Section object, or Section ID.
+	 * @param array                     $args {
+	 *  Optional. Array of properties for the new Section object. Default empty array.
+	 *  @type int          $priority              Priority of the section, defining the display order of panels and sections.
+	 *                                            Default 160.
+	 *  @type string       $panel                 The panel this section belongs to (if any). Default empty.
+	 *  @type string       $capability            Capability required for the section. Default 'edit_theme_options'
+	 *  @type string|array $theme_supports        Theme features required to support the section.
+	 *  @type string       $title                 Title of the section to show in UI.
+	 *  @type string       $description           Description to show in the UI.
+	 *  @type string       $type                  Type of the section.
+	 *  @type callable     $active_callback       Active callback.
+	 *  @type bool         $description_hidden    Hide the description behind a help icon, instead of inline above the first control. Default false.
+	 * }
+	 * @return WP_Customize_Section             The instance of the section that was added.
+	 */
+	public function add_section( $id, $args = array() ) {
+		if ( $id instanceof WP_Customize_Section ) {
+			$section = $id;
+		} else {
+			$section = new WP_Customize_Section( $this, $id, $args );
+		}
+
+		$this->sections[ $section->id ] = $section;
+		return $section;
+	}
+
+	/**
+	 * Retrieve a customize section.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id Section ID.
+	 * @return WP_Customize_Section|void The section, if set.
+	 */
+	public function get_section( $id ) {
+		if ( isset( $this->sections[ $id ] ) )
+			return $this->sections[ $id ];
+	}
+
+	/**
+	 * Remove a customize section.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id Section ID.
+	 */
+	public function remove_section( $id ) {
+		unset( $this->sections[ $id ] );
+	}
+
+	/**
+	 * Register a customize section type.
+	 *
+	 * Registered types are eligible to be rendered via JS and created dynamically.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @see WP_Customize_Section
+	 *
+	 * @param string $section Name of a custom section which is a subclass of WP_Customize_Section.
+	 */
+	public function register_section_type( $section ) {
+		$this->registered_section_types[] = $section;
+	}
+
+	/**
+	 * Render JS templates for all registered section types.
+	 *
+	 * @since 4.3.0
+	 */
+	public function render_section_templates() {
+		foreach ( $this->registered_section_types as $section_type ) {
+			$section = new $section_type( $this, 'temp', array() );
+			$section->print_template();
+		}
+	}
+
+	/**
+	 * Add a customize control.
+	 *
+	 * @since 3.4.0
+	 * @since 4.5.0 Return added WP_Customize_Control instance.
+	 *
+	 * @param WP_Customize_Control|string $id   Customize Control object, or ID.
+	 * @param array                       $args {
+	 *  Optional. Array of properties for the new Control object. Default empty array.
+	 *
+	 *  @type array        $settings              All settings tied to the control. If undefined, defaults to `$setting`.
+	 *                                            IDs in the array correspond to the ID of a registered `WP_Customize_Setting`.
+	 *  @type string       $setting               The primary setting for the control (if there is one). Default is 'default'.
+	 *  @type string       $capability            Capability required to use this control. Normally derived from `$settings`.
+	 *  @type int          $priority              Order priority to load the control. Default 10.
+	 *  @type string       $section               The section this control belongs to. Default empty.
+	 *  @type string       $label                 Label for the control. Default empty.
+	 *  @type string       $description           Description for the control. Default empty.
+	 *  @type array        $choices               List of choices for 'radio' or 'select' type controls, where values
+	 *                                            are the keys, and labels are the values. Default empty array.
+	 *  @type array        $input_attrs           List of custom input attributes for control output, where attribute
+	 *                                            names are the keys and values are the values. Default empty array.
+	 *  @type bool         $allow_addition        Show UI for adding new content, currently only used for the
+	 *                                            dropdown-pages control. Default false.
+	 *  @type string       $type                  The type of the control. Default 'text'.
+	 *  @type callback     $active_callback       Active callback.
+	 * }
+	 * @return WP_Customize_Control             The instance of the control that was added.
+	 */
+	public function add_control( $id, $args = array() ) {
+		if ( $id instanceof WP_Customize_Control ) {
+			$control = $id;
+		} else {
+			$control = new WP_Customize_Control( $this, $id, $args );
+		}
+
+		$this->controls[ $control->id ] = $control;
+		return $control;
+	}
+
+	/**
+	 * Retrieve a customize control.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id ID of the control.
+	 * @return WP_Customize_Control|void The control object, if set.
+	 */
+	public function get_control( $id ) {
+		if ( isset( $this->controls[ $id ] ) )
+			return $this->controls[ $id ];
+	}
+
+	/**
+	 * Remove a customize control.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $id ID of the control.
+	 */
+	public function remove_control( $id ) {
+		unset( $this->controls[ $id ] );
+	}
+
+	/**
+	 * Register a customize control type.
+	 *
+	 * Registered types are eligible to be rendered via JS and created dynamically.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param string $control Name of a custom control which is a subclass of
+	 *                        WP_Customize_Control.
+	 */
+	public function register_control_type( $control ) {
+		$this->registered_control_types[] = $control;
+	}
+
+	/**
+	 * Render JS templates for all registered control types.
+	 *
+	 * @since 4.1.0
+	 */
+	public function render_control_templates() {
+		if ( $this->branching() ) {
+			$l10n = array(
+				/* translators: %s: User who is customizing the changeset in customizer. */
+				'locked' => __( '%s is already customizing this changeset. Please wait until they are done to try customizing. Your latest changes have been autosaved.' ),
+				/* translators: %s: User who is customizing the changeset in customizer. */
+				'locked_allow_override' => __( '%s is already customizing this changeset. Do you want to take over?' ),
+			);
+		} else {
+			$l10n = array(
+				/* translators: %s: User who is customizing the changeset in customizer. */
+				'locked' => __( '%s is already customizing this site. Please wait until they are done to try customizing. Your latest changes have been autosaved.' ),
+				/* translators: %s: User who is customizing the changeset in customizer. */
+				'locked_allow_override' => __( '%s is already customizing this site. Do you want to take over?' ),
+			);
+		}
+
+		foreach ( $this->registered_control_types as $control_type ) {
+			$control = new $control_type( $this, 'temp', array(
+				'settings' => array(),
+			) );
+			$control->print_template();
+		}
+		?>
+
+		<script type="text/html" id="tmpl-customize-control-default-content">
+			<#
+			var inputId = _.uniqueId( 'customize-control-default-input-' );
+			var descriptionId = _.uniqueId( 'customize-control-default-description-' );
+			var describedByAttr = data.description ? ' aria-describedby="' + descriptionId + '" ' : '';
+			#>
+			<# switch ( data.type ) {
+				case 'checkbox': #>
+					<span class="customize-inside-control-row">
+						<input
+							id="{{ inputId }}"
+							{{{ describedByAttr }}}
+							type="checkbox"
+							value="{{ data.value }}"
+							data-customize-setti
