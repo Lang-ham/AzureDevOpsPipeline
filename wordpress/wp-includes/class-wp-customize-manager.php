@@ -4000,4 +4000,289 @@ final class WP_Customize_Manager {
 							{{{ describedByAttr }}}
 							type="checkbox"
 							value="{{ data.value }}"
-							data-customize-setti
+							data-customize-setting-key-link="default"
+						>
+						<label for="{{ inputId }}">
+							{{ data.label }}
+						</label>
+						<# if ( data.description ) { #>
+							<span id="{{ descriptionId }}" class="description customize-control-description">{{{ data.description }}}</span>
+						<# } #>
+					</span>
+					<#
+					break;
+				case 'radio':
+					if ( ! data.choices ) {
+						return;
+					}
+					#>
+					<# if ( data.label ) { #>
+						<label for="{{ inputId }}" class="customize-control-title">
+							{{ data.label }}
+						</label>
+					<# } #>
+					<# if ( data.description ) { #>
+						<span id="{{ descriptionId }}" class="description customize-control-description">{{{ data.description }}}</span>
+					<# } #>
+					<# _.each( data.choices, function( val, key ) { #>
+						<span class="customize-inside-control-row">
+							<#
+							var value, text;
+							if ( _.isObject( val ) ) {
+								value = val.value;
+								text = val.text;
+							} else {
+								value = key;
+								text = val;
+							}
+							#>
+							<input
+								id="{{ inputId + '-' + value }}"
+								type="radio"
+								value="{{ value }}"
+								name="{{ inputId }}"
+								data-customize-setting-key-link="default"
+								{{{ describedByAttr }}}
+							>
+							<label for="{{ inputId + '-' + value }}">{{ text }}</label>
+						</span>
+					<# } ); #>
+					<#
+					break;
+				default:
+					#>
+					<# if ( data.label ) { #>
+						<label for="{{ inputId }}" class="customize-control-title">
+							{{ data.label }}
+						</label>
+					<# } #>
+					<# if ( data.description ) { #>
+						<span id="{{ descriptionId }}" class="description customize-control-description">{{{ data.description }}}</span>
+					<# } #>
+
+					<#
+					var inputAttrs = {
+						id: inputId,
+						'data-customize-setting-key-link': 'default'
+					};
+					if ( 'textarea' === data.type ) {
+						inputAttrs.rows = '5';
+					} else if ( 'button' === data.type ) {
+						inputAttrs['class'] = 'button button-secondary';
+						inputAttrs.type = 'button';
+					} else {
+						inputAttrs.type = data.type;
+					}
+					if ( data.description ) {
+						inputAttrs['aria-describedby'] = descriptionId;
+					}
+					_.extend( inputAttrs, data.input_attrs );
+					#>
+
+					<# if ( 'button' === data.type ) { #>
+						<button
+							<# _.each( _.extend( inputAttrs ), function( value, key ) { #>
+								{{{ key }}}="{{ value }}"
+							<# } ); #>
+						>{{ inputAttrs.value }}</button>
+					<# } else if ( 'textarea' === data.type ) { #>
+						<textarea
+							<# _.each( _.extend( inputAttrs ), function( value, key ) { #>
+								{{{ key }}}="{{ value }}"
+							<# }); #>
+						>{{ inputAttrs.value }}</textarea>
+					<# } else if ( 'select' === data.type ) { #>
+						<# delete inputAttrs.type; #>
+						<select
+							<# _.each( _.extend( inputAttrs ), function( value, key ) { #>
+								{{{ key }}}="{{ value }}"
+							<# }); #>
+							>
+							<# _.each( data.choices, function( val, key ) { #>
+								<#
+								var value, text;
+								if ( _.isObject( val ) ) {
+									value = val.value;
+									text = val.text;
+								} else {
+									value = key;
+									text = val;
+								}
+								#>
+								<option value="{{ value }}">{{ text }}</option>
+							<# } ); #>
+						</select>
+					<# } else { #>
+						<input
+							<# _.each( _.extend( inputAttrs ), function( value, key ) { #>
+								{{{ key }}}="{{ value }}"
+							<# }); #>
+							>
+					<# } #>
+			<# } #>
+		</script>
+
+		<script type="text/html" id="tmpl-customize-notification">
+			<li class="notice notice-{{ data.type || 'info' }} {{ data.alt ? 'notice-alt' : '' }} {{ data.dismissible ? 'is-dismissible' : '' }} {{ data.containerClasses || '' }}" data-code="{{ data.code }}" data-type="{{ data.type }}">
+				<div class="notification-message">{{{ data.message || data.code }}}</div>
+				<# if ( data.dismissible ) { #>
+					<button type="button" class="notice-dismiss"><span class="screen-reader-text"><?php _e( 'Dismiss' ); ?></span></button>
+				<# } #>
+			</li>
+		</script>
+
+		<script type="text/html" id="tmpl-customize-changeset-locked-notification">
+			<li class="notice notice-{{ data.type || 'info' }} {{ data.containerClasses || '' }}" data-code="{{ data.code }}" data-type="{{ data.type }}">
+				<div class="notification-message customize-changeset-locked-message">
+					<img class="customize-changeset-locked-avatar" src="{{ data.lockUser.avatar }}" alt="{{ data.lockUser.name }}">
+					<p class="currently-editing">
+						<# if ( data.message ) { #>
+							{{{ data.message }}}
+						<# } else if ( data.allowOverride ) { #>
+							<?php
+							echo esc_html( sprintf( $l10n['locked_allow_override'], '{{ data.lockUser.name }}' ) );
+							?>
+						<# } else { #>
+							<?php
+							echo esc_html( sprintf( $l10n['locked'], '{{ data.lockUser.name }}' ) );
+							?>
+						<# } #>
+					</p>
+					<p class="notice notice-error notice-alt" hidden></p>
+					<p class="action-buttons">
+						<# if ( data.returnUrl !== data.previewUrl ) { #>
+							<a class="button customize-notice-go-back-button" href="{{ data.returnUrl }}"><?php _e( 'Go back' ); ?></a>
+						<# } #>
+						<a class="button customize-notice-preview-button" href="{{ data.frontendPreviewUrl }}"><?php _e( 'Preview' ); ?></a>
+						<# if ( data.allowOverride ) { #>
+							<button class="button button-primary wp-tab-last customize-notice-take-over-button"><?php _e( 'Take over' ); ?></button>
+						<# } #>
+					</p>
+				</div>
+			</li>
+		</script>
+
+		<script type="text/html" id="tmpl-customize-code-editor-lint-error-notification">
+			<li class="notice notice-{{ data.type || 'info' }} {{ data.alt ? 'notice-alt' : '' }} {{ data.dismissible ? 'is-dismissible' : '' }} {{ data.containerClasses || '' }}" data-code="{{ data.code }}" data-type="{{ data.type }}">
+				<div class="notification-message">{{{ data.message || data.code }}}</div>
+
+				<p>
+					<# var elementId = 'el-' + String( Math.random() ); #>
+					<input id="{{ elementId }}" type="checkbox">
+					<label for="{{ elementId }}"><?php _e( 'Update anyway, even though it might break your site?' ); ?></label>
+				</p>
+			</li>
+		</script>
+
+		<?php
+		/* The following template is obsolete in core but retained for plugins. */
+		?>
+		<script type="text/html" id="tmpl-customize-control-notifications">
+			<ul>
+				<# _.each( data.notifications, function( notification ) { #>
+					<li class="notice notice-{{ notification.type || 'info' }} {{ data.altNotice ? 'notice-alt' : '' }}" data-code="{{ notification.code }}" data-type="{{ notification.type }}">{{{ notification.message || notification.code }}}</li>
+				<# } ); #>
+			</ul>
+		</script>
+
+		<script type="text/html" id="tmpl-customize-preview-link-control" >
+			<# var elementPrefix = _.uniqueId( 'el' ) + '-' #>
+			<p class="customize-control-title">
+				<?php esc_html_e( 'Share Preview Link' ); ?>
+			</p>
+			<p class="description customize-control-description"><?php esc_html_e( 'See how changes would look live on your website, and share the preview with people who can\'t access the Customizer.' ); ?></p>
+			<div class="customize-control-notifications-container"></div>
+			<div class="preview-link-wrapper">
+				<label for="{{ elementPrefix }}customize-preview-link-input" class="screen-reader-text"><?php esc_html_e( 'Preview Link' ); ?></label>
+				<a href="" target="">
+					<span class="preview-control-element" data-component="url"></span>
+					<span class="screen-reader-text"><?php _e( '(opens in a new window)' ); ?></span>
+				</a>
+				<input id="{{ elementPrefix }}customize-preview-link-input" readonly tabindex="-1" class="preview-control-element" data-component="input">
+				<button class="customize-copy-preview-link preview-control-element button button-secondary" data-component="button" data-copy-text="<?php esc_attr_e( 'Copy' ); ?>" data-copied-text="<?php esc_attr_e( 'Copied' ); ?>" ><?php esc_html_e( 'Copy' ); ?></button>
+			</div>
+		</script>
+		<script type="text/html" id="tmpl-customize-selected-changeset-status-control">
+			<# var inputId = _.uniqueId( 'customize-selected-changeset-status-control-input-' ); #>
+			<# var descriptionId = _.uniqueId( 'customize-selected-changeset-status-control-description-' ); #>
+			<# if ( data.label ) { #>
+				<label for="{{ inputId }}" class="customize-control-title">{{ data.label }}</label>
+			<# } #>
+			<# if ( data.description ) { #>
+				<span id="{{ descriptionId }}" class="description customize-control-description">{{{ data.description }}}</span>
+			<# } #>
+			<# _.each( data.choices, function( choice ) { #>
+				<# var choiceId = inputId + '-' + choice.status; #>
+				<span class="customize-inside-control-row">
+					<input id="{{ choiceId }}" type="radio" value="{{ choice.status }}" name="{{ inputId }}" data-customize-setting-key-link="default">
+					<label for="{{ choiceId }}">{{ choice.label }}</label>
+				</span>
+			<# } ); #>
+		</script>
+		<?php
+	}
+
+	/**
+	 * Helper function to compare two objects by priority, ensuring sort stability via instance_number.
+	 *
+	 * @since 3.4.0
+	 * @deprecated 4.7.0 Use wp_list_sort()
+	 *
+	 * @param WP_Customize_Panel|WP_Customize_Section|WP_Customize_Control $a Object A.
+	 * @param WP_Customize_Panel|WP_Customize_Section|WP_Customize_Control $b Object B.
+	 * @return int
+	 */
+	protected function _cmp_priority( $a, $b ) {
+		_deprecated_function( __METHOD__, '4.7.0', 'wp_list_sort' );
+
+		if ( $a->priority === $b->priority ) {
+			return $a->instance_number - $b->instance_number;
+		} else {
+			return $a->priority - $b->priority;
+		}
+	}
+
+	/**
+	 * Prepare panels, sections, and controls.
+	 *
+	 * For each, check if required related components exist,
+	 * whether the user has the necessary capabilities,
+	 * and sort by priority.
+	 *
+	 * @since 3.4.0
+	 */
+	public function prepare_controls() {
+
+		$controls = array();
+		$this->controls = wp_list_sort( $this->controls, array(
+			'priority'        => 'ASC',
+			'instance_number' => 'ASC',
+		), 'ASC', true );
+
+		foreach ( $this->controls as $id => $control ) {
+			if ( ! isset( $this->sections[ $control->section ] ) || ! $control->check_capabilities() ) {
+				continue;
+			}
+
+			$this->sections[ $control->section ]->controls[] = $control;
+			$controls[ $id ] = $control;
+		}
+		$this->controls = $controls;
+
+		// Prepare sections.
+		$this->sections = wp_list_sort( $this->sections, array(
+			'priority'        => 'ASC',
+			'instance_number' => 'ASC',
+		), 'ASC', true );
+		$sections = array();
+
+		foreach ( $this->sections as $section ) {
+			if ( ! $section->check_capabilities() ) {
+				continue;
+			}
+
+
+			$section->controls = wp_list_sort( $section->controls, array(
+				'priority'        => 'ASC',
+				'instance_number' => 'ASC',
+			) );
