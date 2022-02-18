@@ -4963,4 +4963,275 @@ final class WP_Customize_Manager {
 			'theme_supports' => array( 'custom-header', 'header-text' ),
 			'default'        => get_theme_support( 'custom-header', 'default-text-color' ),
 
-			'sanitize_callback'    => array( $this, '_sanitize_hea
+			'sanitize_callback'    => array( $this, '_sanitize_header_textcolor' ),
+			'sanitize_js_callback' => 'maybe_hash_hex_color',
+		) );
+
+		// Input type: checkbox
+		// With custom value
+		$this->add_control( 'display_header_text', array(
+			'settings' => 'header_textcolor',
+			'label'    => __( 'Display Site Title and Tagline' ),
+			'section'  => 'title_tagline',
+			'type'     => 'checkbox',
+			'priority' => 40,
+		) );
+
+		$this->add_control( new WP_Customize_Color_Control( $this, 'header_textcolor', array(
+			'label'   => __( 'Header Text Color' ),
+			'section' => 'colors',
+		) ) );
+
+		// Input type: Color
+		// With sanitize_callback
+		$this->add_setting( 'background_color', array(
+			'default'        => get_theme_support( 'custom-background', 'default-color' ),
+			'theme_supports' => 'custom-background',
+
+			'sanitize_callback'    => 'sanitize_hex_color_no_hash',
+			'sanitize_js_callback' => 'maybe_hash_hex_color',
+		) );
+
+		$this->add_control( new WP_Customize_Color_Control( $this, 'background_color', array(
+			'label'   => __( 'Background Color' ),
+			'section' => 'colors',
+		) ) );
+
+		/* Custom Header */
+
+		if ( current_theme_supports( 'custom-header', 'video' ) ) {
+			$title = __( 'Header Media' );
+			$description = '<p>' . __( 'If you add a video, the image will be used as a fallback while the video loads.' ) . '</p>';
+
+			$width = absint( get_theme_support( 'custom-header', 'width' ) );
+			$height = absint( get_theme_support( 'custom-header', 'height' ) );
+			if ( $width && $height ) {
+				$control_description = sprintf(
+					/* translators: 1: .mp4, 2: header size in pixels */
+					__( 'Upload your video in %1$s format and minimize its file size for best results. Your theme recommends dimensions of %2$s pixels.' ),
+					'<code>.mp4</code>',
+					sprintf( '<strong>%s &times; %s</strong>', $width, $height )
+				);
+			} elseif ( $width ) {
+				$control_description = sprintf(
+					/* translators: 1: .mp4, 2: header width in pixels */
+					__( 'Upload your video in %1$s format and minimize its file size for best results. Your theme recommends a width of %2$s pixels.' ),
+					'<code>.mp4</code>',
+					sprintf( '<strong>%s</strong>', $width )
+				);
+			} else {
+				$control_description = sprintf(
+					/* translators: 1: .mp4, 2: header height in pixels */
+					__( 'Upload your video in %1$s format and minimize its file size for best results. Your theme recommends a height of %2$s pixels.' ),
+					'<code>.mp4</code>',
+					sprintf( '<strong>%s</strong>', $height )
+				);
+			}
+		} else {
+			$title = __( 'Header Image' );
+			$description = '';
+			$control_description = '';
+		}
+
+		$this->add_section( 'header_image', array(
+			'title'          => $title,
+			'description'    => $description,
+			'theme_supports' => 'custom-header',
+			'priority'       => 60,
+		) );
+
+		$this->add_setting( 'header_video', array(
+			'theme_supports'    => array( 'custom-header', 'video' ),
+			'transport'         => 'postMessage',
+			'sanitize_callback' => 'absint',
+			'validate_callback' => array( $this, '_validate_header_video' ),
+		) );
+
+		$this->add_setting( 'external_header_video', array(
+			'theme_supports'    => array( 'custom-header', 'video' ),
+			'transport'         => 'postMessage',
+			'sanitize_callback' => array( $this, '_sanitize_external_header_video' ),
+			'validate_callback' => array( $this, '_validate_external_header_video' ),
+		) );
+
+		$this->add_setting( new WP_Customize_Filter_Setting( $this, 'header_image', array(
+			'default'        => sprintf( get_theme_support( 'custom-header', 'default-image' ), get_template_directory_uri(), get_stylesheet_directory_uri() ),
+			'theme_supports' => 'custom-header',
+		) ) );
+
+		$this->add_setting( new WP_Customize_Header_Image_Setting( $this, 'header_image_data', array(
+			'theme_supports' => 'custom-header',
+		) ) );
+
+		/*
+		 * Switch image settings to postMessage when video support is enabled since
+		 * it entails that the_custom_header_markup() will be used, and thus selective
+		 * refresh can be utilized.
+		 */
+		if ( current_theme_supports( 'custom-header', 'video' ) ) {
+			$this->get_setting( 'header_image' )->transport = 'postMessage';
+			$this->get_setting( 'header_image_data' )->transport = 'postMessage';
+		}
+
+		$this->add_control( new WP_Customize_Media_Control( $this, 'header_video', array(
+			'theme_supports' => array( 'custom-header', 'video' ),
+			'label'          => __( 'Header Video' ),
+			'description'    => $control_description,
+			'section'        => 'header_image',
+			'mime_type'      => 'video',
+			'active_callback' => 'is_header_video_active',
+		) ) );
+
+		$this->add_control( 'external_header_video', array(
+			'theme_supports' => array( 'custom-header', 'video' ),
+			'type'           => 'url',
+			'description'    => __( 'Or, enter a YouTube URL:' ),
+			'section'        => 'header_image',
+			'active_callback' => 'is_header_video_active',
+		) );
+
+		$this->add_control( new WP_Customize_Header_Image_Control( $this ) );
+
+		$this->selective_refresh->add_partial( 'custom_header', array(
+			'selector'            => '#wp-custom-header',
+			'render_callback'     => 'the_custom_header_markup',
+			'settings'            => array( 'header_video', 'external_header_video', 'header_image' ), // The image is used as a video fallback here.
+			'container_inclusive' => true,
+		) );
+
+		/* Custom Background */
+
+		$this->add_section( 'background_image', array(
+			'title'          => __( 'Background Image' ),
+			'theme_supports' => 'custom-background',
+			'priority'       => 80,
+		) );
+
+		$this->add_setting( 'background_image', array(
+			'default'        => get_theme_support( 'custom-background', 'default-image' ),
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) );
+
+		$this->add_setting( new WP_Customize_Background_Image_Setting( $this, 'background_image_thumb', array(
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) ) );
+
+		$this->add_control( new WP_Customize_Background_Image_Control( $this ) );
+
+		$this->add_setting( 'background_preset', array(
+			'default'        => get_theme_support( 'custom-background', 'default-preset' ),
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) );
+
+		$this->add_control( 'background_preset', array(
+			'label'      => _x( 'Preset', 'Background Preset' ),
+			'section'    => 'background_image',
+			'type'       => 'select',
+			'choices'    => array(
+				'default' => _x( 'Default', 'Default Preset' ),
+				'fill'    => __( 'Fill Screen' ),
+				'fit'     => __( 'Fit to Screen' ),
+				'repeat'  => _x( 'Repeat', 'Repeat Image' ),
+				'custom'  => _x( 'Custom', 'Custom Preset' ),
+			),
+		) );
+
+		$this->add_setting( 'background_position_x', array(
+			'default'        => get_theme_support( 'custom-background', 'default-position-x' ),
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) );
+
+		$this->add_setting( 'background_position_y', array(
+			'default'        => get_theme_support( 'custom-background', 'default-position-y' ),
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) );
+
+		$this->add_control( new WP_Customize_Background_Position_Control( $this, 'background_position', array(
+			'label'    => __( 'Image Position' ),
+			'section'  => 'background_image',
+			'settings' => array(
+				'x' => 'background_position_x',
+				'y' => 'background_position_y',
+			),
+		) ) );
+
+		$this->add_setting( 'background_size', array(
+			'default'        => get_theme_support( 'custom-background', 'default-size' ),
+			'theme_supports' => 'custom-background',
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+		) );
+
+		$this->add_control( 'background_size', array(
+			'label'      => __( 'Image Size' ),
+			'section'    => 'background_image',
+			'type'       => 'select',
+			'choices'    => array(
+				'auto'    => __( 'Original' ),
+				'contain' => __( 'Fit to Screen' ),
+				'cover'   => __( 'Fill Screen' ),
+			),
+		) );
+
+		$this->add_setting( 'background_repeat', array(
+			'default'           => get_theme_support( 'custom-background', 'default-repeat' ),
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+			'theme_supports'    => 'custom-background',
+		) );
+
+		$this->add_control( 'background_repeat', array(
+			'label'    => __( 'Repeat Background Image' ),
+			'section'  => 'background_image',
+			'type'     => 'checkbox',
+		) );
+
+		$this->add_setting( 'background_attachment', array(
+			'default'           => get_theme_support( 'custom-background', 'default-attachment' ),
+			'sanitize_callback' => array( $this, '_sanitize_background_setting' ),
+			'theme_supports'    => 'custom-background',
+		) );
+
+		$this->add_control( 'background_attachment', array(
+			'label'    => __( 'Scroll with Page' ),
+			'section'  => 'background_image',
+			'type'     => 'checkbox',
+		) );
+
+
+		// If the theme is using the default background callback, we can update
+		// the background CSS using postMessage.
+		if ( get_theme_support( 'custom-background', 'wp-head-callback' ) === '_custom_background_cb' ) {
+			foreach ( array( 'color', 'image', 'preset', 'position_x', 'position_y', 'size', 'repeat', 'attachment' ) as $prop ) {
+				$this->get_setting( 'background_' . $prop )->transport = 'postMessage';
+			}
+		}
+
+		/*
+		 * Static Front Page
+		 * See also https://core.trac.wordpress.org/ticket/19627 which introduces the static-front-page theme_support.
+		 * The following replicates behavior from options-reading.php.
+		 */
+
+		$this->add_section( 'static_front_page', array(
+			'title' => __( 'Homepage Settings' ),
+			'priority' => 120,
+			'description' => __( 'You can choose what&#8217;s displayed on the homepage of your site. It can be posts in reverse chronological order (classic blog), or a fixed/static page. To set a static homepage, you first need to create two Pages. One will become the homepage, and the other will be where your posts are displayed.' ),
+			'active_callback' => array( $this, 'has_published_pages' ),
+		) );
+
+		$this->add_setting( 'show_on_front', array(
+			'default' => get_option( 'show_on_front' ),
+			'capability' => 'manage_options',
+			'type' => 'option',
+		) );
+
+		$this->add_control( 'show_on_front', array(
+			'label' => __( 'Your homepage displays' ),
+			'section' => 'static_front_page',
+			'type' => 'radio',
+			'choices' => array(
+				'
