@@ -4286,3 +4286,373 @@ final class WP_Customize_Manager {
 				'priority'        => 'ASC',
 				'instance_number' => 'ASC',
 			) );
+
+			if ( ! $section->panel ) {
+				// Top-level section.
+				$sections[ $section->id ] = $section;
+			} else {
+				// This section belongs to a panel.
+				if ( isset( $this->panels [ $section->panel ] ) ) {
+					$this->panels[ $section->panel ]->sections[ $section->id ] = $section;
+				}
+			}
+		}
+		$this->sections = $sections;
+
+		// Prepare panels.
+		$this->panels = wp_list_sort( $this->panels, array(
+			'priority'        => 'ASC',
+			'instance_number' => 'ASC',
+		), 'ASC', true );
+		$panels = array();
+
+		foreach ( $this->panels as $panel ) {
+			if ( ! $panel->check_capabilities() ) {
+				continue;
+			}
+
+			$panel->sections = wp_list_sort( $panel->sections, array(
+				'priority'        => 'ASC',
+				'instance_number' => 'ASC',
+			), 'ASC', true );
+			$panels[ $panel->id ] = $panel;
+		}
+		$this->panels = $panels;
+
+		// Sort panels and top-level sections together.
+		$this->containers = array_merge( $this->panels, $this->sections );
+		$this->containers = wp_list_sort( $this->containers, array(
+			'priority'        => 'ASC',
+			'instance_number' => 'ASC',
+		), 'ASC', true );
+	}
+
+	/**
+	 * Enqueue scripts for customize controls.
+	 *
+	 * @since 3.4.0
+	 */
+	public function enqueue_control_scripts() {
+		foreach ( $this->controls as $control ) {
+			$control->enqueue();
+		}
+
+		if ( ! is_multisite() && ( current_user_can( 'install_themes' ) || current_user_can( 'update_themes' ) || current_user_can( 'delete_themes' ) ) ) {
+			wp_enqueue_script( 'updates' );
+			wp_localize_script( 'updates', '_wpUpdatesItemCounts', array(
+				'totals' => wp_get_update_data(),
+			) );
+		}
+	}
+
+	/**
+	 * Determine whether the user agent is iOS.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @return bool Whether the user agent is iOS.
+	 */
+	public function is_ios() {
+		return wp_is_mobile() && preg_match( '/iPad|iPod|iPhone/', $_SERVER['HTTP_USER_AGENT'] );
+	}
+
+	/**
+	 * Get the template string for the Customizer pane document title.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @return string The template string for the document title.
+	 */
+	public function get_document_title_template() {
+		if ( $this->is_theme_active() ) {
+			/* translators: %s: document title from the preview */
+			$document_title_tmpl = __( 'Customize: %s' );
+		} else {
+			/* translators: %s: document title from the preview */
+			$document_title_tmpl = __( 'Live Preview: %s' );
+		}
+		$document_title_tmpl = html_entity_decode( $document_title_tmpl, ENT_QUOTES, 'UTF-8' ); // Because exported to JS and assigned to document.title.
+		return $document_title_tmpl;
+	}
+
+	/**
+	 * Set the initial URL to be previewed.
+	 *
+	 * URL is validated.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param string $preview_url URL to be previewed.
+	 */
+	public function set_preview_url( $preview_url ) {
+		$preview_url = esc_url_raw( $preview_url );
+		$this->preview_url = wp_validate_redirect( $preview_url, home_url( '/' ) );
+	}
+
+	/**
+	 * Get the initial URL to be previewed.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @return string URL being previewed.
+	 */
+	public function get_preview_url() {
+		if ( empty( $this->preview_url ) ) {
+			$preview_url = home_url( '/' );
+		} else {
+			$preview_url = $this->preview_url;
+		}
+		return $preview_url;
+	}
+
+	/**
+	 * Determines whether the admin and the frontend are on different domains.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return bool Whether cross-domain.
+	 */
+	public function is_cross_domain() {
+		$admin_origin = wp_parse_url( admin_url() );
+		$home_origin = wp_parse_url( home_url() );
+		$cross_domain = ( strtolower( $admin_origin['host'] ) !== strtolower( $home_origin['host'] ) );
+		return $cross_domain;
+	}
+
+	/**
+	 * Get URLs allowed to be previewed.
+	 *
+	 * If the front end and the admin are served from the same domain, load the
+	 * preview over ssl if the Customizer is being loaded over ssl. This avoids
+	 * insecure content warnings. This is not attempted if the admin and front end
+	 * are on different domains to avoid the case where the front end doesn't have
+	 * ssl certs. Domain mapping plugins can allow other urls in these conditions
+	 * using the customize_allowed_urls filter.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @returns array Allowed URLs.
+	 */
+	public function get_allowed_urls() {
+		$allowed_urls = array( home_url( '/' ) );
+
+		if ( is_ssl() && ! $this->is_cross_domain() ) {
+			$allowed_urls[] = home_url( '/', 'https' );
+		}
+
+		/**
+		 * Filters the list of URLs allowed to be clicked and followed in the Customizer preview.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param array $allowed_urls An array of allowed URLs.
+		 */
+		$allowed_urls = array_unique( apply_filters( 'customize_allowed_urls', $allowed_urls ) );
+
+		return $allowed_urls;
+	}
+
+	/**
+	 * Get messenger channel.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return string Messenger channel.
+	 */
+	public function get_messenger_channel() {
+		return $this->messenger_channel;
+	}
+
+	/**
+	 * Set URL to link the user to when closing the Customizer.
+	 *
+	 * URL is validated.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param string $return_url URL for return link.
+	 */
+	public function set_return_url( $return_url ) {
+		$return_url = esc_url_raw( $return_url );
+		$return_url = remove_query_arg( wp_removable_query_args(), $return_url );
+		$return_url = wp_validate_redirect( $return_url );
+		$this->return_url = $return_url;
+	}
+
+	/**
+	 * Get URL to link the user to when closing the Customizer.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @return string URL for link to close Customizer.
+	 */
+	public function get_return_url() {
+		$referer = wp_get_referer();
+		$excluded_referer_basenames = array( 'customize.php', 'wp-login.php' );
+
+		if ( $this->return_url ) {
+			$return_url = $this->return_url;
+		} else if ( $referer && ! in_array( basename( parse_url( $referer, PHP_URL_PATH ) ), $excluded_referer_basenames, true ) ) {
+			$return_url = $referer;
+		} else if ( $this->preview_url ) {
+			$return_url = $this->preview_url;
+		} else {
+			$return_url = home_url( '/' );
+		}
+		return $return_url;
+	}
+
+	/**
+	 * Set the autofocused constructs.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param array $autofocus {
+	 *     Mapping of 'panel', 'section', 'control' to the ID which should be autofocused.
+	 *
+	 *     @type string [$control]  ID for control to be autofocused.
+	 *     @type string [$section]  ID for section to be autofocused.
+	 *     @type string [$panel]    ID for panel to be autofocused.
+	 * }
+	 */
+	public function set_autofocus( $autofocus ) {
+		$this->autofocus = array_filter( wp_array_slice_assoc( $autofocus, array( 'panel', 'section', 'control' ) ), 'is_string' );
+	}
+
+	/**
+	 * Get the autofocused constructs.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @return array {
+	 *     Mapping of 'panel', 'section', 'control' to the ID which should be autofocused.
+	 *
+	 *     @type string [$control]  ID for control to be autofocused.
+	 *     @type string [$section]  ID for section to be autofocused.
+	 *     @type string [$panel]    ID for panel to be autofocused.
+	 * }
+	 */
+	public function get_autofocus() {
+		return $this->autofocus;
+	}
+
+	/**
+	 * Get nonces for the Customizer.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @return array Nonces.
+	 */
+	public function get_nonces() {
+		$nonces = array(
+			'save' => wp_create_nonce( 'save-customize_' . $this->get_stylesheet() ),
+			'preview' => wp_create_nonce( 'preview-customize_' . $this->get_stylesheet() ),
+			'switch_themes' => wp_create_nonce( 'switch_themes' ),
+			'dismiss_autosave_or_lock' => wp_create_nonce( 'customize_dismiss_autosave_or_lock' ),
+			'override_lock' => wp_create_nonce( 'customize_override_changeset_lock' ),
+			'trash' => wp_create_nonce( 'trash_customize_changeset' ),
+		);
+
+		/**
+		 * Filters nonces for Customizer.
+		 *
+		 * @since 4.2.0
+		 *
+		 * @param array                $nonces Array of refreshed nonces for save and
+		 *                                     preview actions.
+		 * @param WP_Customize_Manager $this   WP_Customize_Manager instance.
+		 */
+		$nonces = apply_filters( 'customize_refresh_nonces', $nonces, $this );
+
+		return $nonces;
+	}
+
+	/**
+	 * Print JavaScript settings for parent window.
+	 *
+	 * @since 4.4.0
+	 */
+	public function customize_pane_settings() {
+
+		$login_url = add_query_arg( array(
+			'interim-login' => 1,
+			'customize-login' => 1,
+		), wp_login_url() );
+
+		// Ensure dirty flags are set for modified settings.
+		foreach ( array_keys( $this->unsanitized_post_values() ) as $setting_id ) {
+			$setting = $this->get_setting( $setting_id );
+			if ( $setting ) {
+				$setting->dirty = true;
+			}
+		}
+
+		$autosave_revision_post = null;
+		$autosave_autodraft_post = null;
+		$changeset_post_id = $this->changeset_post_id();
+		if ( ! $this->saved_starter_content_changeset && ! $this->autosaved() ) {
+			if ( $changeset_post_id ) {
+				if ( is_user_logged_in() ) {
+					$autosave_revision_post = wp_get_post_autosave( $changeset_post_id, get_current_user_id() );
+				}
+			} else {
+				$autosave_autodraft_posts = $this->get_changeset_posts( array(
+					'posts_per_page' => 1,
+					'post_status' => 'auto-draft',
+					'exclude_restore_dismissed' => true,
+				) );
+				if ( ! empty( $autosave_autodraft_posts ) ) {
+					$autosave_autodraft_post = array_shift( $autosave_autodraft_posts );
+				}
+			}
+		}
+
+		$current_user_can_publish = current_user_can( get_post_type_object( 'customize_changeset' )->cap->publish_posts );
+
+		// @todo Include all of the status labels here from script-loader.php, and then allow it to be filtered.
+		$status_choices = array();
+		if ( $current_user_can_publish ) {
+			$status_choices[] = array(
+				'status' => 'publish',
+				'label' => __( 'Publish' ),
+			);
+		}
+		$status_choices[] = array(
+			'status' => 'draft',
+			'label' => __( 'Save Draft' ),
+		);
+		if ( $current_user_can_publish ) {
+			$status_choices[] = array(
+				'status' => 'future',
+				'label' => _x( 'Schedule', 'customizer changeset action/button label' ),
+			);
+		}
+
+		// Prepare Customizer settings to pass to JavaScript.
+		$changeset_post = null;
+		if ( $changeset_post_id ) {
+			$changeset_post = get_post( $changeset_post_id );
+		}
+
+		// Determine initial date to be at present or future, not past.
+		$current_time = current_time( 'mysql', false );
+		$initial_date = $current_time;
+		if ( $changeset_post ) {
+			$initial_date = get_the_time( 'Y-m-d H:i:s', $changeset_post->ID );
+			if ( $initial_date < $current_time ) {
+				$initial_date = $current_time;
+			}
+		}
+
+		$lock_user_id = false;
+		if ( $this->changeset_post_id() ) {
+			$lock_user_id = wp_check_post_lock( $this->changeset_post_id() );
+		}
+
+		$settings = array(
+			'changeset' => array(
+				'uuid' => $this->changeset_uuid(),
+				'branching' => $this->branching(),
+				'autosaved' => $this->autosaved(),
+				'hasAutosaveRevision' => ! empty( $autosave_revision_post ),
+				'latestAutoDraft
