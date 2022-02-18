@@ -4655,4 +4655,312 @@ final class WP_Customize_Manager {
 				'branching' => $this->branching(),
 				'autosaved' => $this->autosaved(),
 				'hasAutosaveRevision' => ! empty( $autosave_revision_post ),
-				'latestAutoDraft
+				'latestAutoDraftUuid' => $autosave_autodraft_post ? $autosave_autodraft_post->post_name : null,
+				'status' => $changeset_post ? $changeset_post->post_status : '',
+				'currentUserCanPublish' => $current_user_can_publish,
+				'publishDate' => $initial_date,
+				'statusChoices' => $status_choices,
+				'lockUser' => $lock_user_id ? $this->get_lock_user_data( $lock_user_id ) : null,
+			),
+			'initialServerDate' => $current_time,
+			'dateFormat' => get_option( 'date_format' ),
+			'timeFormat' => get_option( 'time_format' ),
+			'initialServerTimestamp' => floor( microtime( true ) * 1000 ),
+			'initialClientTimestamp' => -1, // To be set with JS below.
+			'timeouts' => array(
+				'windowRefresh' => 250,
+				'changesetAutoSave' => AUTOSAVE_INTERVAL * 1000,
+				'keepAliveCheck' => 2500,
+				'reflowPaneContents' => 100,
+				'previewFrameSensitivity' => 2000,
+			),
+			'theme'    => array(
+				'stylesheet'  => $this->get_stylesheet(),
+				'active'      => $this->is_theme_active(),
+				'_canInstall' => current_user_can( 'install_themes' ),
+			),
+			'url'      => array(
+				'preview'       => esc_url_raw( $this->get_preview_url() ),
+				'return'        => esc_url_raw( $this->get_return_url() ),
+				'parent'        => esc_url_raw( admin_url() ),
+				'activated'     => esc_url_raw( home_url( '/' ) ),
+				'ajax'          => esc_url_raw( admin_url( 'admin-ajax.php', 'relative' ) ),
+				'allowed'       => array_map( 'esc_url_raw', $this->get_allowed_urls() ),
+				'isCrossDomain' => $this->is_cross_domain(),
+				'home'          => esc_url_raw( home_url( '/' ) ),
+				'login'         => esc_url_raw( $login_url ),
+			),
+			'browser'  => array(
+				'mobile' => wp_is_mobile(),
+				'ios'    => $this->is_ios(),
+			),
+			'panels'   => array(),
+			'sections' => array(),
+			'nonce'    => $this->get_nonces(),
+			'autofocus' => $this->get_autofocus(),
+			'documentTitleTmpl' => $this->get_document_title_template(),
+			'previewableDevices' => $this->get_previewable_devices(),
+			'l10n' => array(
+				'confirmDeleteTheme' => __( 'Are you sure you want to delete this theme?' ),
+				/* translators: %d: number of theme search results, which cannot currently consider singular vs. plural forms */
+				'themeSearchResults' => __( '%d themes found' ),
+				/* translators: %d: number of themes being displayed, which cannot currently consider singular vs. plural forms */
+				'announceThemeCount' => __( 'Displaying %d themes' ),
+				/* translators: %s: theme name */
+				'announceThemeDetails' => __( 'Showing details for theme: %s' ),
+			),
+		);
+
+		// Temporarily disable installation in Customizer. See #42184.
+		$filesystem_method = get_filesystem_method();
+		ob_start();
+		$filesystem_credentials_are_stored = request_filesystem_credentials( self_admin_url() );
+		ob_end_clean();
+		if ( 'direct' !== $filesystem_method && ! $filesystem_credentials_are_stored ) {
+			$settings['theme']['_filesystemCredentialsNeeded'] = true;
+		}
+
+		// Prepare Customize Section objects to pass to JavaScript.
+		foreach ( $this->sections() as $id => $section ) {
+			if ( $section->check_capabilities() ) {
+				$settings['sections'][ $id ] = $section->json();
+			}
+		}
+
+		// Prepare Customize Panel objects to pass to JavaScript.
+		foreach ( $this->panels() as $panel_id => $panel ) {
+			if ( $panel->check_capabilities() ) {
+				$settings['panels'][ $panel_id ] = $panel->json();
+				foreach ( $panel->sections as $section_id => $section ) {
+					if ( $section->check_capabilities() ) {
+						$settings['sections'][ $section_id ] = $section->json();
+					}
+				}
+			}
+		}
+
+		?>
+		<script type="text/javascript">
+			var _wpCustomizeSettings = <?php echo wp_json_encode( $settings ); ?>;
+			_wpCustomizeSettings.initialClientTimestamp = _.now();
+			_wpCustomizeSettings.controls = {};
+			_wpCustomizeSettings.settings = {};
+			<?php
+
+			// Serialize settings one by one to improve memory usage.
+			echo "(function ( s ){\n";
+			foreach ( $this->settings() as $setting ) {
+				if ( $setting->check_capabilities() ) {
+					printf(
+						"s[%s] = %s;\n",
+						wp_json_encode( $setting->id ),
+						wp_json_encode( $setting->json() )
+					);
+				}
+			}
+			echo "})( _wpCustomizeSettings.settings );\n";
+
+			// Serialize controls one by one to improve memory usage.
+			echo "(function ( c ){\n";
+			foreach ( $this->controls() as $control ) {
+				if ( $control->check_capabilities() ) {
+					printf(
+						"c[%s] = %s;\n",
+						wp_json_encode( $control->id ),
+						wp_json_encode( $control->json() )
+					);
+				}
+			}
+			echo "})( _wpCustomizeSettings.controls );\n";
+		?>
+		</script>
+		<?php
+	}
+
+	/**
+	 * Returns a list of devices to allow previewing.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @return array List of devices with labels and default setting.
+	 */
+	public function get_previewable_devices() {
+		$devices = array(
+			'desktop' => array(
+				'label' => __( 'Enter desktop preview mode' ),
+				'default' => true,
+			),
+			'tablet' => array(
+				'label' => __( 'Enter tablet preview mode' ),
+			),
+			'mobile' => array(
+				'label' => __( 'Enter mobile preview mode' ),
+			),
+		);
+
+		/**
+		 * Filters the available devices to allow previewing in the Customizer.
+		 *
+		 * @since 4.5.0
+		 *
+		 * @see WP_Customize_Manager::get_previewable_devices()
+		 *
+		 * @param array $devices List of devices with labels and default setting.
+		 */
+		$devices = apply_filters( 'customize_previewable_devices', $devices );
+
+		return $devices;
+	}
+
+	/**
+	 * Register some default controls.
+	 *
+	 * @since 3.4.0
+	 */
+	public function register_controls() {
+
+		/* Themes (controls are loaded via ajax) */
+
+		$this->add_panel( new WP_Customize_Themes_Panel( $this, 'themes', array(
+			'title'       => $this->theme()->display( 'Name' ),
+			'description' => (
+				'<p>' . __( 'Looking for a theme? You can search or browse the WordPress.org theme directory, install and preview themes, then activate them right here.' ) . '</p>' .
+				'<p>' . __( 'While previewing a new theme, you can continue to tailor things like widgets and menus, and explore theme-specific options.' ) . '</p>'
+			),
+			'capability'  => 'switch_themes',
+			'priority'    => 0,
+		) ) );
+
+		$this->add_section( new WP_Customize_Themes_Section( $this, 'installed_themes', array(
+			'title'       => __( 'Installed themes' ),
+			'action'      => 'installed',
+			'capability'  => 'switch_themes',
+			'panel'       => 'themes',
+			'priority'    => 0,
+		) ) );
+
+		if ( ! is_multisite() ) {
+			$this->add_section( new WP_Customize_Themes_Section( $this, 'wporg_themes', array(
+				'title'       => __( 'WordPress.org themes' ),
+				'action'      => 'wporg',
+				'filter_type' => 'remote',
+				'capability'  => 'install_themes',
+				'panel'       => 'themes',
+				'priority'    => 5,
+			) ) );
+		}
+
+		// Themes Setting (unused - the theme is considerably more fundamental to the Customizer experience).
+		$this->add_setting( new WP_Customize_Filter_Setting( $this, 'active_theme', array(
+			'capability' => 'switch_themes',
+		) ) );
+
+		/* Site Identity */
+
+		$this->add_section( 'title_tagline', array(
+			'title'    => __( 'Site Identity' ),
+			'priority' => 20,
+		) );
+
+		$this->add_setting( 'blogname', array(
+			'default'    => get_option( 'blogname' ),
+			'type'       => 'option',
+			'capability' => 'manage_options',
+		) );
+
+		$this->add_control( 'blogname', array(
+			'label'      => __( 'Site Title' ),
+			'section'    => 'title_tagline',
+		) );
+
+		$this->add_setting( 'blogdescription', array(
+			'default'    => get_option( 'blogdescription' ),
+			'type'       => 'option',
+			'capability' => 'manage_options',
+		) );
+
+		$this->add_control( 'blogdescription', array(
+			'label'      => __( 'Tagline' ),
+			'section'    => 'title_tagline',
+		) );
+
+		// Add a setting to hide header text if the theme doesn't support custom headers.
+		if ( ! current_theme_supports( 'custom-header', 'header-text' ) ) {
+			$this->add_setting( 'header_text', array(
+				'theme_supports'    => array( 'custom-logo', 'header-text' ),
+				'default'           => 1,
+				'sanitize_callback' => 'absint',
+			) );
+
+			$this->add_control( 'header_text', array(
+				'label'    => __( 'Display Site Title and Tagline' ),
+				'section'  => 'title_tagline',
+				'settings' => 'header_text',
+				'type'     => 'checkbox',
+			) );
+		}
+
+		$this->add_setting( 'site_icon', array(
+			'type'       => 'option',
+			'capability' => 'manage_options',
+			'transport'  => 'postMessage', // Previewed with JS in the Customizer controls window.
+		) );
+
+		$this->add_control( new WP_Customize_Site_Icon_Control( $this, 'site_icon', array(
+			'label'       => __( 'Site Icon' ),
+			'description' => sprintf(
+				'<p>' . __( 'Site Icons are what you see in browser tabs, bookmark bars, and within the WordPress mobile apps. Upload one here!' ) . '</p>' .
+				/* translators: %s: site icon size in pixels */
+				'<p>' . __( 'Site Icons should be square and at least %s pixels.' ) . '</p>',
+				'<strong>512 &times; 512</strong>'
+			),
+			'section'     => 'title_tagline',
+			'priority'    => 60,
+			'height'      => 512,
+			'width'       => 512,
+		) ) );
+
+		$this->add_setting( 'custom_logo', array(
+			'theme_supports' => array( 'custom-logo' ),
+			'transport'      => 'postMessage',
+		) );
+
+		$custom_logo_args = get_theme_support( 'custom-logo' );
+		$this->add_control( new WP_Customize_Cropped_Image_Control( $this, 'custom_logo', array(
+			'label'         => __( 'Logo' ),
+			'section'       => 'title_tagline',
+			'priority'      => 8,
+			'height'        => $custom_logo_args[0]['height'],
+			'width'         => $custom_logo_args[0]['width'],
+			'flex_height'   => $custom_logo_args[0]['flex-height'],
+			'flex_width'    => $custom_logo_args[0]['flex-width'],
+			'button_labels' => array(
+				'select'       => __( 'Select logo' ),
+				'change'       => __( 'Change logo' ),
+				'remove'       => __( 'Remove' ),
+				'default'      => __( 'Default' ),
+				'placeholder'  => __( 'No logo selected' ),
+				'frame_title'  => __( 'Select logo' ),
+				'frame_button' => __( 'Choose logo' ),
+			),
+		) ) );
+
+		$this->selective_refresh->add_partial( 'custom_logo', array(
+			'settings'            => array( 'custom_logo' ),
+			'selector'            => '.custom-logo-link',
+			'render_callback'     => array( $this, '_render_custom_logo_partial' ),
+			'container_inclusive' => true,
+		) );
+
+		/* Colors */
+
+		$this->add_section( 'colors', array(
+			'title'          => __( 'Colors' ),
+			'priority'       => 40,
+		) );
+
+		$this->add_setting( 'header_textcolor', array(
+			'theme_supports' => array( 'custom-header', 'header-text' ),
+			'default'        => get_theme_support( 'custom-header', 'default-text-color' ),
+
+			'sanitize_callback'    => array( $this, '_sanitize_hea
