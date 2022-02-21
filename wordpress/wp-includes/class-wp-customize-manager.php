@@ -5234,4 +5234,312 @@ final class WP_Customize_Manager {
 			'section' => 'static_front_page',
 			'type' => 'radio',
 			'choices' => array(
-				'
+				'posts' => __( 'Your latest posts' ),
+				'page'  => __( 'A static page' ),
+			),
+		) );
+
+		$this->add_setting( 'page_on_front', array(
+			'type'       => 'option',
+			'capability' => 'manage_options',
+		) );
+
+		$this->add_control( 'page_on_front', array(
+			'label' => __( 'Homepage' ),
+			'section' => 'static_front_page',
+			'type' => 'dropdown-pages',
+			'allow_addition' => true,
+		) );
+
+		$this->add_setting( 'page_for_posts', array(
+			'type' => 'option',
+			'capability' => 'manage_options',
+		) );
+
+		$this->add_control( 'page_for_posts', array(
+			'label' => __( 'Posts page' ),
+			'section' => 'static_front_page',
+			'type' => 'dropdown-pages',
+			'allow_addition' => true,
+		) );
+
+		/* Custom CSS */
+		$section_description = '<p>';
+		$section_description .= __( 'Add your own CSS code here to customize the appearance and layout of your site.' );
+		$section_description .= sprintf(
+			' <a href="%1$s" class="external-link" target="_blank">%2$s<span class="screen-reader-text"> %3$s</span></a>',
+			esc_url( __( 'https://codex.wordpress.org/CSS' ) ),
+			__( 'Learn more about CSS' ),
+			/* translators: accessibility text */
+			__( '(opens in a new window)' )
+		);
+		$section_description .= '</p>';
+
+		$section_description .= '<p id="editor-keyboard-trap-help-1">' . __( 'When using a keyboard to navigate:' ) . '</p>';
+		$section_description .= '<ul>';
+		$section_description .= '<li id="editor-keyboard-trap-help-2">' . __( 'In the editing area, the Tab key enters a tab character.' ) . '</li>';
+		$section_description .= '<li id="editor-keyboard-trap-help-3">' . __( 'To move away from this area, press the Esc key followed by the Tab key.' ) . '</li>';
+		$section_description .= '<li id="editor-keyboard-trap-help-4">' . __( 'Screen reader users: when in forms mode, you may need to press the escape key twice.' ) . '</li>';
+		$section_description .= '</ul>';
+
+		if ( 'false' !== wp_get_current_user()->syntax_highlighting ) {
+			$section_description .= '<p>';
+			$section_description .= sprintf(
+				/* translators: 1: link to user profile, 2: additional link attributes, 3: accessibility text */
+				__( 'The edit field automatically highlights code syntax. You can disable this in your <a href="%1$s" %2$s>user profile%3$s</a> to work in plain text mode.' ),
+				esc_url( get_edit_profile_url() ),
+				'class="external-link" target="_blank"',
+				sprintf( '<span class="screen-reader-text"> %s</span>',
+					/* translators: accessibility text */
+					__( '(opens in a new window)' )
+				)
+			);
+			$section_description .= '</p>';
+		}
+
+		$section_description .= '<p class="section-description-buttons">';
+		$section_description .= '<button type="button" class="button-link section-description-close">' . __( 'Close' ) . '</button>';
+		$section_description .= '</p>';
+
+		$this->add_section( 'custom_css', array(
+			'title'              => __( 'Additional CSS' ),
+			'priority'           => 200,
+			'description_hidden' => true,
+			'description'        => $section_description,
+		) );
+
+		$custom_css_setting = new WP_Customize_Custom_CSS_Setting( $this, sprintf( 'custom_css[%s]', get_stylesheet() ), array(
+			'capability' => 'edit_css',
+			'default' => '',
+		) );
+		$this->add_setting( $custom_css_setting );
+
+		$this->add_control( new WP_Customize_Code_Editor_Control( $this, 'custom_css', array(
+			'label'       => __( 'CSS code' ),
+			'section'     => 'custom_css',
+			'settings'    => array( 'default' => $custom_css_setting->id ),
+			'code_type'   => 'text/css',
+			'input_attrs' => array(
+				'aria-describedby' => 'editor-keyboard-trap-help-1 editor-keyboard-trap-help-2 editor-keyboard-trap-help-3 editor-keyboard-trap-help-4',
+			),
+		) ) );
+	}
+
+	/**
+	 * Return whether there are published pages.
+	 *
+	 * Used as active callback for static front page section and controls.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @returns bool Whether there are published (or to be published) pages.
+	 */
+	public function has_published_pages() {
+
+		$setting = $this->get_setting( 'nav_menus_created_posts' );
+		if ( $setting ) {
+			foreach ( $setting->value() as $post_id ) {
+				if ( 'page' === get_post_type( $post_id ) ) {
+					return true;
+				}
+			}
+		}
+		return 0 !== count( get_pages() );
+	}
+
+	/**
+	 * Add settings from the POST data that were not added with code, e.g. dynamically-created settings for Widgets
+	 *
+	 * @since 4.2.0
+	 *
+	 * @see add_dynamic_settings()
+	 */
+	public function register_dynamic_settings() {
+		$setting_ids = array_keys( $this->unsanitized_post_values() );
+		$this->add_dynamic_settings( $setting_ids );
+	}
+
+	/**
+	 * Load themes into the theme browsing/installation UI.
+	 *
+	 * @since 4.9.0
+	 */
+	public function handle_load_themes_request() {
+		check_ajax_referer( 'switch_themes', 'nonce' );
+
+		if ( ! current_user_can( 'switch_themes' ) ) {
+			wp_die( -1 );
+		}
+
+		if ( empty( $_POST['theme_action'] ) ) {
+			wp_send_json_error( 'missing_theme_action' );
+		}
+		$theme_action = sanitize_key( $_POST['theme_action'] );
+		$themes = array();
+		$args = array();
+
+		// Define query filters based on user input.
+		if ( ! array_key_exists( 'search', $_POST ) ) {
+			$args['search'] = '';
+		} else {
+			$args['search'] = sanitize_text_field( wp_unslash( $_POST['search'] ) );
+		}
+
+		if ( ! array_key_exists( 'tags', $_POST ) ) {
+			$args['tag'] = '';
+		} else {
+			$args['tag'] = array_map( 'sanitize_text_field', wp_unslash( (array) $_POST['tags'] ) );
+		}
+
+		if ( ! array_key_exists( 'page', $_POST ) ) {
+			$args['page'] = 1;
+		} else {
+			$args['page'] = absint( $_POST['page'] );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/theme.php';
+
+		if ( 'installed' === $theme_action ) {
+
+			// Load all installed themes from wp_prepare_themes_for_js().
+			$themes = array( 'themes' => wp_prepare_themes_for_js() );
+			foreach ( $themes['themes'] as &$theme ) {
+				$theme['type'] = 'installed';
+				$theme['active'] = ( isset( $_POST['customized_theme'] ) && $_POST['customized_theme'] === $theme['id'] );
+			}
+
+		} elseif ( 'wporg' === $theme_action ) {
+
+			// Load WordPress.org themes from the .org API and normalize data to match installed theme objects.
+			if ( ! current_user_can( 'install_themes' ) ) {
+				wp_die( -1 );
+			}
+
+			// Arguments for all queries.
+			$wporg_args = array(
+				'per_page' => 100,
+				'fields' => array(
+					'screenshot_url' => true,
+					'description' => true,
+					'rating' => true,
+					'downloaded' => true,
+					'downloadlink' => true,
+					'last_updated' => true,
+					'homepage' => true,
+					'num_ratings' => true,
+					'tags' => true,
+					'parent' => true,
+					// 'extended_author' => true, @todo: WordPress.org throws a 500 server error when this is here.
+				),
+			);
+
+			$args = array_merge( $wporg_args, $args );
+
+			if ( '' === $args['search'] && '' === $args['tag'] ) {
+				$args['browse'] = 'new'; // Sort by latest themes by default.
+			}
+
+			// Load themes from the .org API.
+			$themes = themes_api( 'query_themes', $args );
+			if ( is_wp_error( $themes ) ) {
+				wp_send_json_error();
+			}
+
+			// This list matches the allowed tags in wp-admin/includes/theme-install.php.
+			$themes_allowedtags = array_fill_keys(
+				array( 'a', 'abbr', 'acronym', 'code', 'pre', 'em', 'strong', 'div', 'p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img' ),
+				array()
+			);
+			$themes_allowedtags['a'] = array_fill_keys( array( 'href', 'title', 'target' ), true );
+			$themes_allowedtags['acronym']['title'] = true;
+			$themes_allowedtags['abbr']['title'] = true;
+			$themes_allowedtags['img'] = array_fill_keys( array( 'src', 'class', 'alt' ), true );
+
+			// Prepare a list of installed themes to check against before the loop.
+			$installed_themes = array();
+			$wp_themes = wp_get_themes();
+			foreach ( $wp_themes as $theme ) {
+				$installed_themes[] = $theme->get_stylesheet();
+			}
+			$update_php = network_admin_url( 'update.php?action=install-theme' );
+
+			// Set up properties for themes available on WordPress.org.
+			foreach ( $themes->themes as &$theme ) {
+				$theme->install_url = add_query_arg( array(
+					'theme'    => $theme->slug,
+					'_wpnonce' => wp_create_nonce( 'install-theme_' . $theme->slug ),
+				), $update_php );
+
+				$theme->name        = wp_kses( $theme->name, $themes_allowedtags );
+				$theme->author      = wp_kses( $theme->author, $themes_allowedtags );
+				$theme->version     = wp_kses( $theme->version, $themes_allowedtags );
+				$theme->description = wp_kses( $theme->description, $themes_allowedtags );
+				$theme->tags        = implode( ', ', $theme->tags );
+				$theme->stars       = wp_star_rating( array(
+					'rating' => $theme->rating,
+					'type' => 'percent',
+					'number' => $theme->num_ratings,
+					'echo' => false,
+				) );
+				$theme->num_ratings = number_format_i18n( $theme->num_ratings );
+				$theme->preview_url = set_url_scheme( $theme->preview_url );
+
+				// Handle themes that are already installed as installed themes.
+				if ( in_array( $theme->slug, $installed_themes, true ) ) {
+					$theme->type = 'installed';
+				} else {
+					$theme->type = $theme_action;
+				}
+
+				// Set active based on customized theme.
+				$theme->active = ( isset( $_POST['customized_theme'] ) && $_POST['customized_theme'] === $theme->slug );
+
+				// Map available theme properties to installed theme properties.
+				$theme->id           = $theme->slug;
+				$theme->screenshot   = array( $theme->screenshot_url );
+				$theme->authorAndUri = $theme->author;
+				// The .org API can return the full parent theme details if passed the 'parent' arg, or if passed the 'template' option it'll return that in the event it's a child theme.
+				if ( isset( $theme->parent ) ) {
+					$theme->parent = $theme->parent['slug'];
+				} else {
+					$theme->parent = false;
+				}
+				unset( $theme->slug );
+				unset( $theme->screenshot_url );
+				unset( $theme->author );
+			} // End foreach().
+		} // End if().
+
+		/**
+		 * Filters the theme data loaded in the customizer.
+		 *
+		 * This allows theme data to be loading from an external source,
+		 * or modification of data loaded from `wp_prepare_themes_for_js()`
+		 * or WordPress.org via `themes_api()`.
+		 *
+		 * @since 4.9.0
+		 *
+		 * @see wp_prepare_themes_for_js()
+		 * @see themes_api()
+		 * @see WP_Customize_Manager::__construct()
+		 *
+		 * @param array                $themes  Nested array of theme data.
+		 * @param array                $args    List of arguments, such as page, search term, and tags to query for.
+		 * @param WP_Customize_Manager $manager Instance of Customize manager.
+		 */
+		$themes = apply_filters( 'customize_load_themes', $themes, $args, $this );
+
+		wp_send_json_success( $themes );
+	}
+
+
+	/**
+	 * Callback for validating the header_textcolor value.
+	 *
+	 * Accepts 'blank', and otherwise uses sanitize_hex_color_no_hash().
+	 * Returns default text color if hex color is empty.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $color
+	 * @return mixe
