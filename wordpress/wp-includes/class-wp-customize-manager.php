@@ -5542,4 +5542,160 @@ final class WP_Customize_Manager {
 	 * @since 3.4.0
 	 *
 	 * @param string $color
-	 * @return mixe
+	 * @return mixed
+	 */
+	public function _sanitize_header_textcolor( $color ) {
+		if ( 'blank' === $color )
+			return 'blank';
+
+		$color = sanitize_hex_color_no_hash( $color );
+		if ( empty( $color ) )
+			$color = get_theme_support( 'custom-header', 'default-text-color' );
+
+		return $color;
+	}
+
+	/**
+	 * Callback for validating a background setting value.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string $value Repeat value.
+	 * @param WP_Customize_Setting $setting Setting.
+	 * @return string|WP_Error Background value or validation error.
+	 */
+	public function _sanitize_background_setting( $value, $setting ) {
+		if ( 'background_repeat' === $setting->id ) {
+			if ( ! in_array( $value, array( 'repeat-x', 'repeat-y', 'repeat', 'no-repeat' ) ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background repeat.' ) );
+			}
+		} elseif ( 'background_attachment' === $setting->id ) {
+			if ( ! in_array( $value, array( 'fixed', 'scroll' ) ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background attachment.' ) );
+			}
+		} elseif ( 'background_position_x' === $setting->id ) {
+			if ( ! in_array( $value, array( 'left', 'center', 'right' ), true ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background position X.' ) );
+			}
+		} elseif ( 'background_position_y' === $setting->id ) {
+			if ( ! in_array( $value, array( 'top', 'center', 'bottom' ), true ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background position Y.' ) );
+			}
+		} elseif ( 'background_size' === $setting->id ) {
+			if ( ! in_array( $value, array( 'auto', 'contain', 'cover' ), true ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background size.' ) );
+			}
+		} elseif ( 'background_preset' === $setting->id ) {
+			if ( ! in_array( $value, array( 'default', 'fill', 'fit', 'repeat', 'custom' ), true ) ) {
+				return new WP_Error( 'invalid_value', __( 'Invalid value for background size.' ) );
+			}
+		} elseif ( 'background_image' === $setting->id || 'background_image_thumb' === $setting->id ) {
+			$value = empty( $value ) ? '' : esc_url_raw( $value );
+		} else {
+			return new WP_Error( 'unrecognized_setting', __( 'Unrecognized background setting.' ) );
+		}
+		return $value;
+	}
+
+	/**
+	 * Export header video settings to facilitate selective refresh.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $response Response.
+	 * @param WP_Customize_Selective_Refresh $selective_refresh Selective refresh component.
+	 * @param array $partials Array of partials.
+	 * @return array
+	 */
+	public function export_header_video_settings( $response, $selective_refresh, $partials ) {
+		if ( isset( $partials['custom_header'] ) ) {
+			$response['custom_header_settings'] = get_header_video_settings();
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Callback for validating the header_video value.
+	 *
+	 * Ensures that the selected video is less than 8MB and provides an error message.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Error $validity
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	public function _validate_header_video( $validity, $value ) {
+		$video = get_attached_file( absint( $value ) );
+		if ( $video ) {
+			$size = filesize( $video );
+			if ( 8 < $size / pow( 1024, 2 ) ) { // Check whether the size is larger than 8MB.
+				$validity->add( 'size_too_large',
+					__( 'This video file is too large to use as a header video. Try a shorter video or optimize the compression settings and re-upload a file that is less than 8MB. Or, upload your video to YouTube and link it with the option below.' )
+				);
+			}
+			if ( '.mp4' !== substr( $video, -4 ) && '.mov' !== substr( $video, -4 ) ) { // Check for .mp4 or .mov format, which (assuming h.264 encoding) are the only cross-browser-supported formats.
+				$validity->add( 'invalid_file_type', sprintf(
+					/* translators: 1: .mp4, 2: .mov */
+					__( 'Only %1$s or %2$s files may be used for header video. Please convert your video file and try again, or, upload your video to YouTube and link it with the option below.' ),
+					'<code>.mp4</code>',
+					'<code>.mov</code>'
+				) );
+			}
+		}
+		return $validity;
+	}
+
+	/**
+	 * Callback for validating the external_header_video value.
+	 *
+	 * Ensures that the provided URL is supported.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Error $validity
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	public function _validate_external_header_video( $validity, $value ) {
+		$video = esc_url_raw( $value );
+		if ( $video ) {
+			if ( ! preg_match( '#^https?://(?:www\.)?(?:youtube\.com/watch|youtu\.be/)#', $video ) ) {
+				$validity->add( 'invalid_url', __( 'Please enter a valid YouTube URL.' ) );
+			}
+		}
+		return $validity;
+	}
+
+	/**
+	 * Callback for sanitizing the external_header_video value.
+	 *
+	 * @since 4.7.1
+	 *
+	 * @param string $value URL.
+	 * @return string Sanitized URL.
+	 */
+	public function _sanitize_external_header_video( $value ) {
+		return esc_url_raw( trim( $value ) );
+	}
+
+	/**
+	 * Callback for rendering the custom logo, used in the custom_logo partial.
+	 *
+	 * This method exists because the partial object and context data are passed
+	 * into a partial's render_callback so we cannot use get_custom_logo() as
+	 * the render_callback directly since it expects a blog ID as the first
+	 * argument. When WP no longer supports PHP 5.3, this method can be removed
+	 * in favor of an anonymous function.
+	 *
+	 * @see WP_Customize_Manager::register_controls()
+	 *
+	 * @since 4.5.0
+	 *
+	 * @return string Custom logo.
+	 */
+	public function _render_custom_logo_partial() {
+		return get_custom_logo();
+	}
+}
