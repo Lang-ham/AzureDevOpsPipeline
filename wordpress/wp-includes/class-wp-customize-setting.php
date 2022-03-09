@@ -882,4 +882,77 @@ class WP_Customize_Setting {
 	 *
 	 * @param $root
 	 * @param $keys
-	 * @param mixed $value The value 
+	 * @param mixed $value The value to update.
+	 * @return mixed
+	 */
+	final protected function multidimensional_replace( $root, $keys, $value ) {
+		if ( ! isset( $value ) )
+			return $root;
+		elseif ( empty( $keys ) ) // If there are no keys, we're replacing the root.
+			return $value;
+
+		$result = $this->multidimensional( $root, $keys, true );
+
+		if ( isset( $result ) )
+			$result['node'][ $result['key'] ] = $value;
+
+		return $root;
+	}
+
+	/**
+	 * Will attempt to fetch a specific value from a multidimensional array.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param $root
+	 * @param $keys
+	 * @param mixed $default A default value which is used as a fallback. Default is null.
+	 * @return mixed The requested value or the default value.
+	 */
+	final protected function multidimensional_get( $root, $keys, $default = null ) {
+		if ( empty( $keys ) ) // If there are no keys, test the root.
+			return isset( $root ) ? $root : $default;
+
+		$result = $this->multidimensional( $root, $keys );
+		return isset( $result ) ? $result['node'][ $result['key'] ] : $default;
+	}
+
+	/**
+	 * Will attempt to check if a specific value in a multidimensional array is set.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param $root
+	 * @param $keys
+	 * @return bool True if value is set, false if not.
+	 */
+	final protected function multidimensional_isset( $root, $keys ) {
+		$result = $this->multidimensional_get( $root, $keys );
+		return isset( $result );
+	}
+}
+
+/**
+ * WP_Customize_Filter_Setting class.
+ */
+require_once( ABSPATH . WPINC . '/customize/class-wp-customize-filter-setting.php' );
+
+/**
+ * WP_Customize_Header_Image_Setting class.
+ */
+require_once( ABSPATH . WPINC . '/customize/class-wp-customize-header-image-setting.php' );
+
+/**
+ * WP_Customize_Background_Image_Setting class.
+ */
+require_once( ABSPATH . WPINC . '/customize/class-wp-customize-background-image-setting.php' );
+
+/**
+ * WP_Customize_Nav_Menu_Item_Setting class.
+ */
+require_once( ABSPATH . WPINC . '/customize/class-wp-customize-nav-menu-item-setting.php' );
+
+/**
+ * WP_Customize_Nav_Menu_Setting class.
+ */
+require_once( ABSPATH . WPINC . '/customize/class-wp-customize-nav-menu-setting.php' );
