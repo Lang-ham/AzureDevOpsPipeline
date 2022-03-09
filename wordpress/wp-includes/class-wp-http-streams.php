@@ -428,4 +428,5 @@ class WP_Http_Streams {
  * @deprecated 3.7.0 Please use WP_HTTP::request() directly
  */
 class WP_HTTP_Fsockopen extends WP_HTTP_Streams {
-	// For backward compatibility for users who 
+	// For backward compatibility for users who are using the class directly.
+}
