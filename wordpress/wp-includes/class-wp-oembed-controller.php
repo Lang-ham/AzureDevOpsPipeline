@@ -127,4 +127,74 @@ final class WP_oEmbed_Controller {
 	}
 
 	/**
-	 * Checks if current user ca
+	 * Checks if current user can make a proxy oEmbed request.
+	 *
+	 * @since 4.8.0
+	 *
+	 * @return true|WP_Error True if the request has read access, WP_Error object otherwise.
+	 */
+	public function get_proxy_item_permissions_check() {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to make proxied oEmbed requests.' ), array( 'status' => rest_authorization_required_code() ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Callback for the proxy API endpoint.
+	 *
+	 * Returns the JSON object for the proxied item.
+	 *
+	 * @since 4.8.0
+	 *
+	 * @see WP_oEmbed::get_html()
+	 * @param WP_REST_Request $request Full data about the request.
+	 * @return object|WP_Error oEmbed response data or WP_Error on failure.
+	 */
+	public function get_proxy_item( $request ) {
+		$args = $request->get_params();
+
+		// Serve oEmbed data from cache if set.
+		unset( $args['_wpnonce'] );
+		$cache_key = 'oembed_' . md5( serialize( $args ) );
+		$data = get_transient( $cache_key );
+		if ( ! empty( $data ) ) {
+			return $data;
+		}
+
+		$url = $request['url'];
+		unset( $args['url'] );
+
+		// Copy maxwidth/maxheight to width/height since WP_oEmbed::fetch() uses these arg names.
+		if ( isset( $args['maxwidth'] ) ) {
+			$args['width'] = $args['maxwidth'];
+		}
+		if ( isset( $args['maxheight'] ) ) {
+			$args['height'] = $args['maxheight'];
+		}
+
+		$data = _wp_oembed_get_object()->get_data( $url, $args );
+
+		if ( false === $data ) {
+			return new WP_Error( 'oembed_invalid_url', get_status_header_desc( 404 ), array( 'status' => 404 ) );
+		}
+
+		/**
+		 * Filters the oEmbed TTL value (time to live).
+		 *
+		 * Similar to the {@see 'oembed_ttl'} filter, but for the REST API
+		 * oEmbed proxy endpoint.
+		 *
+		 * @since 4.8.0
+		 *
+		 * @param int    $time    Time to live (in seconds).
+		 * @param string $url     The attempted embed URL.
+		 * @param array  $args    An array of embed request arguments.
+		 */
+		$ttl = apply_filters( 'rest_oembed_ttl', DAY_IN_SECONDS, $url, $args );
+
+		set_transient( $cache_key, $data, $ttl );
+
+		return $data;
+	}
+}
