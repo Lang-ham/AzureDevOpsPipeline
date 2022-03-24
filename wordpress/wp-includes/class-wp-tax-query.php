@@ -368,4 +368,282 @@ class WP_Tax_Query {
 	}
 
 	/**
-	 * 
+	 * Generate SQL JOIN and WHERE clauses for a "first-order" query clause.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @global wpdb $wpdb The WordPress database abstraction object.
+	 *
+	 * @param array $clause       Query clause (passed by reference).
+	 * @param array $parent_query Parent query array.
+	 * @return array {
+	 *     Array containing JOIN and WHERE SQL clauses to append to a first-order query.
+	 *
+	 *     @type string $join  SQL fragment to append to the main JOIN clause.
+	 *     @type string $where SQL fragment to append to the main WHERE clause.
+	 * }
+	 */
+	public function get_sql_for_clause( &$clause, $parent_query ) {
+		global $wpdb;
+
+		$sql = array(
+			'where' => array(),
+			'join'  => array(),
+		);
+
+		$join = $where = '';
+
+		$this->clean_query( $clause );
+
+		if ( is_wp_error( $clause ) ) {
+			return self::$no_results;
+		}
+
+		$terms = $clause['terms'];
+		$operator = strtoupper( $clause['operator'] );
+
+		if ( 'IN' == $operator ) {
+
+			if ( empty( $terms ) ) {
+				return self::$no_results;
+			}
+
+			$terms = implode( ',', $terms );
+
+			/*
+			 * Before creating another table join, see if this clause has a
+			 * sibling with an existing join that can be shared.
+			 */
+			$alias = $this->find_compatible_table_alias( $clause, $parent_query );
+			if ( false === $alias ) {
+				$i = count( $this->table_aliases );
+				$alias = $i ? 'tt' . $i : $wpdb->term_relationships;
+
+				// Store the alias as part of a flat array to build future iterators.
+				$this->table_aliases[] = $alias;
+
+				// Store the alias with this clause, so later siblings can use it.
+				$clause['alias'] = $alias;
+
+				$join .= " LEFT JOIN $wpdb->term_relationships";
+				$join .= $i ? " AS $alias" : '';
+				$join .= " ON ($this->primary_table.$this->primary_id_column = $alias.object_id)";
+			}
+
+
+			$where = "$alias.term_taxonomy_id $operator ($terms)";
+
+		} elseif ( 'NOT IN' == $operator ) {
+
+			if ( empty( $terms ) ) {
+				return $sql;
+			}
+
+			$terms = implode( ',', $terms );
+
+			$where = "$this->primary_table.$this->primary_id_column NOT IN (
+				SELECT object_id
+				FROM $wpdb->term_relationships
+				WHERE term_taxonomy_id IN ($terms)
+			)";
+
+		} elseif ( 'AND' == $operator ) {
+
+			if ( empty( $terms ) ) {
+				return $sql;
+			}
+
+			$num_terms = count( $terms );
+
+			$terms = implode( ',', $terms );
+
+			$where = "(
+				SELECT COUNT(1)
+				FROM $wpdb->term_relationships
+				WHERE term_taxonomy_id IN ($terms)
+				AND object_id = $this->primary_table.$this->primary_id_column
+			) = $num_terms";
+
+		} elseif ( 'NOT EXISTS' === $operator || 'EXISTS' === $operator ) {
+
+			$where = $wpdb->prepare( "$operator (
+				SELECT 1
+				FROM $wpdb->term_relationships
+				INNER JOIN $wpdb->term_taxonomy
+				ON $wpdb->term_taxonomy.term_taxonomy_id = $wpdb->term_relationships.term_taxonomy_id
+				WHERE $wpdb->term_taxonomy.taxonomy = %s
+				AND $wpdb->term_relationships.object_id = $this->primary_table.$this->primary_id_column
+			)", $clause['taxonomy'] );
+
+		}
+
+		$sql['join'][]  = $join;
+		$sql['where'][] = $where;
+		return $sql;
+	}
+
+	/**
+	 * Identify an existing table alias that is compatible with the current query clause.
+	 *
+	 * We avoid unnecessary table joins by allowing each clause to look for
+	 * an existing table alias that is compatible with the query that it
+	 * needs to perform.
+	 *
+	 * An existing alias is compatible if (a) it is a sibling of `$clause`
+	 * (ie, it's under the scope of the same relation), and (b) the combination
+	 * of operator and relation between the clauses allows for a shared table
+	 * join. In the case of WP_Tax_Query, this only applies to 'IN'
+	 * clauses that are connected by the relation 'OR'.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param array       $clause       Query clause.
+	 * @param array       $parent_query Parent query of $clause.
+	 * @return string|false Table alias if found, otherwise false.
+	 */
+	protected function find_compatible_table_alias( $clause, $parent_query ) {
+		$alias = false;
+
+		// Sanity check. Only IN queries use the JOIN syntax .
+		if ( ! isset( $clause['operator'] ) || 'IN' !== $clause['operator'] ) {
+			return $alias;
+		}
+
+		// Since we're only checking IN queries, we're only concerned with OR relations.
+		if ( ! isset( $parent_query['relation'] ) || 'OR' !== $parent_query['relation'] ) {
+			return $alias;
+		}
+
+		$compatible_operators = array( 'IN' );
+
+		foreach ( $parent_query as $sibling ) {
+			if ( ! is_array( $sibling ) || ! $this->is_first_order_clause( $sibling ) ) {
+				continue;
+			}
+
+			if ( empty( $sibling['alias'] ) || empty( $sibling['operator'] ) ) {
+				continue;
+			}
+
+			// The sibling must both have compatible operator to share its alias.
+			if ( in_array( strtoupper( $sibling['operator'] ), $compatible_operators ) ) {
+				$alias = $sibling['alias'];
+				break;
+			}
+		}
+
+		return $alias;
+	}
+
+	/**
+	 * Validates a single query.
+	 *
+	 * @since 3.2.0
+	 *
+	 * @param array $query The single query. Passed by reference.
+	 */
+	private function clean_query( &$query ) {
+		if ( empty( $query['taxonomy'] ) ) {
+			if ( 'term_taxonomy_id' !== $query['field'] ) {
+				$query = new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+				return;
+			}
+
+			// so long as there are shared terms, include_children requires that a taxonomy is set
+			$query['include_children'] = false;
+		} elseif ( ! taxonomy_exists( $query['taxonomy'] ) ) {
+			$query = new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+			return;
+		}
+
+		$query['terms'] = array_unique( (array) $query['terms'] );
+
+		if ( is_taxonomy_hierarchical( $query['taxonomy'] ) && $query['include_children'] ) {
+			$this->transform_query( $query, 'term_id' );
+
+			if ( is_wp_error( $query ) )
+				return;
+
+			$children = array();
+			foreach ( $query['terms'] as $term ) {
+				$children = array_merge( $children, get_term_children( $term, $query['taxonomy'] ) );
+				$children[] = $term;
+			}
+			$query['terms'] = $children;
+		}
+
+		$this->transform_query( $query, 'term_taxonomy_id' );
+	}
+
+	/**
+	 * Transforms a single query, from one field to another.
+	 *
+	 * Operates on the `$query` object by reference. In the case of error,
+	 * `$query` is converted to a WP_Error object.
+	 *
+	 * @since 3.2.0
+	 *
+	 * @global wpdb $wpdb The WordPress database abstraction object.
+	 *
+	 * @param array  $query           The single query. Passed by reference.
+	 * @param string $resulting_field The resulting field. Accepts 'slug', 'name', 'term_taxonomy_id',
+	 *                                or 'term_id'. Default 'term_id'.
+	 */
+	public function transform_query( &$query, $resulting_field ) {
+		if ( empty( $query['terms'] ) )
+			return;
+
+		if ( $query['field'] == $resulting_field )
+			return;
+
+		$resulting_field = sanitize_key( $resulting_field );
+
+		// Empty 'terms' always results in a null transformation.
+		$terms = array_filter( $query['terms'] );
+		if ( empty( $terms ) ) {
+			$query['terms'] = array();
+			$query['field'] = $resulting_field;
+			return;
+		}
+
+		$args = array(
+			'get'                    => 'all',
+			'number'                 => 0,
+			'taxonomy'               => $query['taxonomy'],
+			'update_term_meta_cache' => false,
+			'orderby'                => 'none',
+		);
+
+		// Term query parameter name depends on the 'field' being searched on.
+		switch ( $query['field'] ) {
+			case 'slug':
+				$args['slug'] = $terms;
+				break;
+			case 'name':
+				$args['name'] = $terms;
+				break;
+			case 'term_taxonomy_id':
+				$args['term_taxonomy_id'] = $terms;
+				break;
+			default:
+				$args['include'] = wp_parse_id_list( $terms );
+				break;
+		}
+
+		$term_query = new WP_Term_Query();
+		$term_list  = $term_query->query( $args );
+
+		if ( is_wp_error( $term_list ) ) {
+			$query = $term_list;
+			return;
+		}
+
+		if ( 'AND' == $query['operator'] && count( $term_list ) < count( $query['terms'] ) ) {
+			$query = new WP_Error( 'inexistent_terms', __( 'Inexistent terms.' ) );
+			return;
+		}
+
+		$query['terms'] = wp_list_pluck( $term_list, $resulting_field );
+		$query['field'] = $resulting_field;
+	}
+}
