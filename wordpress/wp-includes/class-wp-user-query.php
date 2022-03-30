@@ -823,4 +823,38 @@ class WP_User_Query {
 	 * @param string $name Property to check if set.
 	 * @return bool Whether the property is set.
 	 */
-	pu
+	public function __isset( $name ) {
+		if ( in_array( $name, $this->compat_fields ) ) {
+			return isset( $this->$name );
+		}
+	}
+
+	/**
+	 * Make private properties un-settable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to unset.
+	 */
+	public function __unset( $name ) {
+		if ( in_array( $name, $this->compat_fields ) ) {
+			unset( $this->$name );
+		}
+	}
+
+	/**
+	 * Make private/protected methods readable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param callable $name      Method to call.
+	 * @param array    $arguments Arguments to pass when calling.
+	 * @return mixed Return value of the callback, false otherwise.
+	 */
+	public function __call( $name, $arguments ) {
+		if ( 'get_search_sql' === $name ) {
+			return call_user_func_array( array( $this, $name ), $arguments );
+		}
+		return false;
+	}
+}
