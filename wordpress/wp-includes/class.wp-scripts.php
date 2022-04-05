@@ -423,4 +423,138 @@ class WP_Scripts extends WP_Dependencies {
 			if ( !is_scalar($value) )
 				continue;
 
-			$l10n[$key] = html_entity_decode( (string) $value, EN
+			$l10n[$key] = html_entity_decode( (string) $value, ENT_QUOTES, 'UTF-8');
+		}
+
+		$script = "var $object_name = " . wp_json_encode( $l10n ) . ';';
+
+		if ( !empty($after) )
+			$script .= "\n$after;";
+
+		$data = $this->get_data( $handle, 'data' );
+
+		if ( !empty( $data ) )
+			$script = "$data\n$script";
+
+		return $this->add_data( $handle, 'data', $script );
+	}
+
+	/**
+	 * Sets handle group.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @see WP_Dependencies::set_group()
+	 *
+	 * @param string    $handle    Name of the item. Should be unique.
+	 * @param bool      $recursion Internal flag that calling function was called recursively.
+	 * @param int|false $group     Optional. Group level: (int) level, (false) no groups. Default false.
+	 * @return bool Not already in the group or a lower group
+	 */
+	public function set_group( $handle, $recursion, $group = false ) {
+		if ( isset( $this->registered[$handle]->args ) && $this->registered[$handle]->args === 1 )
+			$grp = 1;
+		else
+			$grp = (int) $this->get_data( $handle, 'group' );
+
+		if ( false !== $group && $grp > $group )
+			$grp = $group;
+
+		return parent::set_group( $handle, $recursion, $grp );
+	}
+
+	/**
+	 * Determines script dependencies.
+     *
+	 * @since 2.1.0
+	 *
+	 * @see WP_Dependencies::all_deps()
+	 *
+	 * @param mixed     $handles   Item handle and argument (string) or item handles and arguments (array of strings).
+	 * @param bool      $recursion Internal flag that function is calling itself.
+	 * @param int|false $group     Optional. Group level: (int) level, (false) no groups. Default false.
+	 * @return bool True on success, false on failure.
+	 */
+	public function all_deps( $handles, $recursion = false, $group = false ) {
+		$r = parent::all_deps( $handles, $recursion, $group );
+		if ( ! $recursion ) {
+			/**
+			 * Filters the list of script dependencies left to print.
+			 *
+			 * @since 2.3.0
+			 *
+			 * @param array $to_do An array of script dependencies.
+			 */
+			$this->to_do = apply_filters( 'print_scripts_array', $this->to_do );
+		}
+		return $r;
+	}
+
+	/**
+	 * Processes items and dependencies for the head group.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @see WP_Dependencies::do_items()
+	 *
+	 * @return array Handles of items that have been processed.
+	 */
+	public function do_head_items() {
+		$this->do_items(false, 0);
+		return $this->done;
+	}
+
+	/**
+	 * Processes items and dependencies for the footer group.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @see WP_Dependencies::do_items()
+	 *
+	 * @return array Handles of items that have been processed.
+	 */
+	public function do_footer_items() {
+		$this->do_items(false, 1);
+		return $this->done;
+	}
+
+	/**
+	 * Whether a handle's source is in a default directory.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $src The source of the enqueued script.
+	 * @return bool True if found, false if not.
+	 */
+	public function in_default_dir( $src ) {
+		if ( ! $this->default_dirs ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $src, '/' . WPINC . '/js/l10n' ) ) {
+			return false;
+		}
+
+		foreach ( (array) $this->default_dirs as $test ) {
+			if ( 0 === strpos( $src, $test ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Resets class properties.
+	 *
+	 * @since 2.8.0
+	 */
+	public function reset() {
+		$this->do_concat = false;
+		$this->print_code = '';
+		$this->concat = '';
+		$this->concat_version = '';
+		$this->print_html = '';
+		$this->ext_version = '';
+		$this->ext_handles = '';
+	}
+}
