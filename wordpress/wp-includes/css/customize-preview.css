@@ -14,11 +14,11 @@
 .widget .customize-partial-edit-shortcut,
 .customize-partial-edit-shortcut {
 	position: absolute;
-	float: right;
+	float: left;
 	width: 1px; /* required to have a size to be focusable in Safari */
 	height: 1px;
 	padding: 0;
-	margin: -1px -1px 0 0;
+	margin: -1px 0 0 -1px;
 	border: 0;
 	background: transparent;
 	color: transparent;
@@ -35,7 +35,7 @@
 .widget .customize-partial-edit-shortcut button,
 .customize-partial-edit-shortcut button {
 	position: absolute;
-	right: -30px;
+	left: -30px;
 	top: 2px;
 	color: #fff;
 	width: 30px;
@@ -60,12 +60,12 @@
 	opacity: 0;
 	pointer-events: none;
 	text-shadow: 0 -1px 1px #006799,
-	             -1px 0 1px #006799,
+	             1px 0 1px #006799,
 	             0 1px 1px #006799,
-	             1px 0 1px #006799;
+	             -1px 0 1px #006799;
 }
 .wp-custom-header .customize-partial-edit-shortcut button {
-	right: 2px
+	left: 2px
 }
 
 .customize-partial-edit-shortcut button svg {
@@ -240,13 +240,13 @@ body.customize-partial-edit-shortcuts-hidden .customize-partial-edit-shortcut bu
 @media screen and (max-width:800px) {
 	.widget .customize-partial-edit-shortcut button,
 	.customize-partial-edit-shortcut button {
-		right: -32px;
+		left: -32px;
 	}
 }
 
 @media screen and (max-width:320px) {
 	.widget .customize-partial-edit-shortcut button,
 	.customize-partial-edit-shortcut button {
-		right: -30px;
+		left: -30px;
 	}
 }
