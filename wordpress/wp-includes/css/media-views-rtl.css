@@ -696,4 +696,578 @@
 }
 
 .media-frame.hide-toolbar .media-frame-content {
-	botto
+	bottom: 0;
+}
+
+.media-frame.hide-router .media-frame-content {
+	top: 50px;
+}
+
+.media-frame.hide-menu .media-frame-menu,
+.media-frame.hide-router .media-frame-router,
+.media-frame.hide-toolbar .media-frame-toolbar {
+	display: none;
+}
+
+.media-frame.hide-router .media-frame-title {
+	border-bottom: 1px solid #ddd;
+	box-shadow: 0 4px 4px -4px rgba( 0, 0, 0, 0.1 );
+}
+
+.media-frame-title .dashicons {
+	display: none;
+}
+
+.media-frame-title h1 {
+	padding: 0 16px;
+	font-size: 22px;
+	line-height: 50px;
+	margin: 0;
+}
+
+.media-frame-title .suggested-dimensions {
+	font-size: 14px;
+	float: left;
+	margin-left: 20px;
+}
+
+.media-frame-content .crop-content {
+	height: 100%;
+}
+
+.wp-customizer:not(.mobile) .media-frame-content .crop-content.site-icon {
+	margin-left: 300px;
+}
+
+.media-frame-content .crop-content .crop-image {
+	display: block;
+	margin: auto;
+	max-width: 100%;
+	max-height: 100%;
+}
+
+.media-frame-content .crop-content .upload-errors
+{
+	position: absolute;
+	width: 300px;
+	top: 50%;
+	right: 50%;
+	margin-right: -150px;
+	margin-left: -150px;
+	z-index: 600000;
+}
+
+/**
+ * Iframes
+ */
+.media-frame .media-iframe {
+	overflow: hidden;
+}
+
+.media-frame .media-iframe,
+.media-frame .media-iframe iframe {
+	height: 100%;
+	width: 100%;
+	border: 0;
+}
+
+/**
+ * Attachment Browser Filters
+ */
+.media-frame select.attachment-filters {
+	margin-top: 11px;
+	margin-left: 2%;
+	max-width: 42%;
+	max-width: calc(48% - 12px);
+}
+
+.media-frame select.attachment-filters:last-of-type {
+	margin-left: 0;
+}
+
+/**
+ * Search
+ */
+.media-frame .search {
+	margin-top: 11px;
+	padding: 4px;
+	font-size: 13px;
+	color: #444;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	-webkit-appearance: none;
+}
+
+.media-toolbar-primary .search {
+	max-width: 100%;
+}
+
+/**
+ * Attachments
+ */
+.wp-core-ui .attachments {
+	margin: 0;
+	-webkit-overflow-scrolling: touch;
+}
+
+/**
+ * Attachment
+ */
+.wp-core-ui .attachment {
+	position: relative;
+	float: right;
+	padding: 8px;
+	margin: 0;
+	color: #444;
+	cursor: pointer;
+	list-style: none;
+	text-align: center;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	width: 25%;
+	box-sizing: border-box;
+}
+
+.wp-core-ui .attachment:focus,
+.wp-core-ui .selected.attachment:focus,
+.wp-core-ui .attachment.details:focus {
+	box-shadow:
+		inset 0 0 2px 3px #fff,
+		inset 0 0 0 7px #5b9dd9;
+	outline: none;
+}
+
+.wp-core-ui .selected.attachment {
+	box-shadow:
+		inset 0 0 0 5px #fff,
+		inset 0 0 0 7px #ccc;
+}
+
+.wp-core-ui .attachment.details {
+	box-shadow:
+		inset 0 0 0 3px #fff,
+		inset 0 0 0 7px #0073aa;
+}
+
+.wp-core-ui .attachment-preview {
+	position: relative;
+	box-shadow:
+		inset 0 0 15px rgba( 0, 0, 0, 0.1 ),
+		inset 0 0 0 1px rgba( 0, 0, 0, 0.05 );
+	background: #eee;
+	cursor: pointer;
+}
+
+.wp-core-ui .attachment-preview:before {
+	content: "";
+	display: block;
+	padding-top: 100%;
+}
+
+.wp-core-ui .attachment .icon {
+	margin: 0 auto;
+	overflow: hidden;
+}
+
+.wp-core-ui .attachment .thumbnail {
+	overflow: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	opacity: 1;
+	transition: opacity .1s;
+}
+
+.wp-core-ui .attachment .portrait img {
+	max-width: 100%;
+}
+
+.wp-core-ui .attachment .landscape img {
+	max-height: 100%;
+}
+
+.wp-core-ui .attachment .thumbnail:after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	box-shadow: inset 0 0 0 1px rgba( 0, 0, 0, 0.1 );
+	overflow: hidden;
+}
+
+.wp-core-ui .attachment .thumbnail img {
+	top: 0;
+	right: 0;
+}
+
+.wp-core-ui .attachment .thumbnail .centered {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 100%;
+	height: 100%;
+	-webkit-transform: translate( -50%, 50% ); /* Fails with spaces?? Weird! */
+	transform: translate( -50%, 50% );
+}
+
+.wp-core-ui .attachment .thumbnail .centered img {
+	-webkit-transform: translate( 50%, -50% );
+	transform: translate( 50%, -50% );
+}
+
+.wp-core-ui .attachments-browser .attachment .thumbnail .centered img.icon {
+	-webkit-transform: translate( 50%, -70% );
+	transform: translate( 50%, -70% );
+}
+
+.ie8 .wp-core-ui .attachment img.icon {
+	top: 20%;
+	position: relative;
+}
+
+.wp-core-ui .attachment .filename {
+	position: absolute;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	overflow: hidden;
+	max-height: 100%;
+	word-wrap: break-word;
+	text-align: center;
+	font-weight: 600;
+	background: rgba( 255, 255, 255, 0.8 );
+	box-shadow: inset 0 0 0 1px rgba( 0, 0, 0, 0.15 );
+}
+
+.wp-core-ui .attachment .filename div {
+	padding: 5px 10px;
+}
+
+.wp-core-ui .attachment .thumbnail img {
+	position: absolute;
+}
+
+.wp-core-ui .attachment-close {
+	display: block;
+	position: absolute;
+	top: 5px;
+	left: 5px;
+	height: 22px;
+	width: 22px;
+	padding: 0;
+	background-color: #fff;
+	background-position: -96px 4px;
+	border-radius: 3px;
+	box-shadow: 0 0 0 1px rgba( 0, 0, 0, 0.3 );
+	transition: none;
+}
+
+.wp-core-ui .attachment-close:hover,
+.wp-core-ui .attachment-close:focus {
+	background-position: -36px 4px;
+}
+
+.wp-core-ui .attachment .check {
+	display: none;
+	height: 24px;
+	width: 24px;
+	padding: 0;
+	border: 0;
+	position: absolute;
+	z-index: 10;
+	top: 0;
+	left: 0;
+	outline: none;
+	background: #eee;
+	cursor: pointer;
+	box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba( 0, 0, 0, 0.15 );
+}
+
+.wp-core-ui .attachment .check .media-modal-icon {
+	display: block;
+	background-position: -1px 0;
+	height: 15px;
+	width: 15px;
+	margin: 5px;
+}
+
+.wp-core-ui .attachment .check:hover .media-modal-icon {
+	background-position: -40px 0;
+}
+
+.wp-core-ui .attachment.selected .check {
+	display: block;
+}
+
+.wp-core-ui .attachment.details .check,
+.wp-core-ui .attachment.selected .check:focus,
+.wp-core-ui .media-frame.mode-grid .attachment.selected .check {
+	background-color: #0073aa;
+	box-shadow:
+		0 0 0 1px #fff,
+		0 0 0 2px #0073aa;
+}
+
+.wp-core-ui .attachment.details .check .media-modal-icon,
+.wp-core-ui .media-frame.mode-grid .attachment.selected .check .media-modal-icon {
+	background-position: -21px 0;
+}
+
+.wp-core-ui .attachment.details .check:hover .media-modal-icon,
+.wp-core-ui .attachment.selected .check:focus .media-modal-icon,
+.wp-core-ui .media-frame.mode-grid .attachment.selected .check:hover .media-modal-icon {
+	background-position: -60px 0;
+}
+
+.wp-core-ui .media-frame .attachment .describe {
+	position: relative;
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 8px;
+	font-size: 12px;
+	border-radius: 0;
+}
+
+/**
+ * Attachments Browser
+ */
+.media-frame .attachments-browser {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.attachments-browser .media-toolbar {
+	left: 300px;
+	height: 50px;
+}
+
+.attachments-browser.hide-sidebar .media-toolbar {
+	left: 0;
+}
+
+.attachments-browser .media-toolbar-primary > .media-button,
+.attachments-browser .media-toolbar-primary > .media-button-group,
+.attachments-browser .media-toolbar-secondary > .media-button,
+.attachments-browser .media-toolbar-secondary > .media-button-group {
+	margin: 11px 0;
+}
+
+.attachments-browser .attachments {
+	padding: 2px 8px 8px;
+}
+
+.attachments-browser .attachments,
+.attachments-browser .uploader-inline {
+	position: absolute;
+	top: 50px;
+	right: 0;
+	left: 300px;
+	bottom: 0;
+	overflow: auto;
+	outline: none;
+}
+
+.attachments-browser .uploader-inline.hidden {
+	display: none;
+}
+
+.attachments-browser .media-toolbar-primary {
+	max-width: 33%;
+}
+
+.attachments-browser .media-toolbar-secondary {
+	max-width: 66%;
+}
+
+.uploader-inline .close {
+	background-color: transparent;
+	border: 0;
+	cursor: pointer;
+	height: 48px;
+	outline: none;
+	padding: 0;
+	position: absolute;
+	left: 2px;
+	text-align: center;
+	top: 2px;
+	width: 48px;
+	z-index: 1;
+}
+
+.uploader-inline .close:before {
+	font: normal 30px/1 dashicons !important;
+	color: #555d66;
+	display: inline-block;
+	content: "\f335";
+	font-weight: 300;
+	margin-top: 1px;
+}
+
+.uploader-inline .close:focus {
+	outline: 1px solid  #5b9dd9;
+	box-shadow: 0 0 3px rgba( 0, 115, 170, .8 );
+}
+
+.attachments-browser.hide-sidebar .attachments,
+.attachments-browser.hide-sidebar .uploader-inline {
+	left: 0;
+	margin-left: 0;
+}
+
+.attachments-browser .instructions {
+	display: inline-block;
+	margin-top: 16px;
+	line-height: 18px;
+	font-size: 13px;
+	color: #666;
+	margin-left: 0.5em;
+}
+
+.attachments-browser .no-media {
+	padding: 2em 2em 0 0;
+}
+
+/**
+ * Progress Bar
+ */
+.media-progress-bar {
+	position: relative;
+	height: 10px;
+	width: 70%;
+	margin: 10px auto;
+	border-radius: 10px;
+	background: #ddd;
+	background: rgba( 0, 0, 0, 0.1 );
+}
+
+.media-progress-bar div {
+	height: 10px;
+	min-width: 20px;
+	width: 0;
+	background: #0073aa;
+	border-radius: 10px;
+	transition: width 300ms;
+}
+
+.media-uploader-status .media-progress-bar {
+	display: none;
+	width: 100%;
+}
+
+.uploading.media-uploader-status .media-progress-bar {
+	display: block;
+}
+
+.attachment-preview .media-progress-bar {
+	position: absolute;
+	top: 50%;
+	right: 15%;
+	width: 70%;
+	margin: -5px 0 0 0;
+}
+
+.media-uploader-status {
+	position: relative;
+	margin: 0 auto;
+	padding-bottom: 10px;
+	max-width: 400px;
+}
+
+.uploader-inline .media-uploader-status h3, /* Back-compat for pre-4.4 */
+.uploader-inline .media-uploader-status h2 {
+	display: none;
+}
+
+.media-uploader-status .upload-details {
+	display: none;
+	font-size: 12px;
+	color: #666;
+}
+
+.uploading.media-uploader-status .upload-details {
+	display: block;
+}
+
+.media-uploader-status .upload-detail-separator {
+	padding: 0 4px;
+}
+
+.media-uploader-status .upload-count {
+	color: #444;
+}
+
+.media-uploader-status .upload-dismiss-errors,
+.media-uploader-status .upload-errors {
+	display: none;
+}
+
+.errors.media-uploader-status .upload-dismiss-errors,
+.errors.media-uploader-status .upload-errors {
+	display: block;
+}
+
+.media-uploader-status .upload-dismiss-errors {
+	text-decoration: none;
+}
+
+.media-sidebar .media-uploader-status .upload-dismiss-errors {
+	position: absolute;
+	top: -10px;
+	left: -10px;
+	padding: 10px;
+	transition: none;
+}
+
+.media-sidebar .media-uploader-status .upload-dismiss-errors:before {
+	content: "\f153";
+	display: block;
+	font: normal 16px/1 dashicons;
+	color: #72777c;
+}
+
+.media-sidebar .media-uploader-status .upload-dismiss-errors:hover:before,
+.media-sidebar .media-uploader-status .upload-dismiss-errors:focus:before {
+	color: #c00;
+}
+
+.upload-errors .upload-error {
+	padding: 12px;
+	margin-bottom: 12px;
+	background: #fff;
+	border-right: 4px solid #dc3232;
+	box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.uploader-inline .upload-errors .upload-error {
+	background-color: #fbeaea;
+	box-shadow: none;
+}
+
+.upload-errors .upload-error-filename {
+	font-weight: 600;
+}
+
+.upload-errors .upload-error-message {
+	display: block;
+	padding-top: 8px;
+	word-wrap: break-word;
+}
+
+.uploader-window {
+	position: fixed;
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	background: rgba( 0, 86, 132, 0.9 );
+	z-index: 250000;
+	display: non
