@@ -1604,4 +1604,601 @@
 	box-shadow: inset 0 0 15px rgba( 0, 0, 0, 0.1 );
 }
 
-.uploading .attachment-info .media
+.uploading .attachment-info .media-progress-bar {
+	margin-top: 35px;
+}
+
+.attachment-info .thumbnail-image:after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	box-shadow: inset 0 0 0 1px rgba( 0, 0, 0, 0.15 );
+	overflow: hidden;
+}
+
+.attachment-info .thumbnail img {
+	display: block;
+	max-width: 120px;
+	max-height: 120px;
+	margin: 0 auto;
+}
+
+.attachment-info .details {
+	float: left;
+	font-size: 12px;
+	max-width: 100%;
+}
+
+.attachment-info .edit-attachment,
+.attachment-info .delete-attachment,
+.attachment-info .trash-attachment,
+.attachment-info .untrash-attachment {
+	display: block;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.attachment-details.needs-refresh .attachment-info .edit-attachment {
+	display: none;
+}
+
+.attachment-info .edit-attachment {
+	display: block;
+}
+
+.media-modal .delete-attachment,
+.media-modal .trash-attachment,
+.media-modal .untrash-attachment {
+	display: inline;
+	padding: 0;
+	color: #bc0b0b;
+}
+
+.media-modal .delete-attachment:hover,
+.media-modal .delete-attachment:focus,
+.media-modal .trash-attachment:hover,
+.media-modal .trash-attachment:focus,
+.media-modal .untrash-attachment:hover,
+.media-modal .untrash-attachment:focus {
+	color: #dc3232;
+}
+
+/**
+ * Attachment Display Settings
+ */
+.attachment-display-settings {
+	width: 100%;
+	float: left;
+	overflow: hidden;
+}
+
+.attachment-display-settings h4 {
+	margin: 1.4em 0 0.4em;
+}
+
+.collection-settings {
+	overflow: hidden;
+}
+
+.collection-settings .setting input[type="checkbox"] {
+	float: left;
+	margin-right: 8px;
+}
+
+.collection-settings .setting span {
+	min-width: inherit;
+}
+
+/**
+ * Image Editor
+ */
+.media-modal .imgedit-wrap {
+	position: static;
+}
+
+.media-modal .imgedit-wrap .imgedit-panel-content {
+	padding: 16px;
+	position: absolute;
+	top: 0;
+	right: 282px;
+	bottom: 0;
+	left: 0;
+	overflow: auto;
+}
+
+.media-modal .imgedit-wrap .imgedit-settings {
+	background: #f3f3f3;
+	border-left: 1px solid #ddd;
+	padding: 20px 16px 16px;
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 250px;
+	overflow: auto;
+}
+
+.media-modal .imgedit-group {
+	background: none;
+	border: none;
+	border-bottom: 1px solid #ddd;
+	box-shadow: none;
+	margin: 0;
+	margin-bottom: 16px;
+	padding: 0;
+	padding-bottom: 16px;
+	position: relative; /* RTL fix, #WP29352 */
+}
+
+.media-modal .imgedit-group:last-of-type {
+	border: none;
+	margin: 0;
+	padding: 0;
+}
+
+.media-modal .imgedit-group-top {
+	margin: 0;
+}
+
+.media-modal .imgedit-group-top h3, /* Back-compat for pre-4.4 */
+.media-modal .imgedit-group-top h2,
+.media-modal .imgedit-group-top h2 .button-link {
+	display: inline-block;
+	text-transform: uppercase;
+	font-size: 12px;
+	color: #666;
+	margin: 0;
+	margin-top: 3px;
+}
+
+.media-modal .imgedit-group-top h3 a, /* Back-compat for pre-4.4 */
+.media-modal .imgedit-group-top h2 a,
+.media-modal .imgedit-group-top h2 .button-link {
+	text-decoration: none;
+	color: #666;
+}
+
+/* higher specificity than media.css */
+.wp-core-ui.media-modal .image-editor .imgedit-help-toggle,
+.wp-core-ui.media-modal .image-editor .imgedit-help-toggle:hover,
+.wp-core-ui.media-modal .image-editor .imgedit-help-toggle:active {
+	border: 1px solid transparent;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	color: #0074a2;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	box-sizing: content-box;
+	box-shadow: none;
+}
+
+.wp-core-ui.media-modal .image-editor .imgedit-help-toggle:focus {
+	color: #0074a2;
+	border-color: #5b9dd9;
+	outline: none;
+	box-shadow: 0 0 3px rgba( 0, 115, 170, .8 );
+}
+
+.wp-core-ui.media-modal .imgedit-group-top .dashicons-arrow-down.imgedit-help-toggle {
+	margin-top: -3px;
+}
+
+.wp-core-ui.media-modal .image-editor h3 .imgedit-help-toggle {
+	margin-top: -2px;
+}
+
+.media-modal .imgedit-help-toggled span.dashicons:before {
+	content: "\f142";
+}
+
+.media-modal .imgedit-thumbnail-preview {
+	margin: 10px 8px 0 0;
+}
+
+.imgedit-thumbnail-preview-caption {
+	display: block;
+}
+
+.media-modal .imgedit-wrap div.updated {
+	margin: 0;
+	margin-bottom: 16px;
+}
+
+
+/**
+ * Embed from URL and Image Details
+ */
+.embed-url {
+	display: block;
+	position: relative;
+	padding: 16px;
+	margin: 0;
+	z-index: 250;
+	background: #fff;
+	font-size: 18px;
+}
+
+.media-frame .embed-url input {
+	font-size: 18px;
+	padding: 12px 14px;
+	width: 100%;
+	min-width: 200px;
+	box-shadow: inset 2px 2px 4px -2px rgba( 0, 0, 0, 0.1 );
+}
+
+.media-frame .embed-url .spinner {
+	position: absolute;
+	top: 32px;
+	right: 26px;
+}
+
+.media-frame .embed-loading .embed-url .spinner {
+	visibility: visible;
+}
+
+.embed-link-settings,
+.embed-media-settings {
+	position: absolute;
+	top: 70px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 16px 16px 32px;
+	overflow: auto;
+}
+
+.media-embed .embed-link-settings {
+	/* avoid Firefox to give focus to the embed preview container parent */
+	overflow: visible;
+}
+
+.embed-preview img,
+.embed-preview iframe,
+.embed-preview embed,
+.mejs-container video {
+	max-width: 100%;
+	vertical-align: middle;
+}
+
+.embed-preview a {
+	display: inline-block;
+}
+
+.embed-preview img {
+	display: block;
+	height: auto;
+}
+
+.mejs-container:focus {
+	outline: 1px solid #5b9dd9;
+	box-shadow: 0 0 2px 1px rgba(30, 140, 190, .8);
+}
+
+.image-details .media-modal {
+	left: 140px;
+	right: 140px;
+}
+
+.image-details .media-frame-title,
+.image-details .media-frame-content,
+.image-details .media-frame-router {
+	left: 0;
+}
+
+.image-details .embed-media-settings {
+	top: 0;
+	overflow: visible;
+	padding: 0;
+}
+
+.image-details .embed-media-settings,
+.image-details .embed-media-settings div {
+	box-sizing: border-box;
+}
+
+.image-details .column-settings {
+	background: #f3f3f3;
+	border-right: 1px solid #ddd;
+	min-height: 100%;
+	width: 55%;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.image-details .column-settings h3, /* Back-compat for pre-4.4 */
+.image-details .column-settings h2 {
+	margin: 20px;
+	padding-top: 20px;
+	border-top: 1px solid #ddd;
+	color: #23282d;
+}
+
+.image-details .column-image {
+	width: 45%;
+	position: absolute;
+	left: 55%;
+	top: 0;
+}
+
+.image-details .image {
+	margin: 20px;
+}
+
+.image-details .image img {
+	max-width: 100%;
+	max-height: 500px;
+}
+
+.image-details .advanced-toggle {
+	padding: 0;
+	color: #666;
+	text-transform: uppercase;
+	text-decoration: none;
+}
+
+.image-details .advanced-toggle:hover,
+.image-details .advanced-toggle:active {
+	color: #666;
+}
+
+.image-details .advanced-toggle:after {
+	font: normal 20px/1 dashicons;
+	speak: none;
+	vertical-align: top;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	content: "\f140";
+	display: inline-block;
+	margin-top: -2px;
+}
+
+.image-details .advanced-visible .advanced-toggle:after {
+	content: "\f142";
+}
+
+.image-details .embed-media-settings .size {
+	margin-bottom: 4px;
+}
+
+.image-details .custom-size span {
+	display: block;
+}
+
+.image-details .custom-size label {
+	display: block;
+	float: left;
+}
+
+.image-details .custom-size span small {
+	color: #555d66; /* #f3f3f3 background */
+	font-size: inherit;
+}
+
+.image-details .custom-size input {
+	width: 5em;
+}
+
+.image-details .custom-size .sep {
+	float: left;
+	margin: 26px 6px 0 6px;
+}
+
+.image-details .custom-size:after {
+	content: "";
+	display: table;
+	clear: both;
+}
+
+.media-embed .thumbnail {
+	max-width: 100%;
+	max-height: 200px;
+	position: relative;
+	float: left;
+}
+
+.media-embed .thumbnail img {
+	max-height: 200px;
+	display: block;
+}
+
+.media-embed .thumbnail:after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	box-shadow: inset 0 0 0 1px rgba( 0, 0, 0, 0.1 );
+	overflow: hidden;
+}
+
+.media-embed .setting {
+	width: 100%;
+	margin: 10px 0;
+	float: left;
+	display: block;
+	clear: both;
+}
+
+.image-details .embed-media-settings .setting {
+	float: none;
+	width: auto;
+}
+
+.image-details .actions {
+	margin: 10px 0;
+}
+
+.image-details .hidden {
+	display: none;
+}
+
+.media-embed .setting input[type="text"],
+.media-embed .setting textarea {
+	display: block;
+	width: 100%;
+	max-width: 400px;
+	margin: 1px 0;
+}
+
+.image-details .embed-media-settings .setting input[type="text"],
+.image-details .embed-media-settings .setting textarea {
+	max-width: inherit;
+	width: 70%;
+}
+
+.image-details .embed-media-settings .setting input.link-to-custom,
+.image-details .embed-media-settings .link-target,
+.image-details .embed-media-settings .custom-size {
+	margin-left: 27%;
+	width: 70%;
+}
+
+.image-details .embed-media-settings .link-target {
+	margin-top: 24px;
+}
+
+.media-embed .setting input.hidden,
+.media-embed .setting textarea.hidden {
+	display: none;
+}
+
+.media-embed .setting span {
+	display: block;
+	width: 200px;
+	font-size: 13px;
+	line-height: 24px;
+	color: #666;
+}
+
+.image-details .embed-media-settings .setting span {
+	float: left;
+	width: 25%;
+	text-align: right;
+	margin: 8px 1% 0 1%;
+	line-height: 1.1;
+}
+
+.media-embed .setting .button-group {
+	margin: 2px 0;
+}
+
+.media-embed-sidebar {
+	position: absolute;
+	top: 0;
+	left: 440px;
+}
+
+.advanced-section,
+.link-settings {
+	margin-top: 10px;
+}
+
+/* Drag & drop on the editor upload */
+.wp-editor-wrap .uploader-editor {
+	background: rgba( 150, 150, 150, 0.9 );
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 99998; /* under the toolbar */
+	display: none;
+	text-align: center;
+}
+
+.wp-editor-wrap .uploader-editor-content {
+	border: 1px dashed #fff;
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	right: 10px;
+	bottom: 10px;
+}
+
+.wp-editor-wrap .uploader-editor .uploader-editor-title {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	right: 0;
+	-webkit-transform: translateY( -50% );
+	transform: translateY( -50% );
+	font-size: 3em;
+	line-height: 1.3;
+	font-weight: 600;
+	color: #fff;
+	padding: 0;
+	margin: 0;
+	display: none;
+}
+
+.wp-editor-wrap .uploader-editor.droppable {
+	background: rgba( 0, 86, 132, 0.9 );
+}
+
+.wp-editor-wrap .uploader-editor.droppable .uploader-editor-title {
+	display: block;
+}
+
+/**
+ * IE7 Fixes
+ */
+.ie7 .media-frame .attachments-browser {
+	position: static;
+}
+
+.ie7 .media-frame .embed-url input {
+	margin-top: 4px;
+	width: 90%;
+}
+
+.ie7 .compat-item {
+	width: 99%;
+}
+
+.ie7 .attachment-display-settings {
+	width: auto;
+}
+
+.ie7 .attachment-preview,
+.ie7 .attachment-preview .thumbnail {
+	width: 120px;
+	height: 120px;
+}
+
+.ie7 .media-frame .attachment .describe {
+	width: 102px;
+}
+
+.ie7 .media-sidebar .setting select {
+	max-width: 55%;
+}
+
+.ie7 .media-sidebar .setting input[type="text"],
+.ie7 .media-sidebar .setting input[type="password"],
+.ie7 .media-sidebar .setting input[type="email"],
+.ie7 .media-sidebar .setting input[type="number"],
+.ie7 .media-sidebar .setting input[type="search"],
+.ie7 .media-sidebar .setting input[type="tel"],
+.ie7 .media-sidebar .setting input[type="url"],
+.ie7 .media-sidebar .setting textarea {
+	width: 55%;
+}
+
+.ie7 .media-sidebar .setting .link-to-custom {
+	float: left;
+}
+
+/**
+ * Localization
+ */
+.rtl .media-modal,
+.rtl .media-fr
