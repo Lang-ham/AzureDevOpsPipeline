@@ -2201,4 +2201,433 @@
  * Localization
  */
 .rtl .media-modal,
-.rtl .media-fr
+.rtl .media-frame,
+.rtl .media-frame .search,
+.rtl .media-frame input[type="text"],
+.rtl .media-frame input[type="password"],
+.rtl .media-frame input[type="number"],
+.rtl .media-frame input[type="search"],
+.rtl .media-frame input[type="email"],
+.rtl .media-frame input[type="url"],
+.rtl .media-frame input[type="tel"],
+.rtl .media-frame textarea,
+.rtl .media-frame select {
+	font-family: Tahoma, sans-serif;
+}
+
+:lang(he-il) .rtl .media-modal,
+:lang(he-il) .rtl .media-frame,
+:lang(he-il) .rtl .media-frame .search,
+:lang(he-il) .rtl .media-frame input[type="text"],
+:lang(he-il) .rtl .media-frame input[type="password"],
+:lang(he-il) .rtl .media-frame input[type="number"],
+:lang(he-il) .rtl .media-frame input[type="search"],
+:lang(he-il) .rtl .media-frame input[type="email"],
+:lang(he-il) .rtl .media-frame input[type="url"],
+:lang(he-il) .rtl .media-frame textarea,
+:lang(he-il) .rtl .media-frame select {
+	font-family: Arial, sans-serif;
+}
+
+/**
+ * Responsive layout
+ */
+@media only screen and (max-width: 900px) {
+
+	/* Drop-down menu */
+	.media-frame:not(.hide-menu) .media-frame-title,
+	.media-frame:not(.hide-menu) .media-frame-router,
+	.media-frame:not(.hide-menu) .media-frame-content,
+	.media-frame:not(.hide-menu) .media-frame-toolbar {
+		left: 0;
+	}
+
+	.media-frame:not(.hide-menu) .media-frame-menu {
+		position: static;
+		width: 0;
+	}
+
+	.media-frame:not(.hide-menu) .media-menu {
+		width: auto;
+		max-width: 80%;
+		overflow: auto;
+		z-index: 2000;
+		top: 50px;
+		left: -300px;
+		right: auto;
+		bottom: auto;
+		padding: 5px 0;
+		border: 1px solid #ccc;
+	}
+
+	.media-frame:not(.hide-menu) .media-menu.visible {
+		left: 0;
+	}
+
+	.media-frame:not(.hide-menu) .media-menu > a {
+		padding: 12px 16px;
+		font-size: 16px;
+	}
+
+	.media-frame:not(.hide-menu) .media-menu > a.active {
+		display: none;
+	}
+
+	.media-frame:not(.hide-menu) .media-menu .separator {
+		margin: 5px 10px;
+	}
+
+	.media-frame:not(.hide-menu) .media-frame-title {
+		left: 0;
+	}
+
+	.media-frame:not(.hide-menu) .media-frame-title .dashicons {
+		display: inline-block;
+		line-height: 50px;
+	}
+
+	.media-frame:not(.hide-menu) .media-frame-title h1 {
+		color: #0073aa;
+		line-height: 3;
+		font-size: 18px;
+		float: left;
+		cursor: pointer;
+	}
+	/* End drop-down menu */
+
+	.media-sidebar {
+		width: 230px;
+	}
+
+	.attachments-browser .attachments,
+	.attachments-browser .uploader-inline,
+	.attachments-browser .media-toolbar {
+		right: 262px;
+	}
+
+	.media-sidebar .setting,
+	.attachment-details .setting {
+		margin: 6px 0px;
+	}
+
+	.media-sidebar .setting input,
+	.media-sidebar .setting textarea,
+	.media-sidebar .setting span,
+	.attachment-details .setting input,
+	.attachment-details .setting textarea,
+	.attachment-details .setting span,
+	.compat-item label span {
+		float: none;
+	}
+
+	.media-sidebar .setting span,
+	.attachment-details .setting span,
+	.compat-item label span {
+		text-align: inherit;
+		min-height: 16px;
+		margin: 0;
+		padding: 8px 2px 0;
+	}
+
+	.media-sidebar .setting .value,
+	.attachment-details .setting .value {
+		float: none;
+		width: auto;
+	}
+
+	.media-sidebar .setting input[type="text"],
+	.media-sidebar .setting input[type="password"],
+	.media-sidebar .setting input[type="email"],
+	.media-sidebar .setting input[type="number"],
+	.media-sidebar .setting input[type="search"],
+	.media-sidebar .setting input[type="tel"],
+	.media-sidebar .setting input[type="url"],
+	.media-sidebar .setting textarea,
+	.media-sidebar .setting select,
+	.attachment-details .setting input[type="text"],
+	.attachment-details .setting input[type="password"],
+	.attachment-details .setting input[type="email"],
+	.attachment-details .setting input[type="number"],
+	.attachment-details .setting input[type="search"],
+	.attachment-details .setting input[type="tel"],
+	.attachment-details .setting input[type="url"],
+	.attachment-details .setting textarea,
+	.attachment-details .setting select {
+		float: none;
+		width: 98%;
+		max-width: none;
+		height: auto;
+	}
+
+	.media-sidebar .setting select.columns,
+	.attachment-details .setting select.columns {
+		width: auto;
+	}
+
+	.media-frame input,
+	.media-frame textarea,
+	.media-frame .search {
+		padding: 3px 6px;
+	}
+
+	.image-details .column-image {
+		width: 30%;
+		left: 70%;
+	}
+
+	.image-details .column-settings {
+		width: 70%;
+	}
+
+	.image-details .media-modal {
+		left: 30px;
+		right: 30px;
+	}
+
+	.image-details .embed-media-settings .setting {
+		margin: 20px;
+	}
+
+	.image-details .embed-media-settings .setting span {
+		float: none;
+		text-align: left;
+		width: 100%;
+		margin-bottom: 4px;
+	}
+
+	.image-details .embed-media-settings .setting input.link-to-custom,
+	.image-details .embed-media-settings .setting input[type="text"],
+	.image-details .embed-media-settings .setting textarea {
+		width: 100%;
+		margin-left: 0;
+	}
+
+	.image-details .embed-media-settings .custom-size {
+		margin-left: 20px;
+	}
+
+	.collection-settings .setting input[type="checkbox"] {
+		margin-top: 0;
+	}
+
+	.media-selection {
+		min-width: 120px;
+	}
+
+	.media-selection:after {
+		background: none;
+	}
+
+	.media-selection .attachments {
+		display: none;
+	}
+
+	.media-modal .attachments-browser .media-toolbar .search {
+		max-width: 100%;
+		height: auto;
+		float: right;
+	}
+
+	.media-modal .attachments-browser .media-toolbar .attachment-filters {
+		height: auto;
+	}
+
+	.media-modal .attachments-browser .media-toolbar .spinner {
+		margin: 14px 2px 0;
+	}
+
+	/* Text inputs need to be 16px, or they force zooming on iOS */
+	.media-frame input[type="text"],
+	.media-frame input[type="password"],
+	.media-frame input[type="number"],
+	.media-frame input[type="search"],
+	.media-frame input[type="email"],
+	.media-frame input[type="url"],
+	.media-frame textarea,
+	.media-frame select {
+		font-size: 16px;
+	}
+}
+
+/* Responsive on portrait and landscape */
+@media only screen and (max-width: 640px), screen and (max-height: 400px) {
+	/* Full-bleed modal */
+	.media-modal,
+	.image-details .media-modal {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+	}
+
+	.media-modal-backdrop {
+		position: fixed;
+	}
+
+	.media-sidebar {
+		z-index: 1900;
+		max-width: 70%;
+		bottom: 120%;
+		box-sizing: border-box;
+		padding-bottom: 0;
+	}
+
+	.media-sidebar.visible {
+		bottom: 0;
+	}
+
+	.attachments-browser .attachments,
+	.attachments-browser .uploader-inline,
+	.attachments-browser .media-toolbar {
+		right: 0;
+	}
+
+	.image-details .media-frame-title {
+		display: block;
+		top: 0;
+		font-size: 14px;
+	}
+
+	.image-details .column-image,
+	.image-details .column-settings {
+		width: 100%;
+		position: relative;
+		left: 0;
+	}
+
+	.image-details .column-settings {
+		padding: 4px 0;
+	}
+
+	/* Media tabs on the top */
+	.media-frame-content .media-toolbar .instructions {
+		display: none;
+	}
+}
+
+/* Landscape specific header override */
+@media screen and (max-height: 400px) {
+	.media-menu {
+		padding: 0;
+	}
+
+	.media-frame-router {
+		top: 44px;
+	}
+
+	.media-frame-content {
+		top: 78px;
+	}
+
+	.attachments-browser .attachments {
+		top: 40px;
+	}
+
+	/* Prevent unnecessary scrolling on title input */
+	.embed-link-settings {
+		overflow: visible;
+	}
+}
+
+@media only screen and (max-width: 480px) {
+	.media-modal-close {
+		top: -5px;
+	}
+
+	.media-modal .media-frame-title {
+		height: 40px;
+	}
+
+	.wp-core-ui.wp-customizer .media-button {
+		margin-top: 13px;
+	}
+
+	.media-modal .media-frame-title h1,
+	.media-frame:not(.hide-menu) .media-frame-title h1 {
+		font-size: 18px;
+		line-height: 40px;
+	}
+
+	.media-frame:not(.hide-menu) .media-frame-title .dashicons {
+		line-height: 40px;
+	}
+
+	.media-frame-router,
+	.media-frame:not(.hide-menu) .media-menu {
+		top: 40px;
+	}
+
+	.media-frame-content {
+		top: 74px;
+	}
+
+	.media-frame.hide-router .media-frame-content {
+		top: 40px;
+	}
+}
+
+/**
+ * HiDPI Displays
+ */
+@media print,
+  (-webkit-min-device-pixel-ratio: 1.25),
+  (min-resolution: 120dpi) {
+
+	.wp-core-ui .media-modal-icon {
+		background-image: url(../images/uploader-icons-2x.png);
+		background-size: 134px 15px;
+	}
+
+	.media-frame .spinner {
+		background-image: url(../images/spinner-2x.gif);
+	}
+}
+
+.media-frame-content[data-columns="1"] .attachment {
+	width: 100%;
+}
+
+.media-frame-content[data-columns="2"] .attachment {
+	width: 50%;
+}
+
+.media-frame-content[data-columns="3"] .attachment {
+	width: 33.33%;
+}
+
+.media-frame-content[data-columns="4"] .attachment {
+	width: 25%;
+}
+
+.media-frame-content[data-columns="5"] .attachment {
+	width: 20%;
+}
+
+.media-frame-content[data-columns="6"] .attachment {
+	width: 16.66%;
+}
+
+.media-frame-content[data-columns="7"] .attachment {
+	width: 14.28%;
+}
+
+.media-frame-content[data-columns="8"] .attachment {
+	width: 12.5%;
+}
+
+.media-frame-content[data-columns="9"] .attachment {
+	width: 11.11%;
+}
+
+.media-frame-content[data-columns="10"] .attachment {
+	width: 10%;
+}
+
+.media-frame-content[data-columns="11"] .attachment {
+	width: 9.09%;
+}
+
+.media-frame-content[data-columns="12"] .attachment {
+	width: 8.33%;
+}
