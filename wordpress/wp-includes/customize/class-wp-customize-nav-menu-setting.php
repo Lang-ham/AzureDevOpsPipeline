@@ -519,4 +519,122 @@ class WP_Customize_Nav_Menu_Setting extends WP_Customize_Setting {
 			} else {
 				if ( $is_placeholder ) {
 					$this->previous_term_id = $this->term_id;
-				
+					$this->term_id          = $r;
+					$this->update_status    = 'inserted';
+				} else {
+					$this->update_status = 'updated';
+				}
+
+				$auto_add = $value['auto_add'];
+			}
+		}
+
+		if ( null !== $auto_add ) {
+			$nav_menu_options = $this->filter_nav_menu_options_value(
+				(array) get_option( 'nav_menu_options', array() ),
+				$this->term_id,
+				$auto_add
+			);
+			update_option( 'nav_menu_options', $nav_menu_options );
+		}
+
+		if ( 'inserted' === $this->update_status ) {
+			// Make sure that new menus assigned to nav menu locations use their new IDs.
+			foreach ( $this->manager->settings() as $setting ) {
+				if ( ! preg_match( '/^nav_menu_locations\[/', $setting->id ) ) {
+					continue;
+				}
+
+				$post_value = $setting->post_value( null );
+				if ( ! is_null( $post_value ) && $this->previous_term_id === intval( $post_value ) ) {
+					$this->manager->set_post_value( $setting->id, $this->term_id );
+					$setting->save();
+				}
+			}
+
+			// Make sure that any nav_menu widgets referencing the placeholder nav menu get updated and sent back to client.
+			foreach ( array_keys( $this->manager->unsanitized_post_values() ) as $setting_id ) {
+				$nav_menu_widget_setting = $this->manager->get_setting( $setting_id );
+				if ( ! $nav_menu_widget_setting || ! preg_match( '/^widget_nav_menu\[/', $nav_menu_widget_setting->id ) ) {
+					continue;
+				}
+
+				$widget_instance = $nav_menu_widget_setting->post_value(); // Note that this calls WP_Customize_Widgets::sanitize_widget_instance().
+				if ( empty( $widget_instance['nav_menu'] ) || intval( $widget_instance['nav_menu'] ) !== $this->previous_term_id ) {
+					continue;
+				}
+
+				$widget_instance['nav_menu'] = $this->term_id;
+				$updated_widget_instance = $this->manager->widgets->sanitize_widget_js_instance( $widget_instance );
+				$this->manager->set_post_value( $nav_menu_widget_setting->id, $updated_widget_instance );
+				$nav_menu_widget_setting->save();
+
+				$this->_widget_nav_menu_updates[ $nav_menu_widget_setting->id ] = $updated_widget_instance;
+			}
+		}
+	}
+
+	/**
+	 * Updates a nav_menu_options array.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @see WP_Customize_Nav_Menu_Setting::filter_nav_menu_options()
+	 * @see WP_Customize_Nav_Menu_Setting::update()
+	 *
+	 * @param array $nav_menu_options Array as returned by get_option( 'nav_menu_options' ).
+	 * @param int   $menu_id          The term ID for the given menu.
+	 * @param bool  $auto_add         Whether to auto-add or not.
+	 * @return array (Maybe) modified nav_menu_otions array.
+	 */
+	protected function filter_nav_menu_options_value( $nav_menu_options, $menu_id, $auto_add ) {
+		$nav_menu_options = (array) $nav_menu_options;
+		if ( ! isset( $nav_menu_options['auto_add'] ) ) {
+			$nav_menu_options['auto_add'] = array();
+		}
+
+		$i = array_search( $menu_id, $nav_menu_options['auto_add'] );
+		if ( $auto_add && false === $i ) {
+			array_push( $nav_menu_options['auto_add'], $this->term_id );
+		} elseif ( ! $auto_add && false !== $i ) {
+			array_splice( $nav_menu_options['auto_add'], $i, 1 );
+		}
+
+		return $nav_menu_options;
+	}
+
+	/**
+	 * Export data for the JS client.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @see WP_Customize_Nav_Menu_Setting::update()
+	 *
+	 * @param array $data Additional information passed back to the 'saved' event on `wp.customize`.
+	 * @return array Export data.
+	 */
+	public function amend_customize_save_response( $data ) {
+		if ( ! isset( $data['nav_menu_updates'] ) ) {
+			$data['nav_menu_updates'] = array();
+		}
+		if ( ! isset( $data['widget_nav_menu_updates'] ) ) {
+			$data['widget_nav_menu_updates'] = array();
+		}
+
+		$data['nav_menu_updates'][] = array(
+			'term_id'          => $this->term_id,
+			'previous_term_id' => $this->previous_term_id,
+			'error'            => $this->update_error ? $this->update_error->get_error_code() : null,
+			'status'           => $this->update_status,
+			'saved_value'      => 'deleted' === $this->update_status ? null : $this->value(),
+		);
+
+		$data['widget_nav_menu_updates'] = array_merge(
+			$data['widget_nav_menu_updates'],
+			$this->_widget_nav_menu_updates
+		);
+		$this->_widget_nav_menu_updates = array();
+
+		return $data;
+	}
+}
