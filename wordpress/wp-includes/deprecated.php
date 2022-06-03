@@ -472,4 +472,336 @@ function get_linkobjectsbyname($cat_name = "noname" , $orderby = 'name', $limit 
  *
  *     $links = get_linkobjects(1);
  *     if ($links) {
- *     	for
+ *     	foreach ($links as $link) {
+ *     		echo '<li>'.$link->link_name.'<br />'.$link->link_description.'</li>';
+ *     	}
+ *     }
+ *
+ * Fields are:
+ *
+ * - link_id
+ * - link_url
+ * - link_name
+ * - link_image
+ * - link_target
+ * - link_category
+ * - link_description
+ * - link_visible
+ * - link_owner
+ * - link_rating
+ * - link_updated
+ * - link_rel
+ * - link_notes
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0 Use get_bookmarks()
+ * @see get_bookmarks()
+ *
+ * @param int $category The category to use. If no category supplied uses all
+ * @param string $orderby the order to output the links. E.g. 'id', 'name', 'url',
+ *		'description', or 'rating'. Or maybe owner. If you start the name with an
+ *		underscore the order will be reversed. You can also specify 'rand' as the
+ *		order which will return links in a random order.
+ * @param int $limit Limit to X entries. If not specified, all entries are shown.
+ * @return array
+ */
+function get_linkobjects($category = 0, $orderby = 'name', $limit = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_bookmarks()' );
+
+	$links = get_bookmarks( array( 'category' => $category, 'orderby' => $orderby, 'limit' => $limit ) ) ;
+
+	$links_array = array();
+	foreach ($links as $link)
+		$links_array[] = $link;
+
+	return $links_array;
+}
+
+/**
+ * Gets the links associated with category 'cat_name' and display rating stars/chars.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use get_bookmarks()
+ * @see get_bookmarks()
+ *
+ * @param string $cat_name The category name to use. If no match is found uses all
+ * @param string $before The html to output before the link
+ * @param string $after The html to output after the link
+ * @param string $between The html to output between the link/image and its description. Not used if no image or show_images is true
+ * @param bool $show_images Whether to show images (if defined).
+ * @param string $orderby the order to output the links. E.g. 'id', 'name', 'url',
+ *		'description', or 'rating'. Or maybe owner. If you start the name with an
+ *		underscore the order will be reversed. You can also specify 'rand' as the
+ *		order which will return links in a random order.
+ * @param bool $show_description Whether to show the description if show_images=false/not defined
+ * @param int $limit Limit to X entries. If not specified, all entries are shown.
+ * @param int $show_updated Whether to show last updated timestamp
+ */
+function get_linksbyname_withrating($cat_name = "noname", $before = '', $after = '<br />', $between = " ",
+									$show_images = true, $orderby = 'id', $show_description = true, $limit = -1, $show_updated = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_bookmarks()' );
+
+	get_linksbyname($cat_name, $before, $after, $between, $show_images, $orderby, $show_description, true, $limit, $show_updated);
+}
+
+/**
+ * Gets the links associated with category n and display rating stars/chars.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use get_bookmarks()
+ * @see get_bookmarks()
+ *
+ * @param int $category The category to use. If no category supplied uses all
+ * @param string $before The html to output before the link
+ * @param string $after The html to output after the link
+ * @param string $between The html to output between the link/image and its description. Not used if no image or show_images == true
+ * @param bool $show_images Whether to show images (if defined).
+ * @param string $orderby The order to output the links. E.g. 'id', 'name', 'url',
+ *		'description', or 'rating'. Or maybe owner. If you start the name with an
+ *		underscore the order will be reversed. You can also specify 'rand' as the
+ *		order which will return links in a random order.
+ * @param bool $show_description Whether to show the description if show_images=false/not defined.
+ * @param int $limit Limit to X entries. If not specified, all entries are shown.
+ * @param int $show_updated Whether to show last updated timestamp
+ */
+function get_links_withrating($category = -1, $before = '', $after = '<br />', $between = " ", $show_images = true,
+							  $orderby = 'id', $show_description = true, $limit = -1, $show_updated = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_bookmarks()' );
+
+	get_links($category, $before, $after, $between, $show_images, $orderby, $show_description, true, $limit, $show_updated);
+}
+
+/**
+ * Gets the auto_toggle setting.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0
+ *
+ * @param int $id The category to get. If no category supplied uses 0
+ * @return int Only returns 0.
+ */
+function get_autotoggle($id = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0' );
+	return 0;
+}
+
+/**
+ * Lists categories.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use wp_list_categories()
+ * @see wp_list_categories()
+ *
+ * @param int $optionall
+ * @param string $all
+ * @param string $sort_column
+ * @param string $sort_order
+ * @param string $file
+ * @param bool $list
+ * @param int $optiondates
+ * @param int $optioncount
+ * @param int $hide_empty
+ * @param int $use_desc_for_title
+ * @param bool $children
+ * @param int $child_of
+ * @param int $categories
+ * @param int $recurse
+ * @param string $feed
+ * @param string $feed_image
+ * @param string $exclude
+ * @param bool $hierarchical
+ * @return false|null
+ */
+function list_cats($optionall = 1, $all = 'All', $sort_column = 'ID', $sort_order = 'asc', $file = '', $list = true, $optiondates = 0,
+				   $optioncount = 0, $hide_empty = 1, $use_desc_for_title = 1, $children=false, $child_of=0, $categories=0,
+				   $recurse=0, $feed = '', $feed_image = '', $exclude = '', $hierarchical=false) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_list_categories()' );
+
+	$query = compact('optionall', 'all', 'sort_column', 'sort_order', 'file', 'list', 'optiondates', 'optioncount', 'hide_empty', 'use_desc_for_title', 'children',
+		'child_of', 'categories', 'recurse', 'feed', 'feed_image', 'exclude', 'hierarchical');
+	return wp_list_cats($query);
+}
+
+/**
+ * Lists categories.
+ *
+ * @since 1.2.0
+ * @deprecated 2.1.0 Use wp_list_categories()
+ * @see wp_list_categories()
+ *
+ * @param string|array $args
+ * @return false|null|string
+ */
+function wp_list_cats($args = '') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_list_categories()' );
+
+	$r = wp_parse_args( $args );
+
+	// Map to new names.
+	if ( isset($r['optionall']) && isset($r['all']))
+		$r['show_option_all'] = $r['all'];
+	if ( isset($r['sort_column']) )
+		$r['orderby'] = $r['sort_column'];
+	if ( isset($r['sort_order']) )
+		$r['order'] = $r['sort_order'];
+	if ( isset($r['optiondates']) )
+		$r['show_last_update'] = $r['optiondates'];
+	if ( isset($r['optioncount']) )
+		$r['show_count'] = $r['optioncount'];
+	if ( isset($r['list']) )
+		$r['style'] = $r['list'] ? 'list' : 'break';
+	$r['title_li'] = '';
+
+	return wp_list_categories($r);
+}
+
+/**
+ * Deprecated method for generating a drop-down of categories.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use wp_dropdown_categories()
+ * @see wp_dropdown_categories()
+ *
+ * @param int $optionall
+ * @param string $all
+ * @param string $orderby
+ * @param string $order
+ * @param int $show_last_update
+ * @param int $show_count
+ * @param int $hide_empty
+ * @param bool $optionnone
+ * @param int $selected
+ * @param int $exclude
+ * @return string
+ */
+function dropdown_cats($optionall = 1, $all = 'All', $orderby = 'ID', $order = 'asc',
+		$show_last_update = 0, $show_count = 0, $hide_empty = 1, $optionnone = false,
+		$selected = 0, $exclude = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_dropdown_categories()' );
+
+	$show_option_all = '';
+	if ( $optionall )
+		$show_option_all = $all;
+
+	$show_option_none = '';
+	if ( $optionnone )
+		$show_option_none = __('None');
+
+	$vars = compact('show_option_all', 'show_option_none', 'orderby', 'order',
+					'show_last_update', 'show_count', 'hide_empty', 'selected', 'exclude');
+	$query = add_query_arg($vars, '');
+	return wp_dropdown_categories($query);
+}
+
+/**
+ * Lists authors.
+ *
+ * @since 1.2.0
+ * @deprecated 2.1.0 Use wp_list_authors()
+ * @see wp_list_authors()
+ *
+ * @param bool $optioncount
+ * @param bool $exclude_admin
+ * @param bool $show_fullname
+ * @param bool $hide_empty
+ * @param string $feed
+ * @param string $feed_image
+ * @return null|string
+ */
+function list_authors($optioncount = false, $exclude_admin = true, $show_fullname = false, $hide_empty = true, $feed = '', $feed_image = '') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_list_authors()' );
+
+	$args = compact('optioncount', 'exclude_admin', 'show_fullname', 'hide_empty', 'feed', 'feed_image');
+	return wp_list_authors($args);
+}
+
+/**
+ * Retrieves a list of post categories.
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0 Use wp_get_post_categories()
+ * @see wp_get_post_categories()
+ *
+ * @param int $blogid Not Used
+ * @param int $post_ID
+ * @return array
+ */
+function wp_get_post_cats($blogid = '1', $post_ID = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_get_post_categories()' );
+	return wp_get_post_categories($post_ID);
+}
+
+/**
+ * Sets the categories that the post id belongs to.
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0
+ * @deprecated Use wp_set_post_categories()
+ * @see wp_set_post_categories()
+ *
+ * @param int $blogid Not used
+ * @param int $post_ID
+ * @param array $post_categories
+ * @return bool|mixed
+ */
+function wp_set_post_cats($blogid = '1', $post_ID = 0, $post_categories = array()) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_set_post_categories()' );
+	return wp_set_post_categories($post_ID, $post_categories);
+}
+
+/**
+ * Retrieves a list of archives.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use wp_get_archives()
+ * @see wp_get_archives()
+ *
+ * @param string $type
+ * @param string $limit
+ * @param string $format
+ * @param string $before
+ * @param string $after
+ * @param bool $show_post_count
+ * @return string|null
+ */
+function get_archives($type='', $limit='', $format='html', $before = '', $after = '', $show_post_count = false) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_get_archives()' );
+	$args = compact('type', 'limit', 'format', 'before', 'after', 'show_post_count');
+	return wp_get_archives($args);
+}
+
+/**
+ * Returns or Prints link to the author's posts.
+ *
+ * @since 1.2.0
+ * @deprecated 2.1.0 Use get_author_posts_url()
+ * @see get_author_posts_url()
+ *
+ * @param bool $echo
+ * @param int $author_id
+ * @param string $author_nicename Optional.
+ * @return string|null
+ */
+function get_author_link($echo, $author_id, $author_nicename = '') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_author_posts_url()' );
+
+	$link = get_author_posts_url($author_id, $author_nicename);
+
+	if ( $echo )
+		echo $link;
+	return $link;
+}
+
+/**
+ * Print list of pages based on arguments.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use wp_link_pages()
+ * @see wp_link_pages()
+ *
+ * @param string $before
+ * @param string $after
+ * @param string $next_or_number
+ * @param string $nextpagelink
+ * @param string $previouspagelink
+ * @param string $pagelin
