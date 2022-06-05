@@ -1183,4 +1183,400 @@ function comments_rss() {
  * @deprecated 2.0.0 Use wp_create_user()
  * @see wp_create_user()
  *
- * @p
+ * @param string $username The user's username.
+ * @param string $password The user's password.
+ * @param string $email    The user's email.
+ * @return int The new user's ID.
+ */
+function create_user($username, $password, $email) {
+	_deprecated_function( __FUNCTION__, '2.0.0', 'wp_create_user()' );
+	return wp_create_user($username, $password, $email);
+}
+
+/**
+ * Unused function.
+ *
+ * @deprecated 2.5.0
+ */
+function gzip_compression() {
+	_deprecated_function( __FUNCTION__, '2.5.0' );
+	return false;
+}
+
+/**
+ * Retrieve an array of comment data about comment $comment_ID.
+ *
+ * @since 0.71
+ * @deprecated 2.7.0 Use get_comment()
+ * @see get_comment()
+ *
+ * @param int $comment_ID The ID of the comment
+ * @param int $no_cache Whether to use the cache (cast to bool)
+ * @param bool $include_unapproved Whether to include unapproved comments
+ * @return array The comment data
+ */
+function get_commentdata( $comment_ID, $no_cache = 0, $include_unapproved = false ) {
+	_deprecated_function( __FUNCTION__, '2.7.0', 'get_comment()' );
+	return get_comment($comment_ID, ARRAY_A);
+}
+
+/**
+ * Retrieve the category name by the category ID.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use get_cat_name()
+ * @see get_cat_name()
+ *
+ * @param int $cat_ID Category ID
+ * @return string category name
+ */
+function get_catname( $cat_ID ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_cat_name()' );
+	return get_cat_name( $cat_ID );
+}
+
+/**
+ * Retrieve category children list separated before and after the term IDs.
+ *
+ * @since 1.2.0
+ * @deprecated 2.8.0 Use get_term_children()
+ * @see get_term_children()
+ *
+ * @param int $id Category ID to retrieve children.
+ * @param string $before Optional. Prepend before category term ID.
+ * @param string $after Optional, default is empty string. Append after category term ID.
+ * @param array $visited Optional. Category Term IDs that have already been added.
+ * @return string
+ */
+function get_category_children( $id, $before = '/', $after = '', $visited = array() ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_term_children()' );
+	if ( 0 == $id )
+		return '';
+
+	$chain = '';
+	/** TODO: consult hierarchy */
+	$cat_ids = get_all_category_ids();
+	foreach ( (array) $cat_ids as $cat_id ) {
+		if ( $cat_id == $id )
+			continue;
+
+		$category = get_category( $cat_id );
+		if ( is_wp_error( $category ) )
+			return $category;
+		if ( $category->parent == $id && !in_array( $category->term_id, $visited ) ) {
+			$visited[] = $category->term_id;
+			$chain .= $before.$category->term_id.$after;
+			$chain .= get_category_children( $category->term_id, $before, $after );
+		}
+	}
+	return $chain;
+}
+
+/**
+ * Retrieves all category IDs.
+ *
+ * @since 2.0.0
+ * @deprecated 4.0.0 Use get_terms()
+ * @see get_terms()
+ *
+ * @link https://codex.wordpress.org/Function_Reference/get_all_category_ids
+ *
+ * @return object List of all of the category IDs.
+ */
+function get_all_category_ids() {
+	_deprecated_function( __FUNCTION__, '4.0.0', 'get_terms()' );
+
+	if ( ! $cat_ids = wp_cache_get( 'all_category_ids', 'category' ) ) {
+		$cat_ids = get_terms( 'category', array('fields' => 'ids', 'get' => 'all') );
+		wp_cache_add( 'all_category_ids', $cat_ids, 'category' );
+	}
+
+	return $cat_ids;
+}
+
+/**
+ * Retrieve the description of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's description.
+ */
+function get_the_author_description() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'description\')' );
+	return get_the_author_meta('description');
+}
+
+/**
+ * Display the description of the author of the current post.
+ *
+ * @since 1.0.0
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_description() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'description\')' );
+	the_author_meta('description');
+}
+
+/**
+ * Retrieve the login name of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's login name (username).
+ */
+function get_the_author_login() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'login\')' );
+	return get_the_author_meta('login');
+}
+
+/**
+ * Display the login name of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_login() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'login\')' );
+	the_author_meta('login');
+}
+
+/**
+ * Retrieve the first name of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's first name.
+ */
+function get_the_author_firstname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'first_name\')' );
+	return get_the_author_meta('first_name');
+}
+
+/**
+ * Display the first name of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_firstname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'first_name\')' );
+	the_author_meta('first_name');
+}
+
+/**
+ * Retrieve the last name of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's last name.
+ */
+function get_the_author_lastname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'last_name\')' );
+	return get_the_author_meta('last_name');
+}
+
+/**
+ * Display the last name of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_lastname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'last_name\')' );
+	the_author_meta('last_name');
+}
+
+/**
+ * Retrieve the nickname of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's nickname.
+ */
+function get_the_author_nickname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'nickname\')' );
+	return get_the_author_meta('nickname');
+}
+
+/**
+ * Display the nickname of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_nickname() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'nickname\')' );
+	the_author_meta('nickname');
+}
+
+/**
+ * Retrieve the email of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's username.
+ */
+function get_the_author_email() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'email\')' );
+	return get_the_author_meta('email');
+}
+
+/**
+ * Display the email of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_email() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'email\')' );
+	the_author_meta('email');
+}
+
+/**
+ * Retrieve the ICQ number of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's ICQ number.
+ */
+function get_the_author_icq() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'icq\')' );
+	return get_the_author_meta('icq');
+}
+
+/**
+ * Display the ICQ number of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_icq() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'icq\')' );
+	the_author_meta('icq');
+}
+
+/**
+ * Retrieve the Yahoo! IM name of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's Yahoo! IM name.
+ */
+function get_the_author_yim() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'yim\')' );
+	return get_the_author_meta('yim');
+}
+
+/**
+ * Display the Yahoo! IM name of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_yim() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'yim\')' );
+	the_author_meta('yim');
+}
+
+/**
+ * Retrieve the MSN address of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's MSN address.
+ */
+function get_the_author_msn() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'msn\')' );
+	return get_the_author_meta('msn');
+}
+
+/**
+ * Display the MSN address of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_msn() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'msn\')' );
+	the_author_meta('msn');
+}
+
+/**
+ * Retrieve the AIM address of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The author's AIM address.
+ */
+function get_the_author_aim() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'aim\')' );
+	return get_the_author_meta('aim');
+}
+
+/**
+ * Display the AIM address of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta('aim')
+ * @see the_author_meta()
+ */
+function the_author_aim() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'aim\')' );
+	the_author_meta('aim');
+}
+
+/**
+ * Retrieve the specified author's preferred display name.
+ *
+ * @since 1.0.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @param int $auth_id The ID of the author.
+ * @return string The author's display name.
+ */
+function get_author_name( $auth_id = false ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'display_name\')' );
+	return get_the_author_meta('display_name', $auth_id);
+}
+
+/**
+ * Retrieve the URL to the home page of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string The URL to the author's page.
+ */
+function get_the_author_url() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'url\')' );
