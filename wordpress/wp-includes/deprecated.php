@@ -804,4 +804,383 @@ function get_author_link($echo, $author_id, $author_nicename = '') {
  * @param string $next_or_number
  * @param string $nextpagelink
  * @param string $previouspagelink
- * @param string $pagelin
+ * @param string $pagelink
+ * @param string $more_file
+ * @return string
+ */
+function link_pages($before='<br />', $after='<br />', $next_or_number='number', $nextpagelink='next page', $previouspagelink='previous page',
+					$pagelink='%', $more_file='') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_link_pages()' );
+
+	$args = compact('before', 'after', 'next_or_number', 'nextpagelink', 'previouspagelink', 'pagelink', 'more_file');
+	return wp_link_pages($args);
+}
+
+/**
+ * Get value based on option.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use get_option()
+ * @see get_option()
+ *
+ * @param string $option
+ * @return string
+ */
+function get_settings($option) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_option()' );
+
+	return get_option($option);
+}
+
+/**
+ * Print the permalink of the current post in the loop.
+ *
+ * @since 0.71
+ * @deprecated 1.2.0 Use the_permalink()
+ * @see the_permalink()
+ */
+function permalink_link() {
+	_deprecated_function( __FUNCTION__, '1.2.0', 'the_permalink()' );
+	the_permalink();
+}
+
+/**
+ * Print the permalink to the RSS feed.
+ *
+ * @since 0.71
+ * @deprecated 2.3.0 Use the_permalink_rss()
+ * @see the_permalink_rss()
+ *
+ * @param string $deprecated
+ */
+function permalink_single_rss($deprecated = '') {
+	_deprecated_function( __FUNCTION__, '2.3.0', 'the_permalink_rss()' );
+	the_permalink_rss();
+}
+
+/**
+ * Gets the links associated with category.
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0 Use wp_list_bookmarks()
+ * @see wp_list_bookmarks()
+ *
+ * @param string $args a query string
+ * @return null|string
+ */
+function wp_get_links($args = '') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_list_bookmarks()' );
+
+	if ( strpos( $args, '=' ) === false ) {
+		$cat_id = $args;
+		$args = add_query_arg( 'category', $cat_id, $args );
+	}
+
+	$defaults = array(
+		'after' => '<br />',
+		'before' => '',
+		'between' => ' ',
+		'categorize' => 0,
+		'category' => '',
+		'echo' => true,
+		'limit' => -1,
+		'orderby' => 'name',
+		'show_description' => true,
+		'show_images' => true,
+		'show_rating' => false,
+		'show_updated' => true,
+		'title_li' => '',
+	);
+
+	$r = wp_parse_args( $args, $defaults );
+
+	return wp_list_bookmarks($r);
+}
+
+/**
+ * Gets the links associated with category by id.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use get_bookmarks()
+ * @see get_bookmarks()
+ *
+ * @param int $category The category to use. If no category supplied uses all
+ * @param string $before the html to output before the link
+ * @param string $after the html to output after the link
+ * @param string $between the html to output between the link/image and its description.
+ *		Not used if no image or show_images == true
+ * @param bool $show_images whether to show images (if defined).
+ * @param string $orderby the order to output the links. E.g. 'id', 'name', 'url',
+ *		'description', or 'rating'. Or maybe owner. If you start the name with an
+ *		underscore the order will be reversed. You can also specify 'rand' as the order
+ *		which will return links in a random order.
+ * @param bool $show_description whether to show the description if show_images=false/not defined.
+ * @param bool $show_rating show rating stars/chars
+ * @param int $limit Limit to X entries. If not specified, all entries are shown.
+ * @param int $show_updated whether to show last updated timestamp
+ * @param bool $echo whether to echo the results, or return them instead
+ * @return null|string
+ */
+function get_links($category = -1, $before = '', $after = '<br />', $between = ' ', $show_images = true, $orderby = 'name',
+			$show_description = true, $show_rating = false, $limit = -1, $show_updated = 1, $echo = true) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_bookmarks()' );
+
+	$order = 'ASC';
+	if ( substr($orderby, 0, 1) == '_' ) {
+		$order = 'DESC';
+		$orderby = substr($orderby, 1);
+	}
+
+	if ( $category == -1 ) //get_bookmarks uses '' to signify all categories
+		$category = '';
+
+	$results = get_bookmarks(array('category' => $category, 'orderby' => $orderby, 'order' => $order, 'show_updated' => $show_updated, 'limit' => $limit));
+
+	if ( !$results )
+		return;
+
+	$output = '';
+
+	foreach ( (array) $results as $row ) {
+		if ( !isset($row->recently_updated) )
+			$row->recently_updated = false;
+		$output .= $before;
+		if ( $show_updated && $row->recently_updated )
+			$output .= get_option('links_recently_updated_prepend');
+		$the_link = '#';
+		if ( !empty($row->link_url) )
+			$the_link = esc_url($row->link_url);
+		$rel = $row->link_rel;
+		if ( '' != $rel )
+			$rel = ' rel="' . $rel . '"';
+
+		$desc = esc_attr(sanitize_bookmark_field('link_description', $row->link_description, $row->link_id, 'display'));
+		$name = esc_attr(sanitize_bookmark_field('link_name', $row->link_name, $row->link_id, 'display'));
+		$title = $desc;
+
+		if ( $show_updated )
+			if (substr($row->link_updated_f, 0, 2) != '00')
+				$title .= ' ('.__('Last updated') . ' ' . date(get_option('links_updated_date_format'), $row->link_updated_f + (get_option('gmt_offset') * HOUR_IN_SECONDS)) . ')';
+
+		if ( '' != $title )
+			$title = ' title="' . $title . '"';
+
+		$alt = ' alt="' . $name . '"';
+
+		$target = $row->link_target;
+		if ( '' != $target )
+			$target = ' target="' . $target . '"';
+
+		$output .= '<a href="' . $the_link . '"' . $rel . $title . $target. '>';
+
+		if ( $row->link_image != null && $show_images ) {
+			if ( strpos($row->link_image, 'http') !== false )
+				$output .= "<img src=\"$row->link_image\" $alt $title />";
+			else // If it's a relative path
+				$output .= "<img src=\"" . get_option('siteurl') . "$row->link_image\" $alt $title />";
+		} else {
+			$output .= $name;
+		}
+
+		$output .= '</a>';
+
+		if ( $show_updated && $row->recently_updated )
+			$output .= get_option('links_recently_updated_append');
+
+		if ( $show_description && '' != $desc )
+			$output .= $between . $desc;
+
+		if ($show_rating) {
+			$output .= $between . get_linkrating($row);
+		}
+
+		$output .= "$after\n";
+	} // end while
+
+	if ( !$echo )
+		return $output;
+	echo $output;
+}
+
+/**
+ * Output entire list of links by category.
+ *
+ * Output a list of all links, listed by category, using the settings in
+ * $wpdb->linkcategories and output it as a nested HTML unordered list.
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0 Use wp_list_bookmarks()
+ * @see wp_list_bookmarks()
+ *
+ * @param string $order Sort link categories by 'name' or 'id'
+ */
+function get_links_list($order = 'name') {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'wp_list_bookmarks()' );
+
+	$order = strtolower($order);
+
+	// Handle link category sorting
+	$direction = 'ASC';
+	if ( '_' == substr($order,0,1) ) {
+		$direction = 'DESC';
+		$order = substr($order,1);
+	}
+
+	if ( !isset($direction) )
+		$direction = '';
+
+	$cats = get_categories(array('type' => 'link', 'orderby' => $order, 'order' => $direction, 'hierarchical' => 0));
+
+	// Display each category
+	if ( $cats ) {
+		foreach ( (array) $cats as $cat ) {
+			// Handle each category.
+
+			// Display the category name
+			echo '  <li id="linkcat-' . $cat->term_id . '" class="linkcat"><h2>' . apply_filters('link_category', $cat->name ) . "</h2>\n\t<ul>\n";
+			// Call get_links() with all the appropriate params
+			get_links($cat->term_id, '<li>', "</li>", "\n", true, 'name', false);
+
+			// Close the last category
+			echo "\n\t</ul>\n</li>\n";
+		}
+	}
+}
+
+/**
+ * Show the link to the links popup and the number of links.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0
+ *
+ * @param string $text the text of the link
+ * @param int $width the width of the popup window
+ * @param int $height the height of the popup window
+ * @param string $file the page to open in the popup window
+ * @param bool $count the number of links in the db
+ */
+function links_popup_script($text = 'Links', $width=400, $height=400, $file='links.all.php', $count = true) {
+	_deprecated_function( __FUNCTION__, '2.1.0' );
+}
+
+/**
+ * Legacy function that retrieved the value of a link's link_rating field.
+ *
+ * @since 1.0.1
+ * @deprecated 2.1.0 Use sanitize_bookmark_field()
+ * @see sanitize_bookmark_field()
+ *
+ * @param object $link Link object.
+ * @return mixed Value of the 'link_rating' field, false otherwise.
+ */
+function get_linkrating( $link ) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'sanitize_bookmark_field()' );
+	return sanitize_bookmark_field('link_rating', $link->link_rating, $link->link_id, 'display');
+}
+
+/**
+ * Gets the name of category by id.
+ *
+ * @since 0.71
+ * @deprecated 2.1.0 Use get_category()
+ * @see get_category()
+ *
+ * @param int $id The category to get. If no category supplied uses 0
+ * @return string
+ */
+function get_linkcatname($id = 0) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_category()' );
+
+	$id = (int) $id;
+
+	if ( empty($id) )
+		return '';
+
+	$cats = wp_get_link_cats($id);
+
+	if ( empty($cats) || ! is_array($cats) )
+		return '';
+
+	$cat_id = (int) $cats[0]; // Take the first cat.
+
+	$cat = get_category($cat_id);
+	return $cat->name;
+}
+
+/**
+ * Print RSS comment feed link.
+ *
+ * @since 1.0.1
+ * @deprecated 2.5.0 Use post_comments_feed_link()
+ * @see post_comments_feed_link()
+ *
+ * @param string $link_text
+ */
+function comments_rss_link($link_text = 'Comments RSS') {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'post_comments_feed_link()' );
+	post_comments_feed_link($link_text);
+}
+
+/**
+ * Print/Return link to category RSS2 feed.
+ *
+ * @since 1.2.0
+ * @deprecated 2.5.0 Use get_category_feed_link()
+ * @see get_category_feed_link()
+ *
+ * @param bool $echo
+ * @param int $cat_ID
+ * @return string
+ */
+function get_category_rss_link($echo = false, $cat_ID = 1) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'get_category_feed_link()' );
+
+	$link = get_category_feed_link($cat_ID, 'rss2');
+
+	if ( $echo )
+		echo $link;
+	return $link;
+}
+
+/**
+ * Print/Return link to author RSS feed.
+ *
+ * @since 1.2.0
+ * @deprecated 2.5.0 Use get_author_feed_link()
+ * @see get_author_feed_link()
+ *
+ * @param bool $echo
+ * @param int $author_id
+ * @return string
+ */
+function get_author_rss_link($echo = false, $author_id = 1) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'get_author_feed_link()' );
+
+	$link = get_author_feed_link($author_id);
+	if ( $echo )
+		echo $link;
+	return $link;
+}
+
+/**
+ * Return link to the post RSS feed.
+ *
+ * @since 1.5.0
+ * @deprecated 2.2.0 Use get_post_comments_feed_link()
+ * @see get_post_comments_feed_link()
+ *
+ * @return string
+ */
+function comments_rss() {
+	_deprecated_function( __FUNCTION__, '2.2.0', 'get_post_comments_feed_link()' );
+	return esc_url( get_post_comments_feed_link() );
+}
+
+/**
+ * An alias of wp_create_user().
+ *
+ * @since 2.0.0
+ * @deprecated 2.0.0 Use wp_create_user()
+ * @see wp_create_user()
+ *
+ * @p
