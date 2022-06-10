@@ -2252,4 +2252,390 @@ function delete_usermeta( $user_id, $meta_key, $meta_value = '' ) {
  * If $user_id is not a number, then the function will fail over with a 'false'
  * boolean return value. Other returned values depend on whether there is only
  * one item to be returned, which be that single item type. If there is more
- * than one metadata value, then it will
+ * than one metadata value, then it will be list of metadata values.
+ *
+ * @since 2.0.0
+ * @deprecated 3.0.0 Use get_user_meta()
+ * @see get_user_meta()
+ *
+ * @param int $user_id User ID
+ * @param string $meta_key Optional. Metadata key.
+ * @return mixed
+ */
+function get_usermeta( $user_id, $meta_key = '' ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'get_user_meta()' );
+	global $wpdb;
+	$user_id = (int) $user_id;
+
+	if ( !$user_id )
+		return false;
+
+	if ( !empty($meta_key) ) {
+		$meta_key = preg_replace('|[^a-z0-9_]|i', '', $meta_key);
+		$user = wp_cache_get($user_id, 'users');
+		// Check the cached user object
+		if ( false !== $user && isset($user->$meta_key) )
+			$metas = array($user->$meta_key);
+		else
+			$metas = $wpdb->get_col( $wpdb->prepare("SELECT meta_value FROM $wpdb->usermeta WHERE user_id = %d AND meta_key = %s", $user_id, $meta_key) );
+	} else {
+		$metas = $wpdb->get_col( $wpdb->prepare("SELECT meta_value FROM $wpdb->usermeta WHERE user_id = %d", $user_id) );
+	}
+
+	if ( empty($metas) ) {
+		if ( empty($meta_key) )
+			return array();
+		else
+			return '';
+	}
+
+	$metas = array_map('maybe_unserialize', $metas);
+
+	if ( count($metas) == 1 )
+		return $metas[0];
+	else
+		return $metas;
+}
+
+/**
+ * Update metadata of user.
+ *
+ * There is no need to serialize values, they will be serialized if it is
+ * needed. The metadata key can only be a string with underscores. All else will
+ * be removed.
+ *
+ * Will remove the metadata, if the meta value is empty.
+ *
+ * @since 2.0.0
+ * @deprecated 3.0.0 Use update_user_meta()
+ * @see update_user_meta()
+ *
+ * @param int $user_id User ID
+ * @param string $meta_key Metadata key.
+ * @param mixed $meta_value Metadata value.
+ * @return bool True on successful update, false on failure.
+ */
+function update_usermeta( $user_id, $meta_key, $meta_value ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'update_user_meta()' );
+	global $wpdb;
+	if ( !is_numeric( $user_id ) )
+		return false;
+	$meta_key = preg_replace('|[^a-z0-9_]|i', '', $meta_key);
+
+	/** @todo Might need fix because usermeta data is assumed to be already escaped */
+	if ( is_string($meta_value) )
+		$meta_value = stripslashes($meta_value);
+	$meta_value = maybe_serialize($meta_value);
+
+	if (empty($meta_value)) {
+		return delete_usermeta($user_id, $meta_key);
+	}
+
+	$cur = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $wpdb->usermeta WHERE user_id = %d AND meta_key = %s", $user_id, $meta_key) );
+
+	if ( $cur )
+		do_action( 'update_usermeta', $cur->umeta_id, $user_id, $meta_key, $meta_value );
+
+	if ( !$cur )
+		$wpdb->insert($wpdb->usermeta, compact('user_id', 'meta_key', 'meta_value') );
+	elseif ( $cur->meta_value != $meta_value )
+		$wpdb->update($wpdb->usermeta, compact('meta_value'), compact('user_id', 'meta_key') );
+	else
+		return false;
+
+	clean_user_cache( $user_id );
+	wp_cache_delete( $user_id, 'user_meta' );
+
+	if ( !$cur )
+		do_action( 'added_usermeta', $wpdb->insert_id, $user_id, $meta_key, $meta_value );
+	else
+		do_action( 'updated_usermeta', $cur->umeta_id, $user_id, $meta_key, $meta_value );
+
+	return true;
+}
+
+/**
+ * Get users for the site.
+ *
+ * For setups that use the multisite feature. Can be used outside of the
+ * multisite feature.
+ *
+ * @since 2.2.0
+ * @deprecated 3.1.0 Use get_users()
+ * @see get_users()
+ *
+ * @global wpdb $wpdb    WordPress database abstraction object.
+ *
+ * @param int $id Site ID.
+ * @return array List of users that are part of that site ID
+ */
+function get_users_of_blog( $id = '' ) {
+	_deprecated_function( __FUNCTION__, '3.1.0', 'get_users()' );
+
+	global $wpdb;
+	if ( empty( $id ) ) {
+		$id = get_current_blog_id();
+	}
+	$blog_prefix = $wpdb->get_blog_prefix($id);
+	$users = $wpdb->get_results( "SELECT user_id, user_id AS ID, user_login, display_name, user_email, meta_value FROM $wpdb->users, $wpdb->usermeta WHERE {$wpdb->users}.ID = {$wpdb->usermeta}.user_id AND meta_key = '{$blog_prefix}capabilities' ORDER BY {$wpdb->usermeta}.user_id" );
+	return $users;
+}
+
+/**
+ * Enable/disable automatic general feed link outputting.
+ *
+ * @since 2.8.0
+ * @deprecated 3.0.0 Use add_theme_support()
+ * @see add_theme_support()
+ *
+ * @param bool $add Optional, default is true. Add or remove links. Defaults to true.
+ */
+function automatic_feed_links( $add = true ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', "add_theme_support( 'automatic-feed-links' )" );
+
+	if ( $add )
+		add_theme_support( 'automatic-feed-links' );
+	else
+		remove_action( 'wp_head', 'feed_links_extra', 3 ); // Just do this yourself in 3.0+
+}
+
+/**
+ * Retrieve user data based on field.
+ *
+ * @since 1.5.0
+ * @deprecated 3.0.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @param string    $field User meta field.
+ * @param false|int $user Optional. User ID to retrieve the field for. Default false (current user).
+ * @return string The author's field from the current author's DB object.
+ */
+function get_profile( $field, $user = false ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'get_the_author_meta()' );
+	if ( $user ) {
+		$user = get_user_by( 'login', $user );
+		$user = $user->ID;
+	}
+	return get_the_author_meta( $field, $user );
+}
+
+/**
+ * Retrieves the number of posts a user has written.
+ *
+ * @since 0.71
+ * @deprecated 3.0.0 Use count_user_posts()
+ * @see count_user_posts()
+ *
+ * @param int $userid User to count posts for.
+ * @return int Number of posts the given user has written.
+ */
+function get_usernumposts( $userid ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'count_user_posts()' );
+	return count_user_posts( $userid );
+}
+
+/**
+ * Callback used to change %uXXXX to &#YYY; syntax
+ *
+ * @since 2.8.0
+ * @access private
+ * @deprecated 3.0.0
+ *
+ * @param array $matches Single Match
+ * @return string An HTML entity
+ */
+function funky_javascript_callback($matches) {
+	return "&#".base_convert($matches[1],16,10).";";
+}
+
+/**
+ * Fixes JavaScript bugs in browsers.
+ *
+ * Converts unicode characters to HTML numbered entities.
+ *
+ * @since 1.5.0
+ * @deprecated 3.0.0
+ *
+ * @global $is_macIE
+ * @global $is_winIE
+ *
+ * @param string $text Text to be made safe.
+ * @return string Fixed text.
+ */
+function funky_javascript_fix($text) {
+	_deprecated_function( __FUNCTION__, '3.0.0' );
+	// Fixes for browsers' JavaScript bugs.
+	global $is_macIE, $is_winIE;
+
+	if ( $is_winIE || $is_macIE )
+		$text =  preg_replace_callback("/\%u([0-9A-F]{4,4})/",
+					"funky_javascript_callback",
+					$text);
+
+	return $text;
+}
+
+/**
+ * Checks that the taxonomy name exists.
+ *
+ * @since 2.3.0
+ * @deprecated 3.0.0 Use taxonomy_exists()
+ * @see taxonomy_exists()
+ *
+ * @param string $taxonomy Name of taxonomy object
+ * @return bool Whether the taxonomy exists.
+ */
+function is_taxonomy( $taxonomy ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'taxonomy_exists()' );
+	return taxonomy_exists( $taxonomy );
+}
+
+/**
+ * Check if Term exists.
+ *
+ * @since 2.3.0
+ * @deprecated 3.0.0 Use term_exists()
+ * @see term_exists()
+ *
+ * @param int|string $term The term to check
+ * @param string $taxonomy The taxonomy name to use
+ * @param int $parent ID of parent term under which to confine the exists search.
+ * @return mixed Get the term id or Term Object, if exists.
+ */
+function is_term( $term, $taxonomy = '', $parent = 0 ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'term_exists()' );
+	return term_exists( $term, $taxonomy, $parent );
+}
+
+/**
+ * Is the current admin page generated by a plugin?
+ *
+ * Use global $plugin_page and/or get_plugin_page_hookname() hooks.
+ *
+ * @since 1.5.0
+ * @deprecated 3.1.0
+ *
+ * @global $plugin_page
+ *
+ * @return bool
+ */
+function is_plugin_page() {
+	_deprecated_function( __FUNCTION__, '3.1.0'  );
+
+	global $plugin_page;
+
+	if ( isset($plugin_page) )
+		return true;
+
+	return false;
+}
+
+/**
+ * Update the categories cache.
+ *
+ * This function does not appear to be used anymore or does not appear to be
+ * needed. It might be a legacy function left over from when there was a need
+ * for updating the category cache.
+ *
+ * @since 1.5.0
+ * @deprecated 3.1.0
+ *
+ * @return bool Always return True
+ */
+function update_category_cache() {
+	_deprecated_function( __FUNCTION__, '3.1.0'  );
+
+	return true;
+}
+
+/**
+ * Check for PHP timezone support
+ *
+ * @since 2.9.0
+ * @deprecated 3.2.0
+ *
+ * @return bool
+ */
+function wp_timezone_supported() {
+	_deprecated_function( __FUNCTION__, '3.2.0' );
+
+	return true;
+}
+
+/**
+ * Displays an editor: TinyMCE, HTML, or both.
+ *
+ * @since 2.1.0
+ * @deprecated 3.3.0 Use wp_editor()
+ * @see wp_editor()
+ *
+ * @param string $content       Textarea content.
+ * @param string $id            Optional. HTML ID attribute value. Default 'content'.
+ * @param string $prev_id       Optional. Unused.
+ * @param bool   $media_buttons Optional. Whether to display media buttons. Default true.
+ * @param int    $tab_index     Optional. Unused.
+ * @param bool   $extended      Optional. Unused.
+ */
+function the_editor($content, $id = 'content', $prev_id = 'title', $media_buttons = true, $tab_index = 2, $extended = true) {
+	_deprecated_function( __FUNCTION__, '3.3.0', 'wp_editor()' );
+
+	wp_editor( $content, $id, array( 'media_buttons' => $media_buttons ) );
+}
+
+/**
+ * Perform the query to get the $metavalues array(s) needed by _fill_user and _fill_many_users
+ *
+ * @since 3.0.0
+ * @deprecated 3.3.0
+ *
+ * @param array $ids User ID numbers list.
+ * @return array of arrays. The array is indexed by user_id, containing $metavalues object arrays.
+ */
+function get_user_metavalues($ids) {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	$objects = array();
+
+	$ids = array_map('intval', $ids);
+	foreach ( $ids as $id )
+		$objects[$id] = array();
+
+	$metas = update_meta_cache('user', $ids);
+
+	foreach ( $metas as $id => $meta ) {
+		foreach ( $meta as $key => $metavalues ) {
+			foreach ( $metavalues as $value ) {
+				$objects[$id][] = (object)array( 'user_id' => $id, 'meta_key' => $key, 'meta_value' => $value);
+			}
+		}
+	}
+
+	return $objects;
+}
+
+/**
+ * Sanitize every user field.
+ *
+ * If the context is 'raw', then the user object or array will get minimal santization of the int fields.
+ *
+ * @since 2.3.0
+ * @deprecated 3.3.0
+ *
+ * @param object|array $user The User Object or Array
+ * @param string $context Optional, default is 'display'. How to sanitize user fields.
+ * @return object|array The now sanitized User Object or Array (will be the same type as $user)
+ */
+function sanitize_user_object($user, $context = 'display') {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	if ( is_object($user) ) {
+		if ( !isset($user->ID) )
+			$user->ID = 0;
+		if ( ! ( $user instanceof WP_User ) ) {
+			$vars = get_object_vars($user);
+			foreach ( array_keys($vars) as $field ) {
+				if ( is_string($user->$field) || is_numeric($user->$field) )
+					$user->$field = sanitize_user_field($field, $user->$field, $user->ID, $context);
+			}
+		}
+		$user
