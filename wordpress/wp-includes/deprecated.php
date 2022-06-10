@@ -3812,4 +3812,135 @@ function wp_kses_js_entities( $string ) {
  * Sort categories by ID.
  *
  * Used by usort() as a callback, should not be used directly. Can actually be
- * us
+ * used to sort any term object.
+ *
+ * @since 2.3.0
+ * @deprecated 4.7.0 Use wp_list_sort()
+ * @access private
+ *
+ * @param object $a
+ * @param object $b
+ * @return int
+ */
+function _usort_terms_by_ID( $a, $b ) {
+	_deprecated_function( __FUNCTION__, '4.7.0', 'wp_list_sort()' );
+
+	if ( $a->term_id > $b->term_id )
+		return 1;
+	elseif ( $a->term_id < $b->term_id )
+		return -1;
+	else
+		return 0;
+}
+
+/**
+ * Sort categories by name.
+ *
+ * Used by usort() as a callback, should not be used directly. Can actually be
+ * used to sort any term object.
+ *
+ * @since 2.3.0
+ * @deprecated 4.7.0 Use wp_list_sort()
+ * @access private
+ *
+ * @param object $a
+ * @param object $b
+ * @return int
+ */
+function _usort_terms_by_name( $a, $b ) {
+	_deprecated_function( __FUNCTION__, '4.7.0', 'wp_list_sort()' );
+
+	return strcmp( $a->name, $b->name );
+}
+
+/**
+ * Sort menu items by the desired key.
+ *
+ * @since 3.0.0
+ * @deprecated 4.7.0 Use wp_list_sort()
+ * @access private
+ *
+ * @global string $_menu_item_sort_prop
+ *
+ * @param object $a The first object to compare
+ * @param object $b The second object to compare
+ * @return int -1, 0, or 1 if $a is considered to be respectively less than, equal to, or greater than $b.
+ */
+function _sort_nav_menu_items( $a, $b ) {
+	global $_menu_item_sort_prop;
+
+	_deprecated_function( __FUNCTION__, '4.7.0', 'wp_list_sort()' );
+
+	if ( empty( $_menu_item_sort_prop ) )
+		return 0;
+
+	if ( ! isset( $a->$_menu_item_sort_prop ) || ! isset( $b->$_menu_item_sort_prop ) )
+		return 0;
+
+	$_a = (int) $a->$_menu_item_sort_prop;
+	$_b = (int) $b->$_menu_item_sort_prop;
+
+	if ( $a->$_menu_item_sort_prop == $b->$_menu_item_sort_prop )
+		return 0;
+	elseif ( $_a == $a->$_menu_item_sort_prop && $_b == $b->$_menu_item_sort_prop )
+		return $_a < $_b ? -1 : 1;
+	else
+		return strcmp( $a->$_menu_item_sort_prop, $b->$_menu_item_sort_prop );
+}
+
+/**
+ * Retrieves the Press This bookmarklet link.
+ *
+ * @since 2.6.0
+ * @deprecated 4.9.0
+ *
+ */
+function get_shortcut_link() {
+	_deprecated_function( __FUNCTION__, '4.9.0' );
+
+	$link = '';
+
+	/**
+	 * Filters the Press This bookmarklet link.
+	 *
+	 * @since 2.6.0
+	 * @deprecated 4.9.0
+	 *
+	 * @param string $link The Press This bookmarklet link.
+	 */
+	return apply_filters( 'shortcut_link', $link );
+}
+
+/**
+* Ajax handler for saving a post from Press This.
+*
+* @since 4.2.0
+* @deprecated 4.9.0
+*/
+function wp_ajax_press_this_save_post() {
+	_deprecated_function( __FUNCTION__, '4.9.0' );
+	if ( is_plugin_active( 'press-this/press-this-plugin.php' ) ) {
+		include( WP_PLUGIN_DIR . '/press-this/class-wp-press-this-plugin.php' );
+		$wp_press_this = new WP_Press_This_Plugin();
+		$wp_press_this->save_post();
+	} else {
+		wp_send_json_error( array( 'errorMessage' => __( 'The Press This plugin is required.' ) ) );
+	}
+}
+
+/**
+* Ajax handler for creating new category from Press This.
+*
+* @since 4.2.0
+* @deprecated 4.9.0
+*/
+function wp_ajax_press_this_add_category() {
+	_deprecated_function( __FUNCTION__, '4.9.0' );
+	if ( is_plugin_active( 'press-this/press-this-plugin.php' ) ) {
+		include( WP_PLUGIN_DIR . '/press-this/class-wp-press-this-plugin.php' );
+		$wp_press_this = new WP_Press_This_Plugin();
+		$wp_press_this->add_category();
+	} else {
+		wp_send_json_error( array( 'errorMessage' => __( 'The Press This plugin is required.' ) ) );
+	}
+}
