@@ -1918,4 +1918,338 @@ function get_attachment_icon( $id = 0, $fullsize = false, $max_dims = false ) {
 	if ( !$src = get_attachment_icon_src( $post->ID, $fullsize ) )
 		return false;
 
-	
+	list($src, $src_file) = $src;
+
+	// Do we need to constrain the image?
+	if ( ($max_dims = apply_filters('attachment_max_dims', $max_dims)) && file_exists($src_file) ) {
+
+		$imagesize = getimagesize($src_file);
+
+		if (($imagesize[0] > $max_dims[0]) || $imagesize[1] > $max_dims[1] ) {
+			$actual_aspect = $imagesize[0] / $imagesize[1];
+			$desired_aspect = $max_dims[0] / $max_dims[1];
+
+			if ( $actual_aspect >= $desired_aspect ) {
+				$height = $actual_aspect * $max_dims[0];
+				$constraint = "width='{$max_dims[0]}' ";
+				$post->iconsize = array($max_dims[0], $height);
+			} else {
+				$width = $max_dims[1] / $actual_aspect;
+				$constraint = "height='{$max_dims[1]}' ";
+				$post->iconsize = array($width, $max_dims[1]);
+			}
+		} else {
+			$post->iconsize = array($imagesize[0], $imagesize[1]);
+			$constraint = '';
+		}
+	} else {
+		$constraint = '';
+	}
+
+	$post_title = esc_attr($post->post_title);
+
+	$icon = "<img src='$src' title='$post_title' alt='$post_title' $constraint/>";
+
+	return apply_filters( 'attachment_icon', $icon, $post->ID );
+}
+
+/**
+ * Retrieve HTML content of image element.
+ *
+ * @since 2.0.0
+ * @deprecated 2.5.0 Use wp_get_attachment_image()
+ * @see wp_get_attachment_image()
+ *
+ * @param int $id Optional. Post ID.
+ * @param bool $fullsize Optional, default to false. Whether to have full size image.
+ * @param array $max_dims Optional. Dimensions of image.
+ * @return false|string
+ */
+function get_attachment_innerHTML($id = 0, $fullsize = false, $max_dims = false) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'wp_get_attachment_image()' );
+	$id = (int) $id;
+	if ( !$post = get_post($id) )
+		return false;
+
+	if ( $innerHTML = get_attachment_icon($post->ID, $fullsize, $max_dims))
+		return $innerHTML;
+
+	$innerHTML = esc_attr($post->post_title);
+
+	return apply_filters('attachment_innerHTML', $innerHTML, $post->ID);
+}
+
+/**
+ * Retrieves bookmark data based on ID.
+ *
+ * @since 2.0.0
+ * @deprecated 2.1.0 Use get_bookmark()
+ * @see get_bookmark()
+ *
+ * @param int    $bookmark_id ID of link
+ * @param string $output      Optional. Type of output. Accepts OBJECT, ARRAY_N, or ARRAY_A.
+ *                            Default OBJECT.
+ * @param string $filter      Optional. How to filter the link for output. Accepts 'raw', 'edit',
+ *                            'attribute', 'js', 'db', or 'display'. Default 'raw'.
+ * @return object|array Bookmark object or array, depending on the type specified by `$output`.
+ */
+function get_link( $bookmark_id, $output = OBJECT, $filter = 'raw' ) {
+	_deprecated_function( __FUNCTION__, '2.1.0', 'get_bookmark()' );
+	return get_bookmark($bookmark_id, $output, $filter);
+}
+
+/**
+ * Performs esc_url() for database or redirect usage.
+ *
+ * @since 2.3.1
+ * @deprecated 2.8.0 Use esc_url_raw()
+ * @see esc_url_raw()
+ *
+ * @param string $url The URL to be cleaned.
+ * @param array $protocols An array of acceptable protocols.
+ * @return string The cleaned URL.
+ */
+function sanitize_url( $url, $protocols = null ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'esc_url_raw()' );
+	return esc_url_raw( $url, $protocols );
+}
+
+/**
+ * Checks and cleans a URL.
+ *
+ * A number of characters are removed from the URL. If the URL is for displaying
+ * (the default behaviour) ampersands are also replaced. The 'clean_url' filter
+ * is applied to the returned cleaned URL.
+ *
+ * @since 1.2.0
+ * @deprecated 3.0.0 Use esc_url()
+ * @see esc_url()
+ *
+ * @param string $url The URL to be cleaned.
+ * @param array $protocols Optional. An array of acceptable protocols.
+ * @param string $context Optional. How the URL will be used. Default is 'display'.
+ * @return string The cleaned $url after the {@see 'clean_url'} filter is applied.
+ */
+function clean_url( $url, $protocols = null, $context = 'display' ) {
+	if ( $context == 'db' )
+		_deprecated_function( 'clean_url( $context = \'db\' )', '3.0.0', 'esc_url_raw()' );
+	else
+		_deprecated_function( __FUNCTION__, '3.0.0', 'esc_url()' );
+	return esc_url( $url, $protocols, $context );
+}
+
+/**
+ * Escape single quotes, specialchar double quotes, and fix line endings.
+ *
+ * The filter {@see 'js_escape'} is also applied by esc_js().
+ *
+ * @since 2.0.4
+ * @deprecated 2.8.0 Use esc_js()
+ * @see esc_js()
+ *
+ * @param string $text The text to be escaped.
+ * @return string Escaped text.
+ */
+function js_escape( $text ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'esc_js()' );
+	return esc_js( $text );
+}
+
+/**
+ * Legacy escaping for HTML blocks.
+ *
+ * @deprecated 2.8.0 Use esc_html()
+ * @see esc_html()
+ *
+ * @param string       $string        String to escape.
+ * @param string       $quote_style   Unused.
+ * @param false|string $charset       Unused.
+ * @param false        $double_encode Whether to double encode. Unused.
+ * @return string Escaped `$string`.
+ */
+function wp_specialchars( $string, $quote_style = ENT_NOQUOTES, $charset = false, $double_encode = false ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'esc_html()' );
+	if ( func_num_args() > 1 ) { // Maintain back-compat for people passing additional arguments.
+		$args = func_get_args();
+		return call_user_func_array( '_wp_specialchars', $args );
+	} else {
+		return esc_html( $string );
+	}
+}
+
+/**
+ * Escaping for HTML attributes.
+ *
+ * @since 2.0.6
+ * @deprecated 2.8.0 Use esc_attr()
+ * @see esc_attr()
+ *
+ * @param string $text
+ * @return string
+ */
+function attribute_escape( $text ) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'esc_attr()' );
+	return esc_attr( $text );
+}
+
+/**
+ * Register widget for sidebar with backward compatibility.
+ *
+ * Allows $name to be an array that accepts either three elements to grab the
+ * first element and the third for the name or just uses the first element of
+ * the array for the name.
+ *
+ * Passes to wp_register_sidebar_widget() after argument list and backward
+ * compatibility is complete.
+ *
+ * @since 2.2.0
+ * @deprecated 2.8.0 Use wp_register_sidebar_widget()
+ * @see wp_register_sidebar_widget()
+ *
+ * @param string|int $name            Widget ID.
+ * @param callable   $output_callback Run when widget is called.
+ * @param string     $classname       Optional. Classname widget option. Default empty.
+ * @param mixed      $params ,...     Widget parameters.
+ */
+function register_sidebar_widget($name, $output_callback, $classname = '') {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'wp_register_sidebar_widget()' );
+	// Compat
+	if ( is_array($name) ) {
+		if ( count($name) == 3 )
+			$name = sprintf($name[0], $name[2]);
+		else
+			$name = $name[0];
+	}
+
+	$id = sanitize_title($name);
+	$options = array();
+	if ( !empty($classname) && is_string($classname) )
+		$options['classname'] = $classname;
+	$params = array_slice(func_get_args(), 2);
+	$args = array($id, $name, $output_callback, $options);
+	if ( !empty($params) )
+		$args = array_merge($args, $params);
+
+	call_user_func_array('wp_register_sidebar_widget', $args);
+}
+
+/**
+ * Serves as an alias of wp_unregister_sidebar_widget().
+ *
+ * @since 2.2.0
+ * @deprecated 2.8.0 Use wp_unregister_sidebar_widget()
+ * @see wp_unregister_sidebar_widget()
+ *
+ * @param int|string $id Widget ID.
+ */
+function unregister_sidebar_widget($id) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'wp_unregister_sidebar_widget()' );
+	return wp_unregister_sidebar_widget($id);
+}
+
+/**
+ * Registers widget control callback for customizing options.
+ *
+ * Allows $name to be an array that accepts either three elements to grab the
+ * first element and the third for the name or just uses the first element of
+ * the array for the name.
+ *
+ * Passes to wp_register_widget_control() after the argument list has
+ * been compiled.
+ *
+ * @since 2.2.0
+ * @deprecated 2.8.0 Use wp_register_widget_control()
+ * @see wp_register_widget_control()
+ *
+ * @param int|string $name Sidebar ID.
+ * @param callable $control_callback Widget control callback to display and process form.
+ * @param int $width Widget width.
+ * @param int $height Widget height.
+ */
+function register_widget_control($name, $control_callback, $width = '', $height = '') {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'wp_register_widget_control()' );
+	// Compat
+	if ( is_array($name) ) {
+		if ( count($name) == 3 )
+			$name = sprintf($name[0], $name[2]);
+		else
+			$name = $name[0];
+	}
+
+	$id = sanitize_title($name);
+	$options = array();
+	if ( !empty($width) )
+		$options['width'] = $width;
+	if ( !empty($height) )
+		$options['height'] = $height;
+	$params = array_slice(func_get_args(), 4);
+	$args = array($id, $name, $control_callback, $options);
+	if ( !empty($params) )
+		$args = array_merge($args, $params);
+
+	call_user_func_array('wp_register_widget_control', $args);
+}
+
+/**
+ * Alias of wp_unregister_widget_control().
+ *
+ * @since 2.2.0
+ * @deprecated 2.8.0 Use wp_unregister_widget_control()
+ * @see wp_unregister_widget_control()
+ *
+ * @param int|string $id Widget ID.
+ */
+function unregister_widget_control($id) {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'wp_unregister_widget_control()' );
+	return wp_unregister_widget_control($id);
+}
+
+/**
+ * Remove user meta data.
+ *
+ * @since 2.0.0
+ * @deprecated 3.0.0 Use delete_user_meta()
+ * @see delete_user_meta()
+ *
+ * @param int $user_id User ID.
+ * @param string $meta_key Metadata key.
+ * @param mixed $meta_value Metadata value.
+ * @return bool True deletion completed and false if user_id is not a number.
+ */
+function delete_usermeta( $user_id, $meta_key, $meta_value = '' ) {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'delete_user_meta()' );
+	global $wpdb;
+	if ( !is_numeric( $user_id ) )
+		return false;
+	$meta_key = preg_replace('|[^a-z0-9_]|i', '', $meta_key);
+
+	if ( is_array($meta_value) || is_object($meta_value) )
+		$meta_value = serialize($meta_value);
+	$meta_value = trim( $meta_value );
+
+	$cur = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $wpdb->usermeta WHERE user_id = %d AND meta_key = %s", $user_id, $meta_key) );
+
+	if ( $cur && $cur->umeta_id )
+		do_action( 'delete_usermeta', $cur->umeta_id, $user_id, $meta_key, $meta_value );
+
+	if ( ! empty($meta_value) )
+		$wpdb->query( $wpdb->prepare("DELETE FROM $wpdb->usermeta WHERE user_id = %d AND meta_key = %s AND meta_value = %s", $user_id, $meta_key, $meta_value) );
+	else
+		$wpdb->query( $wpdb->prepare("DELETE FROM $wpdb->usermeta WHERE user_id = %d AND meta_key = %s", $user_id, $meta_key) );
+
+	clean_user_cache( $user_id );
+	wp_cache_delete( $user_id, 'user_meta' );
+
+	if ( $cur && $cur->umeta_id )
+		do_action( 'deleted_usermeta', $cur->umeta_id, $user_id, $meta_key, $meta_value );
+
+	return true;
+}
+
+/**
+ * Retrieve user metadata.
+ *
+ * If $user_id is not a number, then the function will fail over with a 'false'
+ * boolean return value. Other returned values depend on whether there is only
+ * one item to be returned, which be that single item type. If there is more
+ * than one metadata value, then it will
