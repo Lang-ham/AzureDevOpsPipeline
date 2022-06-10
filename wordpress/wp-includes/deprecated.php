@@ -2638,4 +2638,380 @@ function sanitize_user_object($user, $context = 'display') {
 					$user->$field = sanitize_user_field($field, $user->$field, $user->ID, $context);
 			}
 		}
-		$user
+		$user->filter = $context;
+	} else {
+		if ( !isset($user['ID']) )
+			$user['ID'] = 0;
+		foreach ( array_keys($user) as $field )
+			$user[$field] = sanitize_user_field($field, $user[$field], $user['ID'], $context);
+		$user['filter'] = $context;
+	}
+
+	return $user;
+}
+
+/**
+ * Get boundary post relational link.
+ *
+ * Can either be start or end post relational link.
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ *
+ * @param string $title Optional. Link title format.
+ * @param bool $in_same_cat Optional. Whether link should be in a same category.
+ * @param string $excluded_categories Optional. Excluded categories IDs.
+ * @param bool $start Optional, default is true. Whether to display link to first or last post.
+ * @return string
+ */
+function get_boundary_post_rel_link($title = '%title', $in_same_cat = false, $excluded_categories = '', $start = true) {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	$posts = get_boundary_post($in_same_cat, $excluded_categories, $start);
+	// If there is no post stop.
+	if ( empty($posts) )
+		return;
+
+	// Even though we limited get_posts to return only 1 item it still returns an array of objects.
+	$post = $posts[0];
+
+	if ( empty($post->post_title) )
+		$post->post_title = $start ? __('First Post') : __('Last Post');
+
+	$date = mysql2date(get_option('date_format'), $post->post_date);
+
+	$title = str_replace('%title', $post->post_title, $title);
+	$title = str_replace('%date', $date, $title);
+	$title = apply_filters('the_title', $title, $post->ID);
+
+	$link = $start ? "<link rel='start' title='" : "<link rel='end' title='";
+	$link .= esc_attr($title);
+	$link .= "' href='" . get_permalink($post) . "' />\n";
+
+	$boundary = $start ? 'start' : 'end';
+	return apply_filters( "{$boundary}_post_rel_link", $link );
+}
+
+/**
+ * Display relational link for the first post.
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ *
+ * @param string $title Optional. Link title format.
+ * @param bool $in_same_cat Optional. Whether link should be in a same category.
+ * @param string $excluded_categories Optional. Excluded categories IDs.
+ */
+function start_post_rel_link($title = '%title', $in_same_cat = false, $excluded_categories = '') {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	echo get_boundary_post_rel_link($title, $in_same_cat, $excluded_categories, true);
+}
+
+/**
+ * Get site index relational link.
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ *
+ * @return string
+ */
+function get_index_rel_link() {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	$link = "<link rel='index' title='" . esc_attr( get_bloginfo( 'name', 'display' ) ) . "' href='" . esc_url( user_trailingslashit( get_bloginfo( 'url', 'display' ) ) ) . "' />\n";
+	return apply_filters( "index_rel_link", $link );
+}
+
+/**
+ * Display relational link for the site index.
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ */
+function index_rel_link() {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	echo get_index_rel_link();
+}
+
+/**
+ * Get parent post relational link.
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ *
+ * @param string $title Optional. Link title format. Default '%title'.
+ * @return string
+ */
+function get_parent_post_rel_link( $title = '%title' ) {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	if ( ! empty( $GLOBALS['post'] ) && ! empty( $GLOBALS['post']->post_parent ) )
+		$post = get_post($GLOBALS['post']->post_parent);
+
+	if ( empty($post) )
+		return;
+
+	$date = mysql2date(get_option('date_format'), $post->post_date);
+
+	$title = str_replace('%title', $post->post_title, $title);
+	$title = str_replace('%date', $date, $title);
+	$title = apply_filters('the_title', $title, $post->ID);
+
+	$link = "<link rel='up' title='";
+	$link .= esc_attr( $title );
+	$link .= "' href='" . get_permalink($post) . "' />\n";
+
+	return apply_filters( "parent_post_rel_link", $link );
+}
+
+/**
+ * Display relational link for parent item
+ *
+ * @since 2.8.0
+ * @deprecated 3.3.0
+ *
+ * @param string $title Optional. Link title format. Default '%title'.
+ */
+function parent_post_rel_link( $title = '%title' ) {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	echo get_parent_post_rel_link($title);
+}
+
+/**
+ * Add the "Dashboard"/"Visit Site" menu.
+ *
+ * @since 3.2.0
+ * @deprecated 3.3.0
+ *
+ * @param WP_Admin_Bar $wp_admin_bar WP_Admin_Bar instance.
+ */
+function wp_admin_bar_dashboard_view_site_menu( $wp_admin_bar ) {
+	_deprecated_function( __FUNCTION__, '3.3.0' );
+
+	$user_id = get_current_user_id();
+
+	if ( 0 != $user_id ) {
+		if ( is_admin() )
+			$wp_admin_bar->add_menu( array( 'id' => 'view-site', 'title' => __( 'Visit Site' ), 'href' => home_url() ) );
+		elseif ( is_multisite() )
+			$wp_admin_bar->add_menu( array( 'id' => 'dashboard', 'title' => __( 'Dashboard' ), 'href' => get_dashboard_url( $user_id ) ) );
+		else
+			$wp_admin_bar->add_menu( array( 'id' => 'dashboard', 'title' => __( 'Dashboard' ), 'href' => admin_url() ) );
+	}
+}
+
+/**
+ * Checks if the current user belong to a given site.
+ *
+ * @since MU (3.0.0)
+ * @deprecated 3.3.0 Use is_user_member_of_blog()
+ * @see is_user_member_of_blog()
+ *
+ * @param int $blog_id Site ID
+ * @return bool True if the current users belong to $blog_id, false if not.
+ */
+function is_blog_user( $blog_id = 0 ) {
+	_deprecated_function( __FUNCTION__, '3.3.0', 'is_user_member_of_blog()' );
+
+	return is_user_member_of_blog( get_current_user_id(), $blog_id );
+}
+
+/**
+ * Open the file handle for debugging.
+ *
+ * @since 0.71
+ * @deprecated 3.4.0 Use error_log()
+ * @see error_log()
+ *
+ * @link https://secure.php.net/manual/en/function.error-log.php
+ *
+ * @param string $filename File name.
+ * @param string $mode     Type of access you required to the stream.
+ * @return false Always false.
+ */
+function debug_fopen( $filename, $mode ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'error_log()' );
+	return false;
+}
+
+/**
+ * Write contents to the file used for debugging.
+ *
+ * @since 0.71
+ * @deprecated 3.4.0 Use error_log()
+ * @see error_log()
+ *
+ * @link https://secure.php.net/manual/en/function.error-log.php
+ *
+ * @param mixed  $fp     Unused.
+ * @param string $string Message to log.
+ */
+function debug_fwrite( $fp, $string ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'error_log()' );
+	if ( ! empty( $GLOBALS['debug'] ) )
+		error_log( $string );
+}
+
+/**
+ * Close the debugging file handle.
+ *
+ * @since 0.71
+ * @deprecated 3.4.0 Use error_log()
+ * @see error_log()
+ *
+ * @link https://secure.php.net/manual/en/function.error-log.php
+ *
+ * @param mixed $fp Unused.
+ */
+function debug_fclose( $fp ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'error_log()' );
+}
+
+/**
+ * Retrieve list of themes with theme data in theme directory.
+ *
+ * The theme is broken, if it doesn't have a parent theme and is missing either
+ * style.css and, or index.php. If the theme has a parent theme then it is
+ * broken, if it is missing style.css; index.php is optional.
+ *
+ * @since 1.5.0
+ * @deprecated 3.4.0 Use wp_get_themes()
+ * @see wp_get_themes()
+ *
+ * @return array Theme list with theme data.
+ */
+function get_themes() {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'wp_get_themes()' );
+
+	global $wp_themes;
+	if ( isset( $wp_themes ) )
+		return $wp_themes;
+
+	$themes = wp_get_themes();
+	$wp_themes = array();
+
+	foreach ( $themes as $theme ) {
+		$name = $theme->get('Name');
+		if ( isset( $wp_themes[ $name ] ) )
+			$wp_themes[ $name . '/' . $theme->get_stylesheet() ] = $theme;
+		else
+			$wp_themes[ $name ] = $theme;
+	}
+
+	return $wp_themes;
+}
+
+/**
+ * Retrieve theme data.
+ *
+ * @since 1.5.0
+ * @deprecated 3.4.0 Use wp_get_theme()
+ * @see wp_get_theme()
+ *
+ * @param string $theme Theme name.
+ * @return array|null Null, if theme name does not exist. Theme data, if exists.
+ */
+function get_theme( $theme ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'wp_get_theme( $stylesheet )' );
+
+	$themes = get_themes();
+	if ( is_array( $themes ) && array_key_exists( $theme, $themes ) )
+		return $themes[ $theme ];
+	return null;
+}
+
+/**
+ * Retrieve current theme name.
+ *
+ * @since 1.5.0
+ * @deprecated 3.4.0 Use wp_get_theme()
+ * @see wp_get_theme()
+ *
+ * @return string
+ */
+function get_current_theme() {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'wp_get_theme()' );
+
+	if ( $theme = get_option( 'current_theme' ) )
+		return $theme;
+
+	return wp_get_theme()->get('Name');
+}
+
+/**
+ * Accepts matches array from preg_replace_callback in wpautop() or a string.
+ *
+ * Ensures that the contents of a `<pre>...</pre>` HTML block are not
+ * converted into paragraphs or line-breaks.
+ *
+ * @since 1.2.0
+ * @deprecated 3.4.0
+ *
+ * @param array|string $matches The array or string
+ * @return string The pre block without paragraph/line-break conversion.
+ */
+function clean_pre($matches) {
+	_deprecated_function( __FUNCTION__, '3.4.0' );
+
+	if ( is_array($matches) )
+		$text = $matches[1] . $matches[2] . "</pre>";
+	else
+		$text = $matches;
+
+	$text = str_replace(array('<br />', '<br/>', '<br>'), array('', '', ''), $text);
+	$text = str_replace('<p>', "\n", $text);
+	$text = str_replace('</p>', '', $text);
+
+	return $text;
+}
+
+
+/**
+ * Add callbacks for image header display.
+ *
+ * @since 2.1.0
+ * @deprecated 3.4.0 Use add_theme_support()
+ * @see add_theme_support()
+ *
+ * @param callable $wp_head_callback Call on the {@see 'wp_head'} action.
+ * @param callable $admin_head_callback Call on custom header administration screen.
+ * @param callable $admin_preview_callback Output a custom header image div on the custom header administration screen. Optional.
+ */
+function add_custom_image_header( $wp_head_callback, $admin_head_callback, $admin_preview_callback = '' ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'add_theme_support( \'custom-header\', $args )' );
+	$args = array(
+		'wp-head-callback'    => $wp_head_callback,
+		'admin-head-callback' => $admin_head_callback,
+	);
+	if ( $admin_preview_callback )
+		$args['admin-preview-callback'] = $admin_preview_callback;
+	return add_theme_support( 'custom-header', $args );
+}
+
+/**
+ * Remove image header support.
+ *
+ * @since 3.1.0
+ * @deprecated 3.4.0 Use remove_theme_support()
+ * @see remove_theme_support()
+ *
+ * @return null|bool Whether support was removed.
+ */
+function remove_custom_image_header() {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'remove_theme_support( \'custom-header\' )' );
+	return remove_theme_support( 'custom-header' );
+}
+
+/**
+ * Add callbacks for background image display.
+ *
+ * @since 3.0.0
+ * @deprecated 3.4.0 Use add_theme_support()
+ * @see add_theme_support()
+ *
+ * @param callable $wp_head_callback Call on the {@see 'wp_head'} action.
+ * @param callable $admin_head_callback Call on custom background administration screen.
+ * @param callable $admin_preview_callback Output 
