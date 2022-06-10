@@ -1580,3 +1580,342 @@ function get_author_name( $auth_id = false ) {
  */
 function get_the_author_url() {
 	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'url\')' );
+	return get_the_author_meta('url');
+}
+
+/**
+ * Display the URL to the home page of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_url() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'url\')' );
+	the_author_meta('url');
+}
+
+/**
+ * Retrieve the ID of the author of the current post.
+ *
+ * @since 1.5.0
+ * @deprecated 2.8.0 Use get_the_author_meta()
+ * @see get_the_author_meta()
+ *
+ * @return string|int The author's ID.
+ */
+function get_the_author_ID() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'get_the_author_meta(\'ID\')' );
+	return get_the_author_meta('ID');
+}
+
+/**
+ * Display the ID of the author of the current post.
+ *
+ * @since 0.71
+ * @deprecated 2.8.0 Use the_author_meta()
+ * @see the_author_meta()
+ */
+function the_author_ID() {
+	_deprecated_function( __FUNCTION__, '2.8.0', 'the_author_meta(\'ID\')' );
+	the_author_meta('ID');
+}
+
+/**
+ * Display the post content for the feed.
+ *
+ * For encoding the html or the $encode_html parameter, there are three possible
+ * values. '0' will make urls footnotes and use make_url_footnote(). '1' will
+ * encode special characters and automatically display all of the content. The
+ * value of '2' will strip all HTML tags from the content.
+ *
+ * Also note that you cannot set the amount of words and not set the html
+ * encoding. If that is the case, then the html encoding will default to 2,
+ * which will strip all HTML tags.
+ *
+ * To restrict the amount of words of the content, you can use the cut
+ * parameter. If the content is less than the amount, then there won't be any
+ * dots added to the end. If there is content left over, then dots will be added
+ * and the rest of the content will be removed.
+ *
+ * @since 0.71
+ *
+ * @deprecated 2.9.0 Use the_content_feed()
+ * @see the_content_feed()
+ *
+ * @param string $more_link_text Optional. Text to display when more content is available but not displayed.
+ * @param int $stripteaser Optional. Default is 0.
+ * @param string $more_file Optional.
+ * @param int $cut Optional. Amount of words to keep for the content.
+ * @param int $encode_html Optional. How to encode the content.
+ */
+function the_content_rss($more_link_text='(more...)', $stripteaser=0, $more_file='', $cut = 0, $encode_html = 0) {
+	_deprecated_function( __FUNCTION__, '2.9.0', 'the_content_feed()' );
+	$content = get_the_content($more_link_text, $stripteaser);
+
+	/**
+	 * Filters the post content in the context of an RSS feed.
+	 *
+	 * @since 0.71
+	 *
+	 * @param string $content Content of the current post.
+	 */
+	$content = apply_filters('the_content_rss', $content);
+	if ( $cut && !$encode_html )
+		$encode_html = 2;
+	if ( 1== $encode_html ) {
+		$content = esc_html($content);
+		$cut = 0;
+	} elseif ( 0 == $encode_html ) {
+		$content = make_url_footnote($content);
+	} elseif ( 2 == $encode_html ) {
+		$content = strip_tags($content);
+	}
+	if ( $cut ) {
+		$blah = explode(' ', $content);
+		if ( count($blah) > $cut ) {
+			$k = $cut;
+			$use_dotdotdot = 1;
+		} else {
+			$k = count($blah);
+			$use_dotdotdot = 0;
+		}
+
+		/** @todo Check performance, might be faster to use array slice instead. */
+		for ( $i=0; $i<$k; $i++ )
+			$excerpt .= $blah[$i].' ';
+		$excerpt .= ($use_dotdotdot) ? '...' : '';
+		$content = $excerpt;
+	}
+	$content = str_replace(']]>', ']]&gt;', $content);
+	echo $content;
+}
+
+/**
+ * Strip HTML and put links at the bottom of stripped content.
+ *
+ * Searches for all of the links, strips them out of the content, and places
+ * them at the bottom of the content with numbers.
+ *
+ * @since 0.71
+ * @deprecated 2.9.0
+ *
+ * @param string $content Content to get links
+ * @return string HTML stripped out of content with links at the bottom.
+ */
+function make_url_footnote( $content ) {
+	_deprecated_function( __FUNCTION__, '2.9.0', '' );
+	preg_match_all( '/<a(.+?)href=\"(.+?)\"(.*?)>(.+?)<\/a>/', $content, $matches );
+	$links_summary = "\n";
+	for ( $i = 0, $c = count( $matches[0] ); $i < $c; $i++ ) {
+		$link_match = $matches[0][$i];
+		$link_number = '['.($i+1).']';
+		$link_url = $matches[2][$i];
+		$link_text = $matches[4][$i];
+		$content = str_replace( $link_match, $link_text . ' ' . $link_number, $content );
+		$link_url = ( ( strtolower( substr( $link_url, 0, 7 ) ) != 'http://' ) && ( strtolower( substr( $link_url, 0, 8 ) ) != 'https://' ) ) ? get_option( 'home' ) . $link_url : $link_url;
+		$links_summary .= "\n" . $link_number . ' ' . $link_url;
+	}
+	$content  = strip_tags( $content );
+	$content .= $links_summary;
+	return $content;
+}
+
+/**
+ * Retrieve translated string with vertical bar context
+ *
+ * Quite a few times, there will be collisions with similar translatable text
+ * found in more than two places but with different translated context.
+ *
+ * In order to use the separate contexts, the _c() function is used and the
+ * translatable string uses a pipe ('|') which has the context the string is in.
+ *
+ * When the translated string is returned, it is everything before the pipe, not
+ * including the pipe character. If there is no pipe in the translated text then
+ * everything is returned.
+ *
+ * @since 2.2.0
+ * @deprecated 2.9.0 Use _x()
+ * @see _x()
+ *
+ * @param string $text Text to translate
+ * @param string $domain Optional. Domain to retrieve the translated text
+ * @return string Translated context string without pipe
+ */
+function _c( $text, $domain = 'default' ) {
+	_deprecated_function( __FUNCTION__, '2.9.0', '_x()' );
+	return before_last_bar( translate( $text, $domain ) );
+}
+
+/**
+ * Translates $text like translate(), but assumes that the text
+ * contains a context after its last vertical bar.
+ *
+ * @since 2.5.0
+ * @deprecated 3.0.0 Use _x()
+ * @see _x()
+ *
+ * @param string $text Text to translate
+ * @param string $domain Domain to retrieve the translated text
+ * @return string Translated text
+ */
+function translate_with_context( $text, $domain = 'default' ) {
+	_deprecated_function( __FUNCTION__, '2.9.0', '_x()' );
+	return before_last_bar( translate( $text, $domain ) );
+}
+
+/**
+ * Legacy version of _n(), which supports contexts.
+ *
+ * Strips everything from the translation after the last bar.
+ *
+ * @since 2.7.0
+ * @deprecated 3.0.0 Use _nx()
+ * @see _nx()
+ *
+ * @param string $single The text to be used if the number is singular.
+ * @param string $plural The text to be used if the number is plural.
+ * @param int    $number The number to compare against to use either the singular or plural form.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ * @return string The translated singular or plural form.
+ */
+function _nc( $single, $plural, $number, $domain = 'default' ) {
+	_deprecated_function( __FUNCTION__, '2.9.0', '_nx()' );
+	return before_last_bar( _n( $single, $plural, $number, $domain ) );
+}
+
+/**
+ * Retrieve the plural or single form based on the amount.
+ *
+ * @since 1.2.0
+ * @deprecated 2.8.0 Use _n()
+ * @see _n()
+ */
+function __ngettext() {
+	_deprecated_function( __FUNCTION__, '2.8.0', '_n()' );
+	$args = func_get_args();
+	return call_user_func_array('_n', $args);
+}
+
+/**
+ * Register plural strings in POT file, but don't translate them.
+ *
+ * @since 2.5.0
+ * @deprecated 2.8.0 Use _n_noop()
+ * @see _n_noop()
+ */
+function __ngettext_noop() {
+	_deprecated_function( __FUNCTION__, '2.8.0', '_n_noop()' );
+	$args = func_get_args();
+	return call_user_func_array('_n_noop', $args);
+
+}
+
+/**
+ * Retrieve all autoload options, or all options if no autoloaded ones exist.
+ *
+ * @since 1.0.0
+ * @deprecated 3.0.0 Use wp_load_alloptions())
+ * @see wp_load_alloptions()
+ *
+ * @return array List of all options.
+ */
+function get_alloptions() {
+	_deprecated_function( __FUNCTION__, '3.0.0', 'wp_load_alloptions()' );
+	return wp_load_alloptions();
+}
+
+/**
+ * Retrieve HTML content of attachment image with link.
+ *
+ * @since 2.0.0
+ * @deprecated 2.5.0 Use wp_get_attachment_link()
+ * @see wp_get_attachment_link()
+ *
+ * @param int $id Optional. Post ID.
+ * @param bool $fullsize Optional, default is false. Whether to use full size image.
+ * @param array $max_dims Optional. Max image dimensions.
+ * @param bool $permalink Optional, default is false. Whether to include permalink to image.
+ * @return string
+ */
+function get_the_attachment_link($id = 0, $fullsize = false, $max_dims = false, $permalink = false) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'wp_get_attachment_link()' );
+	$id = (int) $id;
+	$_post = get_post($id);
+
+	if ( ('attachment' != $_post->post_type) || !$url = wp_get_attachment_url($_post->ID) )
+		return __('Missing Attachment');
+
+	if ( $permalink )
+		$url = get_attachment_link($_post->ID);
+
+	$post_title = esc_attr($_post->post_title);
+
+	$innerHTML = get_attachment_innerHTML($_post->ID, $fullsize, $max_dims);
+	return "<a href='$url' title='$post_title'>$innerHTML</a>";
+}
+
+/**
+ * Retrieve icon URL and Path.
+ *
+ * @since 2.1.0
+ * @deprecated 2.5.0 Use wp_get_attachment_image_src()
+ * @see wp_get_attachment_image_src()
+ *
+ * @param int $id Optional. Post ID.
+ * @param bool $fullsize Optional, default to false. Whether to have full image.
+ * @return array Icon URL and full path to file, respectively.
+ */
+function get_attachment_icon_src( $id = 0, $fullsize = false ) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'wp_get_attachment_image_src()' );
+	$id = (int) $id;
+	if ( !$post = get_post($id) )
+		return false;
+
+	$file = get_attached_file( $post->ID );
+
+	if ( !$fullsize && $src = wp_get_attachment_thumb_url( $post->ID ) ) {
+		// We have a thumbnail desired, specified and existing
+
+		$src_file = basename($src);
+	} elseif ( wp_attachment_is_image( $post->ID ) ) {
+		// We have an image without a thumbnail
+
+		$src = wp_get_attachment_url( $post->ID );
+		$src_file = & $file;
+	} elseif ( $src = wp_mime_type_icon( $post->ID ) ) {
+		// No thumb, no image. We'll look for a mime-related icon instead.
+
+		$icon_dir = apply_filters( 'icon_dir', get_template_directory() . '/images' );
+		$src_file = $icon_dir . '/' . basename($src);
+	}
+
+	if ( !isset($src) || !$src )
+		return false;
+
+	return array($src, $src_file);
+}
+
+/**
+ * Retrieve HTML content of icon attachment image element.
+ *
+ * @since 2.0.0
+ * @deprecated 2.5.0 Use wp_get_attachment_image()
+ * @see wp_get_attachment_image()
+ *
+ * @param int $id Optional. Post ID.
+ * @param bool $fullsize Optional, default to false. Whether to have full size image.
+ * @param array $max_dims Optional. Dimensions of image.
+ * @return false|string HTML content.
+ */
+function get_attachment_icon( $id = 0, $fullsize = false, $max_dims = false ) {
+	_deprecated_function( __FUNCTION__, '2.5.0', 'wp_get_attachment_image()' );
+	$id = (int) $id;
+	if ( !$post = get_post($id) )
+		return false;
+
+	if ( !$src = get_attachment_icon_src( $post->ID, $fullsize ) )
+		return false;
+
+	
