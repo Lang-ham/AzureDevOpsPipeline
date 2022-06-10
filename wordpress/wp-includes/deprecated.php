@@ -3014,4 +3014,380 @@ function remove_custom_image_header() {
  *
  * @param callable $wp_head_callback Call on the {@see 'wp_head'} action.
  * @param callable $admin_head_callback Call on custom background administration screen.
- * @param callable $admin_preview_callback Output 
+ * @param callable $admin_preview_callback Output a custom background image div on the custom background administration screen. Optional.
+ */
+function add_custom_background( $wp_head_callback = '', $admin_head_callback = '', $admin_preview_callback = '' ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'add_theme_support( \'custom-background\', $args )' );
+	$args = array();
+	if ( $wp_head_callback )
+		$args['wp-head-callback'] = $wp_head_callback;
+	if ( $admin_head_callback )
+		$args['admin-head-callback'] = $admin_head_callback;
+	if ( $admin_preview_callback )
+		$args['admin-preview-callback'] = $admin_preview_callback;
+	return add_theme_support( 'custom-background', $args );
+}
+
+/**
+ * Remove custom background support.
+ *
+ * @since 3.1.0
+ * @deprecated 3.4.0 Use add_custom_background()
+ * @see add_custom_background()
+ *
+ * @return null|bool Whether support was removed.
+ */
+function remove_custom_background() {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'remove_theme_support( \'custom-background\' )' );
+	return remove_theme_support( 'custom-background' );
+}
+
+/**
+ * Retrieve theme data from parsed theme file.
+ *
+ * @since 1.5.0
+ * @deprecated 3.4.0 Use wp_get_theme()
+ * @see wp_get_theme()
+ *
+ * @param string $theme_file Theme file path.
+ * @return array Theme data.
+ */
+function get_theme_data( $theme_file ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'wp_get_theme()' );
+	$theme = new WP_Theme( basename( dirname( $theme_file ) ), dirname( dirname( $theme_file ) ) );
+
+	$theme_data = array(
+		'Name' => $theme->get('Name'),
+		'URI' => $theme->display('ThemeURI', true, false),
+		'Description' => $theme->display('Description', true, false),
+		'Author' => $theme->display('Author', true, false),
+		'AuthorURI' => $theme->display('AuthorURI', true, false),
+		'Version' => $theme->get('Version'),
+		'Template' => $theme->get('Template'),
+		'Status' => $theme->get('Status'),
+		'Tags' => $theme->get('Tags'),
+		'Title' => $theme->get('Name'),
+		'AuthorName' => $theme->get('Author'),
+	);
+
+	foreach ( apply_filters( 'extra_theme_headers', array() ) as $extra_header ) {
+		if ( ! isset( $theme_data[ $extra_header ] ) )
+			$theme_data[ $extra_header ] = $theme->get( $extra_header );
+	}
+
+	return $theme_data;
+}
+
+/**
+ * Alias of update_post_cache().
+ *
+ * @see update_post_cache() Posts and pages are the same, alias is intentional
+ *
+ * @since 1.5.1
+ * @deprecated 3.4.0 Use update_post_cache()
+ * @see update_post_cache()
+ *
+ * @param array $pages list of page objects
+ */
+function update_page_cache( &$pages ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'update_post_cache()' );
+
+	update_post_cache( $pages );
+}
+
+/**
+ * Will clean the page in the cache.
+ *
+ * Clean (read: delete) page from cache that matches $id. Will also clean cache
+ * associated with 'all_page_ids' and 'get_pages'.
+ *
+ * @since 2.0.0
+ * @deprecated 3.4.0 Use clean_post_cache
+ * @see clean_post_cache()
+ *
+ * @param int $id Page ID to clean
+ */
+function clean_page_cache( $id ) {
+	_deprecated_function( __FUNCTION__, '3.4.0', 'clean_post_cache()' );
+
+	clean_post_cache( $id );
+}
+
+/**
+ * Retrieve nonce action "Are you sure" message.
+ *
+ * Deprecated in 3.4.1 and 3.5.0. Backported to 3.3.3.
+ *
+ * @since 2.0.4
+ * @deprecated 3.4.1 Use wp_nonce_ays()
+ * @see wp_nonce_ays()
+ *
+ * @param string $action Nonce action.
+ * @return string Are you sure message.
+ */
+function wp_explain_nonce( $action ) {
+	_deprecated_function( __FUNCTION__, '3.4.1', 'wp_nonce_ays()' );
+	return __( 'Are you sure you want to do this?' );
+}
+
+/**
+ * Display "sticky" CSS class, if a post is sticky.
+ *
+ * @since 2.7.0
+ * @deprecated 3.5.0 Use post_class()
+ * @see post_class()
+ *
+ * @param int $post_id An optional post ID.
+ */
+function sticky_class( $post_id = null ) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'post_class()' );
+	if ( is_sticky( $post_id ) )
+		echo ' sticky';
+}
+
+/**
+ * Retrieve post ancestors.
+ *
+ * This is no longer needed as WP_Post lazy-loads the ancestors
+ * property with get_post_ancestors().
+ *
+ * @since 2.3.4
+ * @deprecated 3.5.0 Use get_post_ancestors()
+ * @see get_post_ancestors()
+ *
+ * @param WP_Post $post Post object, passed by reference (unused).
+ */
+function _get_post_ancestors( &$post ) {
+	_deprecated_function( __FUNCTION__, '3.5.0' );
+}
+
+/**
+ * Load an image from a string, if PHP supports it.
+ *
+ * @since 2.1.0
+ * @deprecated 3.5.0 Use wp_get_image_editor()
+ * @see wp_get_image_editor()
+ *
+ * @param string $file Filename of the image to load.
+ * @return resource The resulting image resource on success, Error string on failure.
+ */
+function wp_load_image( $file ) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'wp_get_image_editor()' );
+
+	if ( is_numeric( $file ) )
+		$file = get_attached_file( $file );
+
+	if ( ! is_file( $file ) ) {
+		/* translators: %s: file name */
+		return sprintf( __( 'File &#8220;%s&#8221; doesn&#8217;t exist?' ), $file );
+	}
+
+	if ( ! function_exists('imagecreatefromstring') )
+		return __('The GD image library is not installed.');
+
+	// Set artificially high because GD uses uncompressed images in memory.
+	wp_raise_memory_limit( 'image' );
+
+	$image = imagecreatefromstring( file_get_contents( $file ) );
+
+	if ( ! is_resource( $image ) ) {
+		/* translators: %s: file name */
+		return sprintf( __( 'File &#8220;%s&#8221; is not an image.' ), $file );
+	}
+
+	return $image;
+}
+
+/**
+ * Scale down an image to fit a particular size and save a new copy of the image.
+ *
+ * The PNG transparency will be preserved using the function, as well as the
+ * image type. If the file going in is PNG, then the resized image is going to
+ * be PNG. The only supported image types are PNG, GIF, and JPEG.
+ *
+ * Some functionality requires API to exist, so some PHP version may lose out
+ * support. This is not the fault of WordPress (where functionality is
+ * downgraded, not actual defects), but of your PHP version.
+ *
+ * @since 2.5.0
+ * @deprecated 3.5.0 Use wp_get_image_editor()
+ * @see wp_get_image_editor()
+ *
+ * @param string $file Image file path.
+ * @param int $max_w Maximum width to resize to.
+ * @param int $max_h Maximum height to resize to.
+ * @param bool $crop Optional. Whether to crop image or resize.
+ * @param string $suffix Optional. File suffix.
+ * @param string $dest_path Optional. New image file path.
+ * @param int $jpeg_quality Optional, default is 90. Image quality percentage.
+ * @return mixed WP_Error on failure. String with new destination path.
+ */
+function image_resize( $file, $max_w, $max_h, $crop = false, $suffix = null, $dest_path = null, $jpeg_quality = 90 ) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'wp_get_image_editor()' );
+
+	$editor = wp_get_image_editor( $file );
+	if ( is_wp_error( $editor ) )
+		return $editor;
+	$editor->set_quality( $jpeg_quality );
+
+	$resized = $editor->resize( $max_w, $max_h, $crop );
+	if ( is_wp_error( $resized ) )
+		return $resized;
+
+	$dest_file = $editor->generate_filename( $suffix, $dest_path );
+	$saved = $editor->save( $dest_file );
+
+	if ( is_wp_error( $saved ) )
+		return $saved;
+
+	return $dest_file;
+}
+
+/**
+ * Retrieve a single post, based on post ID.
+ *
+ * Has categories in 'post_category' property or key. Has tags in 'tags_input'
+ * property or key.
+ *
+ * @since 1.0.0
+ * @deprecated 3.5.0 Use get_post()
+ * @see get_post()
+ *
+ * @param int $postid Post ID.
+ * @param string $mode How to return result, either OBJECT, ARRAY_N, or ARRAY_A.
+ * @return WP_Post|null Post object or array holding post contents and information
+ */
+function wp_get_single_post( $postid = 0, $mode = OBJECT ) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'get_post()' );
+	return get_post( $postid, $mode );
+}
+
+/**
+ * Check that the user login name and password is correct.
+ *
+ * @since 0.71
+ * @deprecated 3.5.0 Use wp_authenticate()
+ * @see wp_authenticate()
+ *
+ * @param string $user_login User name.
+ * @param string $user_pass User password.
+ * @return bool False if does not authenticate, true if username and password authenticates.
+ */
+function user_pass_ok($user_login, $user_pass) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'wp_authenticate()' );
+	$user = wp_authenticate( $user_login, $user_pass );
+	if ( is_wp_error( $user ) )
+		return false;
+
+	return true;
+}
+
+/**
+ * Callback formerly fired on the save_post hook. No longer needed.
+ *
+ * @since 2.3.0
+ * @deprecated 3.5.0
+ */
+function _save_post_hook() {}
+
+/**
+ * Check if the installed version of GD supports particular image type
+ *
+ * @since 2.9.0
+ * @deprecated 3.5.0 Use wp_image_editor_supports()
+ * @see wp_image_editor_supports()
+ *
+ * @param string $mime_type
+ * @return bool
+ */
+function gd_edit_image_support($mime_type) {
+	_deprecated_function( __FUNCTION__, '3.5.0', 'wp_image_editor_supports()' );
+
+	if ( function_exists('imagetypes') ) {
+		switch( $mime_type ) {
+			case 'image/jpeg':
+				return (imagetypes() & IMG_JPG) != 0;
+			case 'image/png':
+				return (imagetypes() & IMG_PNG) != 0;
+			case 'image/gif':
+				return (imagetypes() & IMG_GIF) != 0;
+		}
+	} else {
+		switch( $mime_type ) {
+			case 'image/jpeg':
+				return function_exists('imagecreatefromjpeg');
+			case 'image/png':
+				return function_exists('imagecreatefrompng');
+			case 'image/gif':
+				return function_exists('imagecreatefromgif');
+		}
+	}
+	return false;
+}
+
+/**
+ * Converts an integer byte value to a shorthand byte value.
+ *
+ * @since 2.3.0
+ * @deprecated 3.6.0 Use size_format()
+ * @see size_format()
+ *
+ * @param int $bytes An integer byte value.
+ * @return string A shorthand byte value.
+ */
+function wp_convert_bytes_to_hr( $bytes ) {
+	_deprecated_function( __FUNCTION__, '3.6.0', 'size_format()' );
+
+	$units = array( 0 => 'B', 1 => 'KB', 2 => 'MB', 3 => 'GB', 4 => 'TB' );
+	$log   = log( $bytes, KB_IN_BYTES );
+	$power = (int) $log;
+	$size  = pow( KB_IN_BYTES, $log - $power );
+
+	if ( ! is_nan( $size ) && array_key_exists( $power, $units ) ) {
+		$unit = $units[ $power ];
+	} else {
+		$size = $bytes;
+		$unit = $units[0];
+	}
+
+	return $size . $unit;
+}
+
+/**
+ * Formerly used internally to tidy up the search terms.
+ *
+ * @since 2.9.0
+ * @access private
+ * @deprecated 3.7.0
+ *
+ * @param string $t Search terms to "tidy", e.g. trim.
+ * @return string Trimmed search terms.
+ */
+function _search_terms_tidy( $t ) {
+	_deprecated_function( __FUNCTION__, '3.7.0' );
+	return trim( $t, "\"'\n\r " );
+}
+
+/**
+ * Determine if TinyMCE is available.
+ *
+ * Checks to see if the user has deleted the tinymce files to slim down
+ * their WordPress installation.
+ *
+ * @since 2.1.0
+ * @deprecated 3.9.0
+ *
+ * @return bool Whether TinyMCE exists.
+ */
+function rich_edit_exists() {
+	global $wp_rich_edit_exists;
+	_deprecated_function( __FUNCTION__, '3.9.0' );
+
+	if ( ! isset( $wp_rich_edit_exists ) )
+		$wp_rich_edit_exists = file_exists( ABSPATH . WPINC . '/js/tinymce/tinymce.js' );
+
+	return $wp_rich_edit_exists;
+}
+
+/**
+ * Old callback
