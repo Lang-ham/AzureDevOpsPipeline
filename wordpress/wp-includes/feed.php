@@ -596,4 +596,115 @@ function rss2_site_icon() {
 <image>
 	<url>' . convert_chars( $url ) . '</url>
 	<title>' . $rss_title . '</title>
-	<link>' . get_bloginfo_
+	<link>' . get_bloginfo_rss( 'url' ) . '</link>
+	<width>32</width>
+	<height>32</height>
+</image> ' . "\n";
+	}
+}
+
+/**
+ * Display the link for the currently displayed feed in a XSS safe way.
+ *
+ * Generate a correct link for the atom:self element.
+ *
+ * @since 2.5.0
+ */
+function self_link() {
+	$host = @parse_url(home_url());
+	/**
+	 * Filters the current feed URL.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @see set_url_scheme()
+	 * @see wp_unslash()
+	 *
+	 * @param string $feed_link The link for the feed with set URL scheme.
+	 */
+	echo esc_url( apply_filters( 'self_link', set_url_scheme( 'http://' . $host['host'] . wp_unslash( $_SERVER['REQUEST_URI'] ) ) ) );
+}
+
+/**
+ * Return the content type for specified feed type.
+ *
+ * @since 2.8.0
+ *
+ * @param string $type Type of feed. Possible values include 'rss', rss2', 'atom', and 'rdf'.
+ */
+function feed_content_type( $type = '' ) {
+	if ( empty($type) )
+		$type = get_default_feed();
+
+	$types = array(
+		'rss'      => 'application/rss+xml',
+		'rss2'     => 'application/rss+xml',
+		'rss-http' => 'text/xml',
+		'atom'     => 'application/atom+xml',
+		'rdf'      => 'application/rdf+xml'
+	);
+
+	$content_type = ( !empty($types[$type]) ) ? $types[$type] : 'application/octet-stream';
+
+	/**
+	 * Filters the content type for a specific feed type.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $content_type Content type indicating the type of data that a feed contains.
+	 * @param string $type         Type of feed. Possible values include 'rss', rss2', 'atom', and 'rdf'.
+	 */
+	return apply_filters( 'feed_content_type', $content_type, $type );
+}
+
+/**
+ * Build SimplePie object based on RSS or Atom feed from URL.
+ *
+ * @since 2.8.0
+ *
+ * @param mixed $url URL of feed to retrieve. If an array of URLs, the feeds are merged
+ * using SimplePie's multifeed feature.
+ * See also {@link ​http://simplepie.org/wiki/faq/typical_multifeed_gotchas}
+ *
+ * @return WP_Error|SimplePie WP_Error object on failure or SimplePie object on success
+ */
+function fetch_feed( $url ) {
+	if ( ! class_exists( 'SimplePie', false ) ) {
+		require_once( ABSPATH . WPINC . '/class-simplepie.php' );
+	}
+
+	require_once( ABSPATH . WPINC . '/class-wp-feed-cache.php' );
+	require_once( ABSPATH . WPINC . '/class-wp-feed-cache-transient.php' );
+	require_once( ABSPATH . WPINC . '/class-wp-simplepie-file.php' );
+	require_once( ABSPATH . WPINC . '/class-wp-simplepie-sanitize-kses.php' );
+
+	$feed = new SimplePie();
+
+	$feed->set_sanitize_class( 'WP_SimplePie_Sanitize_KSES' );
+	// We must manually overwrite $feed->sanitize because SimplePie's
+	// constructor sets it before we have a chance to set the sanitization class
+	$feed->sanitize = new WP_SimplePie_Sanitize_KSES();
+
+	$feed->set_cache_class( 'WP_Feed_Cache' );
+	$feed->set_file_class( 'WP_SimplePie_File' );
+
+	$feed->set_feed_url( $url );
+	/** This filter is documented in wp-includes/class-wp-feed-cache-transient.php */
+	$feed->set_cache_duration( apply_filters( 'wp_feed_cache_transient_lifetime', 12 * HOUR_IN_SECONDS, $url ) );
+	/**
+	 * Fires just before processing the SimplePie feed object.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param object $feed SimplePie feed object (passed by reference).
+	 * @param mixed  $url  URL of feed to retrieve. If an array of URLs, the feeds are merged.
+	 */
+	do_action_ref_array( 'wp_feed_options', array( &$feed, $url ) );
+	$feed->init();
+	$feed->set_output_encoding( get_option( 'blog_charset' ) );
+
+	if ( $feed->error() )
+		return new WP_Error( 'simplepie-error', $feed->error() );
+
+	return $feed;
+}
