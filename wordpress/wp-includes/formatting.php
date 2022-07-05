@@ -1062,4 +1062,203 @@ function wp_check_invalid_utf8( $string, $strip = false ) {
 	if ( ! isset( $utf8_pcre ) ) {
 		$utf8_pcre = @preg_match( '/^./u', 'a' );
 	}
-	// We can't demand utf8 in the PCRE installation, s
+	// We can't demand utf8 in the PCRE installation, so just return the string in those cases
+	if ( !$utf8_pcre ) {
+		return $string;
+	}
+
+	// preg_match fails when it encounters invalid UTF8 in $string
+	if ( 1 === @preg_match( '/^./us', $string ) ) {
+		return $string;
+	}
+
+	// Attempt to strip the bad chars if requested (not recommended)
+	if ( $strip && function_exists( 'iconv' ) ) {
+		return iconv( 'utf-8', 'utf-8', $string );
+	}
+
+	return '';
+}
+
+/**
+ * Encode the Unicode values to be used in the URI.
+ *
+ * @since 1.5.0
+ *
+ * @param string $utf8_string
+ * @param int    $length Max  length of the string
+ * @return string String with Unicode encoded for URI.
+ */
+function utf8_uri_encode( $utf8_string, $length = 0 ) {
+	$unicode = '';
+	$values = array();
+	$num_octets = 1;
+	$unicode_length = 0;
+
+	mbstring_binary_safe_encoding();
+	$string_length = strlen( $utf8_string );
+	reset_mbstring_encoding();
+
+	for ($i = 0; $i < $string_length; $i++ ) {
+
+		$value = ord( $utf8_string[ $i ] );
+
+		if ( $value < 128 ) {
+			if ( $length && ( $unicode_length >= $length ) )
+				break;
+			$unicode .= chr($value);
+			$unicode_length++;
+		} else {
+			if ( count( $values ) == 0 ) {
+				if ( $value < 224 ) {
+					$num_octets = 2;
+				} elseif ( $value < 240 ) {
+					$num_octets = 3;
+				} else {
+					$num_octets = 4;
+				}
+			}
+
+			$values[] = $value;
+
+			if ( $length && ( $unicode_length + ($num_octets * 3) ) > $length )
+				break;
+			if ( count( $values ) == $num_octets ) {
+				for ( $j = 0; $j < $num_octets; $j++ ) {
+					$unicode .= '%' . dechex( $values[ $j ] );
+				}
+
+				$unicode_length += $num_octets * 3;
+
+				$values = array();
+				$num_octets = 1;
+			}
+		}
+	}
+
+	return $unicode;
+}
+
+/**
+ * Converts all accent characters to ASCII characters.
+ *
+ * If there are no accent characters, then the string given is just returned.
+ *
+ * **Accent characters converted:**
+ *
+ * Currency signs:
+ *
+ * |   Code   | Glyph | Replacement |     Description     |
+ * | -------- | ----- | ----------- | ------------------- |
+ * | U+00A3   | £     | (empty)     | British Pound sign  |
+ * | U+20AC   | €     | E           | Euro sign           |
+ *
+ * Decompositions for Latin-1 Supplement:
+ *
+ * |  Code   | Glyph | Replacement |               Description              |
+ * | ------- | ----- | ----------- | -------------------------------------- |
+ * | U+00AA  | ª     | a           | Feminine ordinal indicator             |
+ * | U+00BA  | º     | o           | Masculine ordinal indicator            |
+ * | U+00C0  | À     | A           | Latin capital letter A with grave      |
+ * | U+00C1  | Á     | A           | Latin capital letter A with acute      |
+ * | U+00C2  | Â     | A           | Latin capital letter A with circumflex |
+ * | U+00C3  | Ã     | A           | Latin capital letter A with tilde      |
+ * | U+00C4  | Ä     | A           | Latin capital letter A with diaeresis  |
+ * | U+00C5  | Å     | A           | Latin capital letter A with ring above |
+ * | U+00C6  | Æ     | AE          | Latin capital letter AE                |
+ * | U+00C7  | Ç     | C           | Latin capital letter C with cedilla    |
+ * | U+00C8  | È     | E           | Latin capital letter E with grave      |
+ * | U+00C9  | É     | E           | Latin capital letter E with acute      |
+ * | U+00CA  | Ê     | E           | Latin capital letter E with circumflex |
+ * | U+00CB  | Ë     | E           | Latin capital letter E with diaeresis  |
+ * | U+00CC  | Ì     | I           | Latin capital letter I with grave      |
+ * | U+00CD  | Í     | I           | Latin capital letter I with acute      |
+ * | U+00CE  | Î     | I           | Latin capital letter I with circumflex |
+ * | U+00CF  | Ï     | I           | Latin capital letter I with diaeresis  |
+ * | U+00D0  | Ð     | D           | Latin capital letter Eth               |
+ * | U+00D1  | Ñ     | N           | Latin capital letter N with tilde      |
+ * | U+00D2  | Ò     | O           | Latin capital letter O with grave      |
+ * | U+00D3  | Ó     | O           | Latin capital letter O with acute      |
+ * | U+00D4  | Ô     | O           | Latin capital letter O with circumflex |
+ * | U+00D5  | Õ     | O           | Latin capital letter O with tilde      |
+ * | U+00D6  | Ö     | O           | Latin capital letter O with diaeresis  |
+ * | U+00D8  | Ø     | O           | Latin capital letter O with stroke     |
+ * | U+00D9  | Ù     | U           | Latin capital letter U with grave      |
+ * | U+00DA  | Ú     | U           | Latin capital letter U with acute      |
+ * | U+00DB  | Û     | U           | Latin capital letter U with circumflex |
+ * | U+00DC  | Ü     | U           | Latin capital letter U with diaeresis  |
+ * | U+00DD  | Ý     | Y           | Latin capital letter Y with acute      |
+ * | U+00DE  | Þ     | TH          | Latin capital letter Thorn             |
+ * | U+00DF  | ß     | s           | Latin small letter sharp s             |
+ * | U+00E0  | à     | a           | Latin small letter a with grave        |
+ * | U+00E1  | á     | a           | Latin small letter a with acute        |
+ * | U+00E2  | â     | a           | Latin small letter a with circumflex   |
+ * | U+00E3  | ã     | a           | Latin small letter a with tilde        |
+ * | U+00E4  | ä     | a           | Latin small letter a with diaeresis    |
+ * | U+00E5  | å     | a           | Latin small letter a with ring above   |
+ * | U+00E6  | æ     | ae          | Latin small letter ae                  |
+ * | U+00E7  | ç     | c           | Latin small letter c with cedilla      |
+ * | U+00E8  | è     | e           | Latin small letter e with grave        |
+ * | U+00E9  | é     | e           | Latin small letter e with acute        |
+ * | U+00EA  | ê     | e           | Latin small letter e with circumflex   |
+ * | U+00EB  | ë     | e           | Latin small letter e with diaeresis    |
+ * | U+00EC  | ì     | i           | Latin small letter i with grave        |
+ * | U+00ED  | í     | i           | Latin small letter i with acute        |
+ * | U+00EE  | î     | i           | Latin small letter i with circumflex   |
+ * | U+00EF  | ï     | i           | Latin small letter i with diaeresis    |
+ * | U+00F0  | ð     | d           | Latin small letter Eth                 |
+ * | U+00F1  | ñ     | n           | Latin small letter n with tilde        |
+ * | U+00F2  | ò     | o           | Latin small letter o with grave        |
+ * | U+00F3  | ó     | o           | Latin small letter o with acute        |
+ * | U+00F4  | ô     | o           | Latin small letter o with circumflex   |
+ * | U+00F5  | õ     | o           | Latin small letter o with tilde        |
+ * | U+00F6  | ö     | o           | Latin small letter o with diaeresis    |
+ * | U+00F8  | ø     | o           | Latin small letter o with stroke       |
+ * | U+00F9  | ù     | u           | Latin small letter u with grave        |
+ * | U+00FA  | ú     | u           | Latin small letter u with acute        |
+ * | U+00FB  | û     | u           | Latin small letter u with circumflex   |
+ * | U+00FC  | ü     | u           | Latin small letter u with diaeresis    |
+ * | U+00FD  | ý     | y           | Latin small letter y with acute        |
+ * | U+00FE  | þ     | th          | Latin small letter Thorn               |
+ * | U+00FF  | ÿ     | y           | Latin small letter y with diaeresis    |
+ *
+ * Decompositions for Latin Extended-A:
+ *
+ * |  Code   | Glyph | Replacement |                    Description                    |
+ * | ------- | ----- | ----------- | ------------------------------------------------- |
+ * | U+0100  | Ā     | A           | Latin capital letter A with macron                |
+ * | U+0101  | ā     | a           | Latin small letter a with macron                  |
+ * | U+0102  | Ă     | A           | Latin capital letter A with breve                 |
+ * | U+0103  | ă     | a           | Latin small letter a with breve                   |
+ * | U+0104  | Ą     | A           | Latin capital letter A with ogonek                |
+ * | U+0105  | ą     | a           | Latin small letter a with ogonek                  |
+ * | U+01006 | Ć     | C           | Latin capital letter C with acute                 |
+ * | U+0107  | ć     | c           | Latin small letter c with acute                   |
+ * | U+0108  | Ĉ     | C           | Latin capital letter C with circumflex            |
+ * | U+0109  | ĉ     | c           | Latin small letter c with circumflex              |
+ * | U+010A  | Ċ     | C           | Latin capital letter C with dot above             |
+ * | U+010B  | ċ     | c           | Latin small letter c with dot above               |
+ * | U+010C  | Č     | C           | Latin capital letter C with caron                 |
+ * | U+010D  | č     | c           | Latin small letter c with caron                   |
+ * | U+010E  | Ď     | D           | Latin capital letter D with caron                 |
+ * | U+010F  | ď     | d           | Latin small letter d with caron                   |
+ * | U+0110  | Đ     | D           | Latin capital letter D with stroke                |
+ * | U+0111  | đ     | d           | Latin small letter d with stroke                  |
+ * | U+0112  | Ē     | E           | Latin capital letter E with macron                |
+ * | U+0113  | ē     | e           | Latin small letter e with macron                  |
+ * | U+0114  | Ĕ     | E           | Latin capital letter E with breve                 |
+ * | U+0115  | ĕ     | e           | Latin small letter e with breve                   |
+ * | U+0116  | Ė     | E           | Latin capital letter E with dot above             |
+ * | U+0117  | ė     | e           | Latin small letter e with dot above               |
+ * | U+0118  | Ę     | E           | Latin capital letter E with ogonek                |
+ * | U+0119  | ę     | e           | Latin small letter e with ogonek                  |
+ * | U+011A  | Ě     | E           | Latin capital letter E with caron                 |
+ * | U+011B  | ě     | e           | Latin small letter e with caron                   |
+ * | U+011C  | Ĝ     | G           | Latin capital letter G with circumflex            |
+ * | U+011D  | ĝ     | g           | Latin small letter g with circumflex              |
+ * | U+011E  | Ğ     | G           | Latin capital letter G with breve                 |
+ * | U+011F  | ğ     | g           | Latin small letter g with breve                   |
+ * | U+0120  | Ġ     | G           | Latin capital letter G with dot above             |
+ * | U+0121  | ġ     | g           | Latin small letter g with dot above               |
+ * | U+0122  | Ģ     | G           | Latin capital letter G with cedilla               |
+ * | U+0123  | ģ     | g           | Latin small le
