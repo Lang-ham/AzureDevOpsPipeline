@@ -762,4 +762,304 @@ function wp_replace_in_html_tags( $haystack, $replace_pairs ) {
 		// Extract all $needles.
 		$needles = array_keys( $replace_pairs );
 
-		// Loop through delimiters (elements) o
+		// Loop through delimiters (elements) only.
+		for ( $i = 1, $c = count( $textarr ); $i < $c; $i += 2 ) {
+			foreach ( $needles as $needle ) {
+				if ( false !== strpos( $textarr[$i], $needle ) ) {
+					$textarr[$i] = strtr( $textarr[$i], $replace_pairs );
+					$changed = true;
+					// After one strtr() break out of the foreach loop and look at next element.
+					break;
+				}
+			}
+		}
+	}
+
+	if ( $changed ) {
+		$haystack = implode( $textarr );
+	}
+
+	return $haystack;
+}
+
+/**
+ * Newline preservation help function for wpautop
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param array $matches preg_replace_callback matches array
+ * @return string
+ */
+function _autop_newline_preservation_helper( $matches ) {
+	return str_replace( "\n", "<WPPreserveNewline />", $matches[0] );
+}
+
+/**
+ * Don't auto-p wrap shortcodes that stand alone
+ *
+ * Ensures that shortcodes are not wrapped in `<p>...</p>`.
+ *
+ * @since 2.9.0
+ *
+ * @global array $shortcode_tags
+ *
+ * @param string $pee The content.
+ * @return string The filtered content.
+ */
+function shortcode_unautop( $pee ) {
+	global $shortcode_tags;
+
+	if ( empty( $shortcode_tags ) || !is_array( $shortcode_tags ) ) {
+		return $pee;
+	}
+
+	$tagregexp = join( '|', array_map( 'preg_quote', array_keys( $shortcode_tags ) ) );
+	$spaces = wp_spaces_regexp();
+
+	$pattern =
+		  '/'
+		. '<p>'                              // Opening paragraph
+		. '(?:' . $spaces . ')*+'            // Optional leading whitespace
+		. '('                                // 1: The shortcode
+		.     '\\['                          // Opening bracket
+		.     "($tagregexp)"                 // 2: Shortcode name
+		.     '(?![\\w-])'                   // Not followed by word character or hyphen
+		                                     // Unroll the loop: Inside the opening shortcode tag
+		.     '[^\\]\\/]*'                   // Not a closing bracket or forward slash
+		.     '(?:'
+		.         '\\/(?!\\])'               // A forward slash not followed by a closing bracket
+		.         '[^\\]\\/]*'               // Not a closing bracket or forward slash
+		.     ')*?'
+		.     '(?:'
+		.         '\\/\\]'                   // Self closing tag and closing bracket
+		.     '|'
+		.         '\\]'                      // Closing bracket
+		.         '(?:'                      // Unroll the loop: Optionally, anything between the opening and closing shortcode tags
+		.             '[^\\[]*+'             // Not an opening bracket
+		.             '(?:'
+		.                 '\\[(?!\\/\\2\\])' // An opening bracket not followed by the closing shortcode tag
+		.                 '[^\\[]*+'         // Not an opening bracket
+		.             ')*+'
+		.             '\\[\\/\\2\\]'         // Closing shortcode tag
+		.         ')?'
+		.     ')'
+		. ')'
+		. '(?:' . $spaces . ')*+'            // optional trailing whitespace
+		. '<\\/p>'                           // closing paragraph
+		. '/';
+
+	return preg_replace( $pattern, '$1', $pee );
+}
+
+/**
+ * Checks to see if a string is utf8 encoded.
+ *
+ * NOTE: This function checks for 5-Byte sequences, UTF8
+ *       has Bytes Sequences with a maximum length of 4.
+ *
+ * @author bmorel at ssi dot fr (modified)
+ * @since 1.2.1
+ *
+ * @param string $str The string to be checked
+ * @return bool True if $str fits a UTF-8 model, false otherwise.
+ */
+function seems_utf8( $str ) {
+	mbstring_binary_safe_encoding();
+	$length = strlen($str);
+	reset_mbstring_encoding();
+	for ($i=0; $i < $length; $i++) {
+		$c = ord($str[$i]);
+		if ($c < 0x80) $n = 0; // 0bbbbbbb
+		elseif (($c & 0xE0) == 0xC0) $n=1; // 110bbbbb
+		elseif (($c & 0xF0) == 0xE0) $n=2; // 1110bbbb
+		elseif (($c & 0xF8) == 0xF0) $n=3; // 11110bbb
+		elseif (($c & 0xFC) == 0xF8) $n=4; // 111110bb
+		elseif (($c & 0xFE) == 0xFC) $n=5; // 1111110b
+		else return false; // Does not match any model
+		for ($j=0; $j<$n; $j++) { // n bytes matching 10bbbbbb follow ?
+			if ((++$i == $length) || ((ord($str[$i]) & 0xC0) != 0x80))
+				return false;
+		}
+	}
+	return true;
+}
+
+/**
+ * Converts a number of special characters into their HTML entities.
+ *
+ * Specifically deals with: &, <, >, ", and '.
+ *
+ * $quote_style can be set to ENT_COMPAT to encode " to
+ * &quot;, or ENT_QUOTES to do both. Default is ENT_NOQUOTES where no quotes are encoded.
+ *
+ * @since 1.2.2
+ * @access private
+ *
+ * @staticvar string $_charset
+ *
+ * @param string     $string         The text which is to be encoded.
+ * @param int|string $quote_style    Optional. Converts double quotes if set to ENT_COMPAT,
+ *                                   both single and double if set to ENT_QUOTES or none if set to ENT_NOQUOTES.
+ *                                   Also compatible with old values; converting single quotes if set to 'single',
+ *                                   double if set to 'double' or both if otherwise set.
+ *                                   Default is ENT_NOQUOTES.
+ * @param string     $charset        Optional. The character encoding of the string. Default is false.
+ * @param bool       $double_encode  Optional. Whether to encode existing html entities. Default is false.
+ * @return string The encoded text with HTML entities.
+ */
+function _wp_specialchars( $string, $quote_style = ENT_NOQUOTES, $charset = false, $double_encode = false ) {
+	$string = (string) $string;
+
+	if ( 0 === strlen( $string ) )
+		return '';
+
+	// Don't bother if there are no specialchars - saves some processing
+	if ( ! preg_match( '/[&<>"\']/', $string ) )
+		return $string;
+
+	// Account for the previous behaviour of the function when the $quote_style is not an accepted value
+	if ( empty( $quote_style ) )
+		$quote_style = ENT_NOQUOTES;
+	elseif ( ! in_array( $quote_style, array( 0, 2, 3, 'single', 'double' ), true ) )
+		$quote_style = ENT_QUOTES;
+
+	// Store the site charset as a static to avoid multiple calls to wp_load_alloptions()
+	if ( ! $charset ) {
+		static $_charset = null;
+		if ( ! isset( $_charset ) ) {
+			$alloptions = wp_load_alloptions();
+			$_charset = isset( $alloptions['blog_charset'] ) ? $alloptions['blog_charset'] : '';
+		}
+		$charset = $_charset;
+	}
+
+	if ( in_array( $charset, array( 'utf8', 'utf-8', 'UTF8' ) ) )
+		$charset = 'UTF-8';
+
+	$_quote_style = $quote_style;
+
+	if ( $quote_style === 'double' ) {
+		$quote_style = ENT_COMPAT;
+		$_quote_style = ENT_COMPAT;
+	} elseif ( $quote_style === 'single' ) {
+		$quote_style = ENT_NOQUOTES;
+	}
+
+	if ( ! $double_encode ) {
+		// Guarantee every &entity; is valid, convert &garbage; into &amp;garbage;
+		// This is required for PHP < 5.4.0 because ENT_HTML401 flag is unavailable.
+		$string = wp_kses_normalize_entities( $string );
+	}
+
+	$string = @htmlspecialchars( $string, $quote_style, $charset, $double_encode );
+
+	// Back-compat.
+	if ( 'single' === $_quote_style )
+		$string = str_replace( "'", '&#039;', $string );
+
+	return $string;
+}
+
+/**
+ * Converts a number of HTML entities into their special characters.
+ *
+ * Specifically deals with: &, <, >, ", and '.
+ *
+ * $quote_style can be set to ENT_COMPAT to decode " entities,
+ * or ENT_QUOTES to do both " and '. Default is ENT_NOQUOTES where no quotes are decoded.
+ *
+ * @since 2.8.0
+ *
+ * @param string     $string The text which is to be decoded.
+ * @param string|int $quote_style Optional. Converts double quotes if set to ENT_COMPAT,
+ *                                both single and double if set to ENT_QUOTES or
+ *                                none if set to ENT_NOQUOTES.
+ *                                Also compatible with old _wp_specialchars() values;
+ *                                converting single quotes if set to 'single',
+ *                                double if set to 'double' or both if otherwise set.
+ *                                Default is ENT_NOQUOTES.
+ * @return string The decoded text without HTML entities.
+ */
+function wp_specialchars_decode( $string, $quote_style = ENT_NOQUOTES ) {
+	$string = (string) $string;
+
+	if ( 0 === strlen( $string ) ) {
+		return '';
+	}
+
+	// Don't bother if there are no entities - saves a lot of processing
+	if ( strpos( $string, '&' ) === false ) {
+		return $string;
+	}
+
+	// Match the previous behaviour of _wp_specialchars() when the $quote_style is not an accepted value
+	if ( empty( $quote_style ) ) {
+		$quote_style = ENT_NOQUOTES;
+	} elseif ( !in_array( $quote_style, array( 0, 2, 3, 'single', 'double' ), true ) ) {
+		$quote_style = ENT_QUOTES;
+	}
+
+	// More complete than get_html_translation_table( HTML_SPECIALCHARS )
+	$single = array( '&#039;'  => '\'', '&#x27;' => '\'' );
+	$single_preg = array( '/&#0*39;/'  => '&#039;', '/&#x0*27;/i' => '&#x27;' );
+	$double = array( '&quot;' => '"', '&#034;'  => '"', '&#x22;' => '"' );
+	$double_preg = array( '/&#0*34;/'  => '&#034;', '/&#x0*22;/i' => '&#x22;' );
+	$others = array( '&lt;'   => '<', '&#060;'  => '<', '&gt;'   => '>', '&#062;'  => '>', '&amp;'  => '&', '&#038;'  => '&', '&#x26;' => '&' );
+	$others_preg = array( '/&#0*60;/'  => '&#060;', '/&#0*62;/'  => '&#062;', '/&#0*38;/'  => '&#038;', '/&#x0*26;/i' => '&#x26;' );
+
+	if ( $quote_style === ENT_QUOTES ) {
+		$translation = array_merge( $single, $double, $others );
+		$translation_preg = array_merge( $single_preg, $double_preg, $others_preg );
+	} elseif ( $quote_style === ENT_COMPAT || $quote_style === 'double' ) {
+		$translation = array_merge( $double, $others );
+		$translation_preg = array_merge( $double_preg, $others_preg );
+	} elseif ( $quote_style === 'single' ) {
+		$translation = array_merge( $single, $others );
+		$translation_preg = array_merge( $single_preg, $others_preg );
+	} elseif ( $quote_style === ENT_NOQUOTES ) {
+		$translation = $others;
+		$translation_preg = $others_preg;
+	}
+
+	// Remove zero padding on numeric entities
+	$string = preg_replace( array_keys( $translation_preg ), array_values( $translation_preg ), $string );
+
+	// Replace characters according to translation table
+	return strtr( $string, $translation );
+}
+
+/**
+ * Checks for invalid UTF8 in a string.
+ *
+ * @since 2.8.0
+ *
+ * @staticvar bool $is_utf8
+ * @staticvar bool $utf8_pcre
+ *
+ * @param string  $string The text which is to be checked.
+ * @param bool    $strip Optional. Whether to attempt to strip out invalid UTF8. Default is false.
+ * @return string The checked text.
+ */
+function wp_check_invalid_utf8( $string, $strip = false ) {
+	$string = (string) $string;
+
+	if ( 0 === strlen( $string ) ) {
+		return '';
+	}
+
+	// Store the site charset as a static to avoid multiple calls to get_option()
+	static $is_utf8 = null;
+	if ( ! isset( $is_utf8 ) ) {
+		$is_utf8 = in_array( get_option( 'blog_charset' ), array( 'utf8', 'utf-8', 'UTF8', 'UTF-8' ) );
+	}
+	if ( ! $is_utf8 ) {
+		return $string;
+	}
+
+	// Check for support for utf8 in the installed PCRE library once and store the result in a static
+	static $utf8_pcre = null;
+	if ( ! isset( $utf8_pcre ) ) {
+		$utf8_pcre = @preg_match( '/^./u', 'a' );
+	}
+	// We can't demand utf8 in the PCRE installation, s
