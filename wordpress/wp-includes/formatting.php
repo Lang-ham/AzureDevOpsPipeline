@@ -1261,4 +1261,130 @@ function utf8_uri_encode( $utf8_string, $length = 0 ) {
  * | U+0120  | Ġ     | G           | Latin capital letter G with dot above             |
  * | U+0121  | ġ     | g           | Latin small letter g with dot above               |
  * | U+0122  | Ģ     | G           | Latin capital letter G with cedilla               |
- * | U+0123  | ģ     | g           | Latin small le
+ * | U+0123  | ģ     | g           | Latin small letter g with cedilla                 |
+ * | U+0124  | Ĥ     | H           | Latin capital letter H with circumflex            |
+ * | U+0125  | ĥ     | h           | Latin small letter h with circumflex              |
+ * | U+0126  | Ħ     | H           | Latin capital letter H with stroke                |
+ * | U+0127  | ħ     | h           | Latin small letter h with stroke                  |
+ * | U+0128  | Ĩ     | I           | Latin capital letter I with tilde                 |
+ * | U+0129  | ĩ     | i           | Latin small letter i with tilde                   |
+ * | U+012A  | Ī     | I           | Latin capital letter I with macron                |
+ * | U+012B  | ī     | i           | Latin small letter i with macron                  |
+ * | U+012C  | Ĭ     | I           | Latin capital letter I with breve                 |
+ * | U+012D  | ĭ     | i           | Latin small letter i with breve                   |
+ * | U+012E  | Į     | I           | Latin capital letter I with ogonek                |
+ * | U+012F  | į     | i           | Latin small letter i with ogonek                  |
+ * | U+0130  | İ     | I           | Latin capital letter I with dot above             |
+ * | U+0131  | ı     | i           | Latin small letter dotless i                      |
+ * | U+0132  | Ĳ     | IJ          | Latin capital ligature IJ                         |
+ * | U+0133  | ĳ     | ij          | Latin small ligature ij                           |
+ * | U+0134  | Ĵ     | J           | Latin capital letter J with circumflex            |
+ * | U+0135  | ĵ     | j           | Latin small letter j with circumflex              |
+ * | U+0136  | Ķ     | K           | Latin capital letter K with cedilla               |
+ * | U+0137  | ķ     | k           | Latin small letter k with cedilla                 |
+ * | U+0138  | ĸ     | k           | Latin small letter Kra                            |
+ * | U+0139  | Ĺ     | L           | Latin capital letter L with acute                 |
+ * | U+013A  | ĺ     | l           | Latin small letter l with acute                   |
+ * | U+013B  | Ļ     | L           | Latin capital letter L with cedilla               |
+ * | U+013C  | ļ     | l           | Latin small letter l with cedilla                 |
+ * | U+013D  | Ľ     | L           | Latin capital letter L with caron                 |
+ * | U+013E  | ľ     | l           | Latin small letter l with caron                   |
+ * | U+013F  | Ŀ     | L           | Latin capital letter L with middle dot            |
+ * | U+0140  | ŀ     | l           | Latin small letter l with middle dot              |
+ * | U+0141  | Ł     | L           | Latin capital letter L with stroke                |
+ * | U+0142  | ł     | l           | Latin small letter l with stroke                  |
+ * | U+0143  | Ń     | N           | Latin capital letter N with acute                 |
+ * | U+0144  | ń     | n           | Latin small letter N with acute                   |
+ * | U+0145  | Ņ     | N           | Latin capital letter N with cedilla               |
+ * | U+0146  | ņ     | n           | Latin small letter n with cedilla                 |
+ * | U+0147  | Ň     | N           | Latin capital letter N with caron                 |
+ * | U+0148  | ň     | n           | Latin small letter n with caron                   |
+ * | U+0149  | ŉ     | n           | Latin small letter n preceded by apostrophe       |
+ * | U+014A  | Ŋ     | N           | Latin capital letter Eng                          |
+ * | U+014B  | ŋ     | n           | Latin small letter Eng                            |
+ * | U+014C  | Ō     | O           | Latin capital letter O with macron                |
+ * | U+014D  | ō     | o           | Latin small letter o with macron                  |
+ * | U+014E  | Ŏ     | O           | Latin capital letter O with breve                 |
+ * | U+014F  | ŏ     | o           | Latin small letter o with breve                   |
+ * | U+0150  | Ő     | O           | Latin capital letter O with double acute          |
+ * | U+0151  | ő     | o           | Latin small letter o with double acute            |
+ * | U+0152  | Œ     | OE          | Latin capital ligature OE                         |
+ * | U+0153  | œ     | oe          | Latin small ligature oe                           |
+ * | U+0154  | Ŕ     | R           | Latin capital letter R with acute                 |
+ * | U+0155  | ŕ     | r           | Latin small letter r with acute                   |
+ * | U+0156  | Ŗ     | R           | Latin capital letter R with cedilla               |
+ * | U+0157  | ŗ     | r           | Latin small letter r with cedilla                 |
+ * | U+0158  | Ř     | R           | Latin capital letter R with caron                 |
+ * | U+0159  | ř     | r           | Latin small letter r with caron                   |
+ * | U+015A  | Ś     | S           | Latin capital letter S with acute                 |
+ * | U+015B  | ś     | s           | Latin small letter s with acute                   |
+ * | U+015C  | Ŝ     | S           | Latin capital letter S with circumflex            |
+ * | U+015D  | ŝ     | s           | Latin small letter s with circumflex              |
+ * | U+015E  | Ş     | S           | Latin capital letter S with cedilla               |
+ * | U+015F  | ş     | s           | Latin small letter s with cedilla                 |
+ * | U+0160  | Š     | S           | Latin capital letter S with caron                 |
+ * | U+0161  | š     | s           | Latin small letter s with caron                   |
+ * | U+0162  | Ţ     | T           | Latin capital letter T with cedilla               |
+ * | U+0163  | ţ     | t           | Latin small letter t with cedilla                 |
+ * | U+0164  | Ť     | T           | Latin capital letter T with caron                 |
+ * | U+0165  | ť     | t           | Latin small letter t with caron                   |
+ * | U+0166  | Ŧ     | T           | Latin capital letter T with stroke                |
+ * | U+0167  | ŧ     | t           | Latin small letter t with stroke                  |
+ * | U+0168  | Ũ     | U           | Latin capital letter U with tilde                 |
+ * | U+0169  | ũ     | u           | Latin small letter u with tilde                   |
+ * | U+016A  | Ū     | U           | Latin capital letter U with macron                |
+ * | U+016B  | ū     | u           | Latin small letter u with macron                  |
+ * | U+016C  | Ŭ     | U           | Latin capital letter U with breve                 |
+ * | U+016D  | ŭ     | u           | Latin small letter u with breve                   |
+ * | U+016E  | Ů     | U           | Latin capital letter U with ring above            |
+ * | U+016F  | ů     | u           | Latin small letter u with ring above              |
+ * | U+0170  | Ű     | U           | Latin capital letter U with double acute          |
+ * | U+0171  | ű     | u           | Latin small letter u with double acute            |
+ * | U+0172  | Ų     | U           | Latin capital letter U with ogonek                |
+ * | U+0173  | ų     | u           | Latin small letter u with ogonek                  |
+ * | U+0174  | Ŵ     | W           | Latin capital letter W with circumflex            |
+ * | U+0175  | ŵ     | w           | Latin small letter w with circumflex              |
+ * | U+0176  | Ŷ     | Y           | Latin capital letter Y with circumflex            |
+ * | U+0177  | ŷ     | y           | Latin small letter y with circumflex              |
+ * | U+0178  | Ÿ     | Y           | Latin capital letter Y with diaeresis             |
+ * | U+0179  | Ź     | Z           | Latin capital letter Z with acute                 |
+ * | U+017A  | ź     | z           | Latin small letter z with acute                   |
+ * | U+017B  | Ż     | Z           | Latin capital letter Z with dot above             |
+ * | U+017C  | ż     | z           | Latin small letter z with dot above               |
+ * | U+017D  | Ž     | Z           | Latin capital letter Z with caron                 |
+ * | U+017E  | ž     | z           | Latin small letter z with caron                   |
+ * | U+017F  | ſ     | s           | Latin small letter long s                         |
+ * | U+01A0  | Ơ     | O           | Latin capital letter O with horn                  |
+ * | U+01A1  | ơ     | o           | Latin small letter o with horn                    |
+ * | U+01AF  | Ư     | U           | Latin capital letter U with horn                  |
+ * | U+01B0  | ư     | u           | Latin small letter u with horn                    |
+ * | U+01CD  | Ǎ     | A           | Latin capital letter A with caron                 |
+ * | U+01CE  | ǎ     | a           | Latin small letter a with caron                   |
+ * | U+01CF  | Ǐ     | I           | Latin capital letter I with caron                 |
+ * | U+01D0  | ǐ     | i           | Latin small letter i with caron                   |
+ * | U+01D1  | Ǒ     | O           | Latin capital letter O with caron                 |
+ * | U+01D2  | ǒ     | o           | Latin small letter o with caron                   |
+ * | U+01D3  | Ǔ     | U           | Latin capital letter U with caron                 |
+ * | U+01D4  | ǔ     | u           | Latin small letter u with caron                   |
+ * | U+01D5  | Ǖ     | U           | Latin capital letter U with diaeresis and macron  |
+ * | U+01D6  | ǖ     | u           | Latin small letter u with diaeresis and macron    |
+ * | U+01D7  | Ǘ     | U           | Latin capital letter U with diaeresis and acute   |
+ * | U+01D8  | ǘ     | u           | Latin small letter u with diaeresis and acute     |
+ * | U+01D9  | Ǚ     | U           | Latin capital letter U with diaeresis and caron   |
+ * | U+01DA  | ǚ     | u           | Latin small letter u with diaeresis and caron     |
+ * | U+01DB  | Ǜ     | U           | Latin capital letter U with diaeresis and grave   |
+ * | U+01DC  | ǜ     | u           | Latin small letter u with diaeresis and grave     |
+ *
+ * Decompositions for Latin Extended-B:
+ *
+ * |   Code   | Glyph | Replacement |                Description                |
+ * | -------- | ----- | ----------- | ----------------------------------------- |
+ * | U+0218   | Ș     | S           | Latin capital letter S with comma below   |
+ * | U+0219   | ș     | s           | Latin small letter s with comma below     |
+ * | U+021A   | Ț     | T           | Latin capital letter T with comma below   |
+ * | U+021B   | ț     | t           | Latin small letter t with comma below     |
+ *
+ * Vowels with diacritic (Chinese, Hanyu Pinyin):
+ *
+ * |   Code   | Glyph | Replacement |                      Description                      |
+ * | -------- | ----- | ----------- | -----------------------------------------
