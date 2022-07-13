@@ -1387,4 +1387,132 @@ function utf8_uri_encode( $utf8_string, $length = 0 ) {
  * Vowels with diacritic (Chinese, Hanyu Pinyin):
  *
  * |   Code   | Glyph | Replacement |                      Description                      |
- * | -------- | ----- | ----------- | -----------------------------------------
+ * | -------- | ----- | ----------- | ----------------------------------------------------- |
+ * | U+0251   | ɑ     | a           | Latin small letter alpha                              |
+ * | U+1EA0   | Ạ     | A           | Latin capital letter A with dot below                 |
+ * | U+1EA1   | ạ     | a           | Latin small letter a with dot below                   |
+ * | U+1EA2   | Ả     | A           | Latin capital letter A with hook above                |
+ * | U+1EA3   | ả     | a           | Latin small letter a with hook above                  |
+ * | U+1EA4   | Ấ     | A           | Latin capital letter A with circumflex and acute      |
+ * | U+1EA5   | ấ     | a           | Latin small letter a with circumflex and acute        |
+ * | U+1EA6   | Ầ     | A           | Latin capital letter A with circumflex and grave      |
+ * | U+1EA7   | ầ     | a           | Latin small letter a with circumflex and grave        |
+ * | U+1EA8   | Ẩ     | A           | Latin capital letter A with circumflex and hook above |
+ * | U+1EA9   | ẩ     | a           | Latin small letter a with circumflex and hook above   |
+ * | U+1EAA   | Ẫ     | A           | Latin capital letter A with circumflex and tilde      |
+ * | U+1EAB   | ẫ     | a           | Latin small letter a with circumflex and tilde        |
+ * | U+1EA6   | Ậ     | A           | Latin capital letter A with circumflex and dot below  |
+ * | U+1EAD   | ậ     | a           | Latin small letter a with circumflex and dot below    |
+ * | U+1EAE   | Ắ     | A           | Latin capital letter A with breve and acute           |
+ * | U+1EAF   | ắ     | a           | Latin small letter a with breve and acute             |
+ * | U+1EB0   | Ằ     | A           | Latin capital letter A with breve and grave           |
+ * | U+1EB1   | ằ     | a           | Latin small letter a with breve and grave             |
+ * | U+1EB2   | Ẳ     | A           | Latin capital letter A with breve and hook above      |
+ * | U+1EB3   | ẳ     | a           | Latin small letter a with breve and hook above        |
+ * | U+1EB4   | Ẵ     | A           | Latin capital letter A with breve and tilde           |
+ * | U+1EB5   | ẵ     | a           | Latin small letter a with breve and tilde             |
+ * | U+1EB6   | Ặ     | A           | Latin capital letter A with breve and dot below       |
+ * | U+1EB7   | ặ     | a           | Latin small letter a with breve and dot below         |
+ * | U+1EB8   | Ẹ     | E           | Latin capital letter E with dot below                 |
+ * | U+1EB9   | ẹ     | e           | Latin small letter e with dot below                   |
+ * | U+1EBA   | Ẻ     | E           | Latin capital letter E with hook above                |
+ * | U+1EBB   | ẻ     | e           | Latin small letter e with hook above                  |
+ * | U+1EBC   | Ẽ     | E           | Latin capital letter E with tilde                     |
+ * | U+1EBD   | ẽ     | e           | Latin small letter e with tilde                       |
+ * | U+1EBE   | Ế     | E           | Latin capital letter E with circumflex and acute      |
+ * | U+1EBF   | ế     | e           | Latin small letter e with circumflex and acute        |
+ * | U+1EC0   | Ề     | E           | Latin capital letter E with circumflex and grave      |
+ * | U+1EC1   | ề     | e           | Latin small letter e with circumflex and grave        |
+ * | U+1EC2   | Ể     | E           | Latin capital letter E with circumflex and hook above |
+ * | U+1EC3   | ể     | e           | Latin small letter e with circumflex and hook above   |
+ * | U+1EC4   | Ễ     | E           | Latin capital letter E with circumflex and tilde      |
+ * | U+1EC5   | ễ     | e           | Latin small letter e with circumflex and tilde        |
+ * | U+1EC6   | Ệ     | E           | Latin capital letter E with circumflex and dot below  |
+ * | U+1EC7   | ệ     | e           | Latin small letter e with circumflex and dot below    |
+ * | U+1EC8   | Ỉ     | I           | Latin capital letter I with hook above                |
+ * | U+1EC9   | ỉ     | i           | Latin small letter i with hook above                  |
+ * | U+1ECA   | Ị     | I           | Latin capital letter I with dot below                 |
+ * | U+1ECB   | ị     | i           | Latin small letter i with dot below                   |
+ * | U+1ECC   | Ọ     | O           | Latin capital letter O with dot below                 |
+ * | U+1ECD   | ọ     | o           | Latin small letter o with dot below                   |
+ * | U+1ECE   | Ỏ     | O           | Latin capital letter O with hook above                |
+ * | U+1ECF   | ỏ     | o           | Latin small letter o with hook above                  |
+ * | U+1ED0   | Ố     | O           | Latin capital letter O with circumflex and acute      |
+ * | U+1ED1   | ố     | o           | Latin small letter o with circumflex and acute        |
+ * | U+1ED2   | Ồ     | O           | Latin capital letter O with circumflex and grave      |
+ * | U+1ED3   | ồ     | o           | Latin small letter o with circumflex and grave        |
+ * | U+1ED4   | Ổ     | O           | Latin capital letter O with circumflex and hook above |
+ * | U+1ED5   | ổ     | o           | Latin small letter o with circumflex and hook above   |
+ * | U+1ED6   | Ỗ     | O           | Latin capital letter O with circumflex and tilde      |
+ * | U+1ED7   | ỗ     | o           | Latin small letter o with circumflex and tilde        |
+ * | U+1ED8   | Ộ     | O           | Latin capital letter O with circumflex and dot below  |
+ * | U+1ED9   | ộ     | o           | Latin small letter o with circumflex and dot below    |
+ * | U+1EDA   | Ớ     | O           | Latin capital letter O with horn and acute            |
+ * | U+1EDB   | ớ     | o           | Latin small letter o with horn and acute              |
+ * | U+1EDC   | Ờ     | O           | Latin capital letter O with horn and grave            |
+ * | U+1EDD   | ờ     | o           | Latin small letter o with horn and grave              |
+ * | U+1EDE   | Ở     | O           | Latin capital letter O with horn and hook above       |
+ * | U+1EDF   | ở     | o           | Latin small letter o with horn and hook above         |
+ * | U+1EE0   | Ỡ     | O           | Latin capital letter O with horn and tilde            |
+ * | U+1EE1   | ỡ     | o           | Latin small letter o with horn and tilde              |
+ * | U+1EE2   | Ợ     | O           | Latin capital letter O with horn and dot below        |
+ * | U+1EE3   | ợ     | o           | Latin small letter o with horn and dot below          |
+ * | U+1EE4   | Ụ     | U           | Latin capital letter U with dot below                 |
+ * | U+1EE5   | ụ     | u           | Latin small letter u with dot below                   |
+ * | U+1EE6   | Ủ     | U           | Latin capital letter U with hook above                |
+ * | U+1EE7   | ủ     | u           | Latin small letter u with hook above                  |
+ * | U+1EE8   | Ứ     | U           | Latin capital letter U with horn and acute            |
+ * | U+1EE9   | ứ     | u           | Latin small letter u with horn and acute              |
+ * | U+1EEA   | Ừ     | U           | Latin capital letter U with horn and grave            |
+ * | U+1EEB   | ừ     | u           | Latin small letter u with horn and grave              |
+ * | U+1EEC   | Ử     | U           | Latin capital letter U with horn and hook above       |
+ * | U+1EED   | ử     | u           | Latin small letter u with horn and hook above         |
+ * | U+1EEE   | Ữ     | U           | Latin capital letter U with horn and tilde            |
+ * | U+1EEF   | ữ     | u           | Latin small letter u with horn and tilde              |
+ * | U+1EF0   | Ự     | U           | Latin capital letter U with horn and dot below        |
+ * | U+1EF1   | ự     | u           | Latin small letter u with horn and dot below          |
+ * | U+1EF2   | Ỳ     | Y           | Latin capital letter Y with grave                     |
+ * | U+1EF3   | ỳ     | y           | Latin small letter y with grave                       |
+ * | U+1EF4   | Ỵ     | Y           | Latin capital letter Y with dot below                 |
+ * | U+1EF5   | ỵ     | y           | Latin small letter y with dot below                   |
+ * | U+1EF6   | Ỷ     | Y           | Latin capital letter Y with hook above                |
+ * | U+1EF7   | ỷ     | y           | Latin small letter y with hook above                  |
+ * | U+1EF8   | Ỹ     | Y           | Latin capital letter Y with tilde                     |
+ * | U+1EF9   | ỹ     | y           | Latin small letter y with tilde                       |
+ *
+ * German (`de_DE`), German formal (`de_DE_formal`), German (Switzerland) formal (`de_CH`),
+ * and German (Switzerland) informal (`de_CH_informal`) locales:
+ *
+ * |   Code   | Glyph | Replacement |               Description               |
+ * | -------- | ----- | ----------- | --------------------------------------- |
+ * | U+00C4   | Ä     | Ae          | Latin capital letter A with diaeresis   |
+ * | U+00E4   | ä     | ae          | Latin small letter a with diaeresis     |
+ * | U+00D6   | Ö     | Oe          | Latin capital letter O with diaeresis   |
+ * | U+00F6   | ö     | oe          | Latin small letter o with diaeresis     |
+ * | U+00DC   | Ü     | Ue          | Latin capital letter U with diaeresis   |
+ * | U+00FC   | ü     | ue          | Latin small letter u with diaeresis     |
+ * | U+00DF   | ß     | ss          | Latin small letter sharp s              |
+ *
+ * Danish (`da_DK`) locale:
+ *
+ * |   Code   | Glyph | Replacement |               Description               |
+ * | -------- | ----- | ----------- | --------------------------------------- |
+ * | U+00C6   | Æ     | Ae          | Latin capital letter AE                 |
+ * | U+00E6   | æ     | ae          | Latin small letter ae                   |
+ * | U+00D8   | Ø     | Oe          | Latin capital letter O with stroke      |
+ * | U+00F8   | ø     | oe          | Latin small letter o with stroke        |
+ * | U+00C5   | Å     | Aa          | Latin capital letter A with ring above  |
+ * | U+00E5   | å     | aa          | Latin small letter a with ring above    |
+ *
+ * Catalan (`ca`) locale:
+ *
+ * |   Code   | Glyph | Replacement |               Description               |
+ * | -------- | ----- | ----------- | --------------------------------------- |
+ * | U+00B7   | l·l   | ll          | Flown dot (between two Ls)              |
+ *
+ * Serbian (`sr_RS`) and Bosnian (`bs_BA`) locales:
+ *
+ * |   Code   | Glyph | Replacement |               Description               |
+ * | -------- | ----- | ----------- | --------------------------------------- |
+ * | U+0110   | Đ     | DJ          | Latin capital letter D with stroke      |
+ * | U+0111   | đ     | dj
