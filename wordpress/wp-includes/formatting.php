@@ -2223,4 +2223,356 @@ function force_balance_tags( $text ) {
 		// clear the shifter
 		$tagqueue = '';
 		// Pop or Push
-		if ( isset($regex[1][0]) && '/' == $regex[1][0] ) { // En
+		if ( isset($regex[1][0]) && '/' == $regex[1][0] ) { // End Tag
+			$tag = strtolower(substr($regex[1],1));
+			// if too many closing tags
+			if ( $stacksize <= 0 ) {
+				$tag = '';
+				// or close to be safe $tag = '/' . $tag;
+			}
+			// if stacktop value = tag close value then pop
+			elseif ( $tagstack[$stacksize - 1] == $tag ) { // found closing tag
+				$tag = '</' . $tag . '>'; // Close Tag
+				// Pop
+				array_pop( $tagstack );
+				$stacksize--;
+			} else { // closing tag not at top, search for it
+				for ( $j = $stacksize-1; $j >= 0; $j-- ) {
+					if ( $tagstack[$j] == $tag ) {
+					// add tag to tagqueue
+						for ( $k = $stacksize-1; $k >= $j; $k--) {
+							$tagqueue .= '</' . array_pop( $tagstack ) . '>';
+							$stacksize--;
+						}
+						break;
+					}
+				}
+				$tag = '';
+			}
+		} else { // Begin Tag
+			$tag = strtolower($regex[1]);
+
+			// Tag Cleaning
+
+			// If it's an empty tag "< >", do nothing
+			if ( '' == $tag ) {
+				// do nothing
+			}
+			// ElseIf it presents itself as a self-closing tag...
+			elseif ( substr( $regex[2], -1 ) == '/' ) {
+				// ...but it isn't a known single-entity self-closing tag, then don't let it be treated as such and
+				// immediately close it with a closing tag (the tag will encapsulate no text as a result)
+				if ( ! in_array( $tag, $single_tags ) )
+					$regex[2] = trim( substr( $regex[2], 0, -1 ) ) . "></$tag";
+			}
+			// ElseIf it's a known single-entity tag but it doesn't close itself, do so
+			elseif ( in_array($tag, $single_tags) ) {
+				$regex[2] .= '/';
+			}
+			// Else it's not a single-entity tag
+			else {
+				// If the top of the stack is the same as the tag we want to push, close previous tag
+				if ( $stacksize > 0 && !in_array($tag, $nestable_tags) && $tagstack[$stacksize - 1] == $tag ) {
+					$tagqueue = '</' . array_pop( $tagstack ) . '>';
+					$stacksize--;
+				}
+				$stacksize = array_push( $tagstack, $tag );
+			}
+
+			// Attributes
+			$attributes = $regex[2];
+			if ( ! empty( $attributes ) && $attributes[0] != '>' )
+				$attributes = ' ' . $attributes;
+
+			$tag = '<' . $tag . $attributes . '>';
+			//If already queuing a close tag, then put this tag on, too
+			if ( !empty($tagqueue) ) {
+				$tagqueue .= $tag;
+				$tag = '';
+			}
+		}
+		$newtext .= substr($text, 0, $i) . $tag;
+		$text = substr($text, $i + $l);
+	}
+
+	// Clear Tag Queue
+	$newtext .= $tagqueue;
+
+	// Add Remaining text
+	$newtext .= $text;
+
+	// Empty Stack
+	while( $x = array_pop($tagstack) )
+		$newtext .= '</' . $x . '>'; // Add remaining tags to close
+
+	// WP fix for the bug with HTML comments
+	$newtext = str_replace("< !--","<!--",$newtext);
+	$newtext = str_replace("<    !--","< !--",$newtext);
+
+	return $newtext;
+}
+
+/**
+ * Acts on text which is about to be edited.
+ *
+ * The $content is run through esc_textarea(), which uses htmlspecialchars()
+ * to convert special characters to HTML entities. If `$richedit` is set to true,
+ * it is simply a holder for the {@see 'format_to_edit'} filter.
+ *
+ * @since 0.71
+ * @since 4.4.0 The `$richedit` parameter was renamed to `$rich_text` for clarity.
+ *
+ * @param string $content   The text about to be edited.
+ * @param bool   $rich_text Optional. Whether `$content` should be considered rich text,
+ *                          in which case it would not be passed through esc_textarea().
+ *                          Default false.
+ * @return string The text after the filter (and possibly htmlspecialchars()) has been run.
+ */
+function format_to_edit( $content, $rich_text = false ) {
+	/**
+	 * Filters the text to be formatted for editing.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param string $content The text, prior to formatting for editing.
+	 */
+	$content = apply_filters( 'format_to_edit', $content );
+	if ( ! $rich_text )
+		$content = esc_textarea( $content );
+	return $content;
+}
+
+/**
+ * Add leading zeros when necessary.
+ *
+ * If you set the threshold to '4' and the number is '10', then you will get
+ * back '0010'. If you set the threshold to '4' and the number is '5000', then you
+ * will get back '5000'.
+ *
+ * Uses sprintf to append the amount of zeros based on the $threshold parameter
+ * and the size of the number. If the number is large enough, then no zeros will
+ * be appended.
+ *
+ * @since 0.71
+ *
+ * @param int $number     Number to append zeros to if not greater than threshold.
+ * @param int $threshold  Digit places number needs to be to not have zeros added.
+ * @return string Adds leading zeros to number if needed.
+ */
+function zeroise( $number, $threshold ) {
+	return sprintf( '%0' . $threshold . 's', $number );
+}
+
+/**
+ * Adds backslashes before letters and before a number at the start of a string.
+ *
+ * @since 0.71
+ *
+ * @param string $string Value to which backslashes will be added.
+ * @return string String with backslashes inserted.
+ */
+function backslashit( $string ) {
+	if ( isset( $string[0] ) && $string[0] >= '0' && $string[0] <= '9' )
+		$string = '\\\\' . $string;
+	return addcslashes( $string, 'A..Za..z' );
+}
+
+/**
+ * Appends a trailing slash.
+ *
+ * Will remove trailing forward and backslashes if it exists already before adding
+ * a trailing forward slash. This prevents double slashing a string or path.
+ *
+ * The primary use of this is for paths and thus should be used for paths. It is
+ * not restricted to paths and offers no specific path support.
+ *
+ * @since 1.2.0
+ *
+ * @param string $string What to add the trailing slash to.
+ * @return string String with trailing slash added.
+ */
+function trailingslashit( $string ) {
+	return untrailingslashit( $string ) . '/';
+}
+
+/**
+ * Removes trailing forward slashes and backslashes if they exist.
+ *
+ * The primary use of this is for paths and thus should be used for paths. It is
+ * not restricted to paths and offers no specific path support.
+ *
+ * @since 2.2.0
+ *
+ * @param string $string What to remove the trailing slashes from.
+ * @return string String without the trailing slashes.
+ */
+function untrailingslashit( $string ) {
+	return rtrim( $string, '/\\' );
+}
+
+/**
+ * Adds slashes to escape strings.
+ *
+ * Slashes will first be removed if magic_quotes_gpc is set, see {@link
+ * https://secure.php.net/magic_quotes} for more details.
+ *
+ * @since 0.71
+ *
+ * @param string $gpc The string returned from HTTP request data.
+ * @return string Returns a string escaped with slashes.
+ */
+function addslashes_gpc($gpc) {
+	if ( get_magic_quotes_gpc() )
+		$gpc = stripslashes($gpc);
+
+	return wp_slash($gpc);
+}
+
+/**
+ * Navigates through an array, object, or scalar, and removes slashes from the values.
+ *
+ * @since 2.0.0
+ *
+ * @param mixed $value The value to be stripped.
+ * @return mixed Stripped value.
+ */
+function stripslashes_deep( $value ) {
+	return map_deep( $value, 'stripslashes_from_strings_only' );
+}
+
+/**
+ * Callback function for `stripslashes_deep()` which strips slashes from strings.
+ *
+ * @since 4.4.0
+ *
+ * @param mixed $value The array or string to be stripped.
+ * @return mixed $value The stripped value.
+ */
+function stripslashes_from_strings_only( $value ) {
+	return is_string( $value ) ? stripslashes( $value ) : $value;
+}
+
+/**
+ * Navigates through an array, object, or scalar, and encodes the values to be used in a URL.
+ *
+ * @since 2.2.0
+ *
+ * @param mixed $value The array or string to be encoded.
+ * @return mixed $value The encoded value.
+ */
+function urlencode_deep( $value ) {
+	return map_deep( $value, 'urlencode' );
+}
+
+/**
+ * Navigates through an array, object, or scalar, and raw-encodes the values to be used in a URL.
+ *
+ * @since 3.4.0
+ *
+ * @param mixed $value The array or string to be encoded.
+ * @return mixed $value The encoded value.
+ */
+function rawurlencode_deep( $value ) {
+	return map_deep( $value, 'rawurlencode' );
+}
+
+/**
+ * Navigates through an array, object, or scalar, and decodes URL-encoded values
+ *
+ * @since 4.4.0
+ *
+ * @param mixed $value The array or string to be decoded.
+ * @return mixed $value The decoded value.
+ */
+function urldecode_deep( $value ) {
+	return map_deep( $value, 'urldecode' );
+}
+
+/**
+ * Converts email addresses characters to HTML entities to block spam bots.
+ *
+ * @since 0.71
+ *
+ * @param string $email_address Email address.
+ * @param int    $hex_encoding  Optional. Set to 1 to enable hex encoding.
+ * @return string Converted email address.
+ */
+function antispambot( $email_address, $hex_encoding = 0 ) {
+	$email_no_spam_address = '';
+	for ( $i = 0, $len = strlen( $email_address ); $i < $len; $i++ ) {
+		$j = rand( 0, 1 + $hex_encoding );
+		if ( $j == 0 ) {
+			$email_no_spam_address .= '&#' . ord( $email_address[$i] ) . ';';
+		} elseif ( $j == 1 ) {
+			$email_no_spam_address .= $email_address[$i];
+		} elseif ( $j == 2 ) {
+			$email_no_spam_address .= '%' . zeroise( dechex( ord( $email_address[$i] ) ), 2 );
+		}
+	}
+
+	return str_replace( '@', '&#64;', $email_no_spam_address );
+}
+
+/**
+ * Callback to convert URI match to HTML A element.
+ *
+ * This function was backported from 2.5.0 to 2.3.2. Regex callback for make_clickable().
+ *
+ * @since 2.3.2
+ * @access private
+ *
+ * @param array $matches Single Regex Match.
+ * @return string HTML A element with URI address.
+ */
+function _make_url_clickable_cb( $matches ) {
+	$url = $matches[2];
+
+	if ( ')' == $matches[3] && strpos( $url, '(' ) ) {
+		// If the trailing character is a closing parethesis, and the URL has an opening parenthesis in it, add the closing parenthesis to the URL.
+		// Then we can let the parenthesis balancer do its thing below.
+		$url .= $matches[3];
+		$suffix = '';
+	} else {
+		$suffix = $matches[3];
+	}
+
+	// Include parentheses in the URL only if paired
+	while ( substr_count( $url, '(' ) < substr_count( $url, ')' ) ) {
+		$suffix = strrchr( $url, ')' ) . $suffix;
+		$url = substr( $url, 0, strrpos( $url, ')' ) );
+	}
+
+	$url = esc_url($url);
+	if ( empty($url) )
+		return $matches[0];
+
+	return $matches[1] . "<a href=\"$url\" rel=\"nofollow\">$url</a>" . $suffix;
+}
+
+/**
+ * Callback to convert URL match to HTML A element.
+ *
+ * This function was backported from 2.5.0 to 2.3.2. Regex callback for make_clickable().
+ *
+ * @since 2.3.2
+ * @access private
+ *
+ * @param array $matches Single Regex Match.
+ * @return string HTML A element with URL address.
+ */
+function _make_web_ftp_clickable_cb( $matches ) {
+	$ret = '';
+	$dest = $matches[2];
+	$dest = 'http://' . $dest;
+
+	// removed trailing [.,;:)] from URL
+	if ( in_array( substr($dest, -1), array('.', ',', ';', ':', ')') ) === true ) {
+		$ret = substr($dest, -1);
+		$dest = substr($dest, 0, strlen($dest)-1);
+	}
+
+	$dest = esc_url($dest);
+	if ( empty($dest) )
+		return $matches[0];
+
+	return $matches[1] . "<a href=\"$dest\" rel=\"nofollow\">$dest<
