@@ -1869,4 +1869,358 @@ function sanitize_user( $username, $strict = false ) {
 
 	// If strict, reduce to ASCII for max portability.
 	if ( $strict )
-		$username = preg_replace( '|[^a-z0-9 _.
+		$username = preg_replace( '|[^a-z0-9 _.\-@]|i', '', $username );
+
+	$username = trim( $username );
+	// Consolidate contiguous whitespace
+	$username = preg_replace( '|\s+|', ' ', $username );
+
+	/**
+	 * Filters a sanitized username string.
+	 *
+	 * @since 2.0.1
+	 *
+	 * @param string $username     Sanitized username.
+	 * @param string $raw_username The username prior to sanitization.
+	 * @param bool   $strict       Whether to limit the sanitization to specific characters. Default false.
+	 */
+	return apply_filters( 'sanitize_user', $username, $raw_username, $strict );
+}
+
+/**
+ * Sanitizes a string key.
+ *
+ * Keys are used as internal identifiers. Lowercase alphanumeric characters, dashes and underscores are allowed.
+ *
+ * @since 3.0.0
+ *
+ * @param string $key String key
+ * @return string Sanitized key
+ */
+function sanitize_key( $key ) {
+	$raw_key = $key;
+	$key = strtolower( $key );
+	$key = preg_replace( '/[^a-z0-9_\-]/', '', $key );
+
+	/**
+	 * Filters a sanitized key string.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $key     Sanitized key.
+	 * @param string $raw_key The key prior to sanitization.
+	 */
+	return apply_filters( 'sanitize_key', $key, $raw_key );
+}
+
+/**
+ * Sanitizes a title, or returns a fallback title.
+ *
+ * Specifically, HTML and PHP tags are stripped. Further actions can be added
+ * via the plugin API. If $title is empty and $fallback_title is set, the latter
+ * will be used.
+ *
+ * @since 1.0.0
+ *
+ * @param string $title          The string to be sanitized.
+ * @param string $fallback_title Optional. A title to use if $title is empty.
+ * @param string $context        Optional. The operation for which the string is sanitized
+ * @return string The sanitized string.
+ */
+function sanitize_title( $title, $fallback_title = '', $context = 'save' ) {
+	$raw_title = $title;
+
+	if ( 'save' == $context )
+		$title = remove_accents($title);
+
+	/**
+	 * Filters a sanitized title string.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param string $title     Sanitized title.
+	 * @param string $raw_title The title prior to sanitization.
+	 * @param string $context   The context for which the title is being sanitized.
+	 */
+	$title = apply_filters( 'sanitize_title', $title, $raw_title, $context );
+
+	if ( '' === $title || false === $title )
+		$title = $fallback_title;
+
+	return $title;
+}
+
+/**
+ * Sanitizes a title with the 'query' context.
+ *
+ * Used for querying the database for a value from URL.
+ *
+ * @since 3.1.0
+ *
+ * @param string $title The string to be sanitized.
+ * @return string The sanitized string.
+ */
+function sanitize_title_for_query( $title ) {
+	return sanitize_title( $title, '', 'query' );
+}
+
+/**
+ * Sanitizes a title, replacing whitespace and a few other characters with dashes.
+ *
+ * Limits the output to alphanumeric characters, underscore (_) and dash (-).
+ * Whitespace becomes a dash.
+ *
+ * @since 1.2.0
+ *
+ * @param string $title     The title to be sanitized.
+ * @param string $raw_title Optional. Not used.
+ * @param string $context   Optional. The operation for which the string is sanitized.
+ * @return string The sanitized title.
+ */
+function sanitize_title_with_dashes( $title, $raw_title = '', $context = 'display' ) {
+	$title = strip_tags($title);
+	// Preserve escaped octets.
+	$title = preg_replace('|%([a-fA-F0-9][a-fA-F0-9])|', '---$1---', $title);
+	// Remove percent signs that are not part of an octet.
+	$title = str_replace('%', '', $title);
+	// Restore octets.
+	$title = preg_replace('|---([a-fA-F0-9][a-fA-F0-9])---|', '%$1', $title);
+
+	if (seems_utf8($title)) {
+		if (function_exists('mb_strtolower')) {
+			$title = mb_strtolower($title, 'UTF-8');
+		}
+		$title = utf8_uri_encode($title, 200);
+	}
+
+	$title = strtolower($title);
+
+	if ( 'save' == $context ) {
+		// Convert nbsp, ndash and mdash to hyphens
+		$title = str_replace( array( '%c2%a0', '%e2%80%93', '%e2%80%94' ), '-', $title );
+		// Convert nbsp, ndash and mdash HTML entities to hyphens
+		$title = str_replace( array( '&nbsp;', '&#160;', '&ndash;', '&#8211;', '&mdash;', '&#8212;' ), '-', $title );
+		// Convert forward slash to hyphen
+		$title = str_replace( '/', '-', $title );
+
+		// Strip these characters entirely
+		$title = str_replace( array(
+			// iexcl and iquest
+			'%c2%a1', '%c2%bf',
+			// angle quotes
+			'%c2%ab', '%c2%bb', '%e2%80%b9', '%e2%80%ba',
+			// curly quotes
+			'%e2%80%98', '%e2%80%99', '%e2%80%9c', '%e2%80%9d',
+			'%e2%80%9a', '%e2%80%9b', '%e2%80%9e', '%e2%80%9f',
+			// copy, reg, deg, hellip and trade
+			'%c2%a9', '%c2%ae', '%c2%b0', '%e2%80%a6', '%e2%84%a2',
+			// acute accents
+			'%c2%b4', '%cb%8a', '%cc%81', '%cd%81',
+			// grave accent, macron, caron
+			'%cc%80', '%cc%84', '%cc%8c',
+		), '', $title );
+
+		// Convert times to x
+		$title = str_replace( '%c3%97', 'x', $title );
+	}
+
+	$title = preg_replace('/&.+?;/', '', $title); // kill entities
+	$title = str_replace('.', '-', $title);
+
+	$title = preg_replace('/[^%a-z0-9 _-]/', '', $title);
+	$title = preg_replace('/\s+/', '-', $title);
+	$title = preg_replace('|-+|', '-', $title);
+	$title = trim($title, '-');
+
+	return $title;
+}
+
+/**
+ * Ensures a string is a valid SQL 'order by' clause.
+ *
+ * Accepts one or more columns, with or without a sort order (ASC / DESC).
+ * e.g. 'column_1', 'column_1, column_2', 'column_1 ASC, column_2 DESC' etc.
+ *
+ * Also accepts 'RAND()'.
+ *
+ * @since 2.5.1
+ *
+ * @param string $orderby Order by clause to be validated.
+ * @return string|false Returns $orderby if valid, false otherwise.
+ */
+function sanitize_sql_orderby( $orderby ) {
+	if ( preg_match( '/^\s*(([a-z0-9_]+|`[a-z0-9_]+`)(\s+(ASC|DESC))?\s*(,\s*(?=[a-z0-9_`])|$))+$/i', $orderby ) || preg_match( '/^\s*RAND\(\s*\)\s*$/i', $orderby ) ) {
+		return $orderby;
+	}
+	return false;
+}
+
+/**
+ * Sanitizes an HTML classname to ensure it only contains valid characters.
+ *
+ * Strips the string down to A-Z,a-z,0-9,_,-. If this results in an empty
+ * string then it will return the alternative value supplied.
+ *
+ * @todo Expand to support the full range of CDATA that a class attribute can contain.
+ *
+ * @since 2.8.0
+ *
+ * @param string $class    The classname to be sanitized
+ * @param string $fallback Optional. The value to return if the sanitization ends up as an empty string.
+ * 	Defaults to an empty string.
+ * @return string The sanitized value
+ */
+function sanitize_html_class( $class, $fallback = '' ) {
+	//Strip out any % encoded octets
+	$sanitized = preg_replace( '|%[a-fA-F0-9][a-fA-F0-9]|', '', $class );
+
+	//Limit to A-Z,a-z,0-9,_,-
+	$sanitized = preg_replace( '/[^A-Za-z0-9_-]/', '', $sanitized );
+
+	if ( '' == $sanitized && $fallback ) {
+		return sanitize_html_class( $fallback );
+	}
+	/**
+	 * Filters a sanitized HTML class string.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $sanitized The sanitized HTML class.
+	 * @param string $class     HTML class before sanitization.
+	 * @param string $fallback  The fallback string.
+	 */
+	return apply_filters( 'sanitize_html_class', $sanitized, $class, $fallback );
+}
+
+/**
+ * Converts lone & characters into `&#038;` (a.k.a. `&amp;`)
+ *
+ * @since 0.71
+ *
+ * @param string $content    String of characters to be converted.
+ * @param string $deprecated Not used.
+ * @return string Converted string.
+ */
+function convert_chars( $content, $deprecated = '' ) {
+	if ( ! empty( $deprecated ) ) {
+		_deprecated_argument( __FUNCTION__, '0.71' );
+	}
+
+	if ( strpos( $content, '&' ) !== false ) {
+		$content = preg_replace( '/&([^#])(?![a-z1-4]{1,8};)/i', '&#038;$1', $content );
+	}
+
+	return $content;
+}
+
+/**
+ * Converts invalid Unicode references range to valid range.
+ *
+ * @since 4.3.0
+ *
+ * @param string $content String with entities that need converting.
+ * @return string Converted string.
+ */
+function convert_invalid_entities( $content ) {
+	$wp_htmltranswinuni = array(
+		'&#128;' => '&#8364;', // the Euro sign
+		'&#129;' => '',
+		'&#130;' => '&#8218;', // these are Windows CP1252 specific characters
+		'&#131;' => '&#402;',  // they would look weird on non-Windows browsers
+		'&#132;' => '&#8222;',
+		'&#133;' => '&#8230;',
+		'&#134;' => '&#8224;',
+		'&#135;' => '&#8225;',
+		'&#136;' => '&#710;',
+		'&#137;' => '&#8240;',
+		'&#138;' => '&#352;',
+		'&#139;' => '&#8249;',
+		'&#140;' => '&#338;',
+		'&#141;' => '',
+		'&#142;' => '&#381;',
+		'&#143;' => '',
+		'&#144;' => '',
+		'&#145;' => '&#8216;',
+		'&#146;' => '&#8217;',
+		'&#147;' => '&#8220;',
+		'&#148;' => '&#8221;',
+		'&#149;' => '&#8226;',
+		'&#150;' => '&#8211;',
+		'&#151;' => '&#8212;',
+		'&#152;' => '&#732;',
+		'&#153;' => '&#8482;',
+		'&#154;' => '&#353;',
+		'&#155;' => '&#8250;',
+		'&#156;' => '&#339;',
+		'&#157;' => '',
+		'&#158;' => '&#382;',
+		'&#159;' => '&#376;'
+	);
+
+	if ( strpos( $content, '&#1' ) !== false ) {
+		$content = strtr( $content, $wp_htmltranswinuni );
+	}
+
+	return $content;
+}
+
+/**
+ * Balances tags if forced to, or if the 'use_balanceTags' option is set to true.
+ *
+ * @since 0.71
+ *
+ * @param string $text  Text to be balanced
+ * @param bool   $force If true, forces balancing, ignoring the value of the option. Default false.
+ * @return string Balanced text
+ */
+function balanceTags( $text, $force = false ) {
+	if ( $force || get_option('use_balanceTags') == 1 ) {
+		return force_balance_tags( $text );
+	} else {
+		return $text;
+	}
+}
+
+/**
+ * Balances tags of string using a modified stack.
+ *
+ * @since 2.0.4
+ *
+ * @author Leonard Lin <leonard@acm.org>
+ * @license GPL
+ * @copyright November 4, 2001
+ * @version 1.1
+ * @todo Make better - change loop condition to $text in 1.2
+ * @internal Modified by Scott Reilly (coffee2code) 02 Aug 2004
+ *		1.1  Fixed handling of append/stack pop order of end text
+ *			 Added Cleaning Hooks
+ *		1.0  First Version
+ *
+ * @param string $text Text to be balanced.
+ * @return string Balanced text.
+ */
+function force_balance_tags( $text ) {
+	$tagstack = array();
+	$stacksize = 0;
+	$tagqueue = '';
+	$newtext = '';
+	// Known single-entity/self-closing tags
+	$single_tags = array( 'area', 'base', 'basefont', 'br', 'col', 'command', 'embed', 'frame', 'hr', 'img', 'input', 'isindex', 'link', 'meta', 'param', 'source' );
+	// Tags that can be immediately nested within themselves
+	$nestable_tags = array( 'blockquote', 'div', 'object', 'q', 'span' );
+
+	// WP bug fix for comments - in case you REALLY meant to type '< !--'
+	$text = str_replace('< !--', '<    !--', $text);
+	// WP bug fix for LOVE <3 (and other situations with '<' before a number)
+	$text = preg_replace('#<([0-9]{1})#', '&lt;$1', $text);
+
+	while ( preg_match("/<(\/?[\w:]*)\s*([^>]*)>/", $text, $regex) ) {
+		$newtext .= $tagqueue;
+
+		$i = strpos($text, $regex[0]);
+		$l = strlen($regex[0]);
+
+		// clear the shifter
+		$tagqueue = '';
+		// Pop or Push
+		if ( isset($regex[1][0]) && '/' == $regex[1][0] ) { // En
