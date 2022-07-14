@@ -1515,4 +1515,358 @@ function utf8_uri_encode( $utf8_string, $length = 0 ) {
  * |   Code   | Glyph | Replacement |               Description               |
  * | -------- | ----- | ----------- | --------------------------------------- |
  * | U+0110   | Đ     | DJ          | Latin capital letter D with stroke      |
- * | U+0111   | đ     | dj
+ * | U+0111   | đ     | dj          | Latin small letter d with stroke        |
+ *
+ * @since 1.2.1
+ * @since 4.6.0 Added locale support for `de_CH`, `de_CH_informal`, and `ca`.
+ * @since 4.7.0 Added locale support for `sr_RS`.
+ * @since 4.8.0 Added locale support for `bs_BA`.
+ *
+ * @param string $string Text that might have accent characters
+ * @return string Filtered string with replaced "nice" characters.
+ */
+function remove_accents( $string ) {
+	if ( !preg_match('/[\x80-\xff]/', $string) )
+		return $string;
+
+	if (seems_utf8($string)) {
+		$chars = array(
+		// Decompositions for Latin-1 Supplement
+		'ª' => 'a', 'º' => 'o',
+		'À' => 'A', 'Á' => 'A',
+		'Â' => 'A', 'Ã' => 'A',
+		'Ä' => 'A', 'Å' => 'A',
+		'Æ' => 'AE','Ç' => 'C',
+		'È' => 'E', 'É' => 'E',
+		'Ê' => 'E', 'Ë' => 'E',
+		'Ì' => 'I', 'Í' => 'I',
+		'Î' => 'I', 'Ï' => 'I',
+		'Ð' => 'D', 'Ñ' => 'N',
+		'Ò' => 'O', 'Ó' => 'O',
+		'Ô' => 'O', 'Õ' => 'O',
+		'Ö' => 'O', 'Ù' => 'U',
+		'Ú' => 'U', 'Û' => 'U',
+		'Ü' => 'U', 'Ý' => 'Y',
+		'Þ' => 'TH','ß' => 's',
+		'à' => 'a', 'á' => 'a',
+		'â' => 'a', 'ã' => 'a',
+		'ä' => 'a', 'å' => 'a',
+		'æ' => 'ae','ç' => 'c',
+		'è' => 'e', 'é' => 'e',
+		'ê' => 'e', 'ë' => 'e',
+		'ì' => 'i', 'í' => 'i',
+		'î' => 'i', 'ï' => 'i',
+		'ð' => 'd', 'ñ' => 'n',
+		'ò' => 'o', 'ó' => 'o',
+		'ô' => 'o', 'õ' => 'o',
+		'ö' => 'o', 'ø' => 'o',
+		'ù' => 'u', 'ú' => 'u',
+		'û' => 'u', 'ü' => 'u',
+		'ý' => 'y', 'þ' => 'th',
+		'ÿ' => 'y', 'Ø' => 'O',
+		// Decompositions for Latin Extended-A
+		'Ā' => 'A', 'ā' => 'a',
+		'Ă' => 'A', 'ă' => 'a',
+		'Ą' => 'A', 'ą' => 'a',
+		'Ć' => 'C', 'ć' => 'c',
+		'Ĉ' => 'C', 'ĉ' => 'c',
+		'Ċ' => 'C', 'ċ' => 'c',
+		'Č' => 'C', 'č' => 'c',
+		'Ď' => 'D', 'ď' => 'd',
+		'Đ' => 'D', 'đ' => 'd',
+		'Ē' => 'E', 'ē' => 'e',
+		'Ĕ' => 'E', 'ĕ' => 'e',
+		'Ė' => 'E', 'ė' => 'e',
+		'Ę' => 'E', 'ę' => 'e',
+		'Ě' => 'E', 'ě' => 'e',
+		'Ĝ' => 'G', 'ĝ' => 'g',
+		'Ğ' => 'G', 'ğ' => 'g',
+		'Ġ' => 'G', 'ġ' => 'g',
+		'Ģ' => 'G', 'ģ' => 'g',
+		'Ĥ' => 'H', 'ĥ' => 'h',
+		'Ħ' => 'H', 'ħ' => 'h',
+		'Ĩ' => 'I', 'ĩ' => 'i',
+		'Ī' => 'I', 'ī' => 'i',
+		'Ĭ' => 'I', 'ĭ' => 'i',
+		'Į' => 'I', 'į' => 'i',
+		'İ' => 'I', 'ı' => 'i',
+		'Ĳ' => 'IJ','ĳ' => 'ij',
+		'Ĵ' => 'J', 'ĵ' => 'j',
+		'Ķ' => 'K', 'ķ' => 'k',
+		'ĸ' => 'k', 'Ĺ' => 'L',
+		'ĺ' => 'l', 'Ļ' => 'L',
+		'ļ' => 'l', 'Ľ' => 'L',
+		'ľ' => 'l', 'Ŀ' => 'L',
+		'ŀ' => 'l', 'Ł' => 'L',
+		'ł' => 'l', 'Ń' => 'N',
+		'ń' => 'n', 'Ņ' => 'N',
+		'ņ' => 'n', 'Ň' => 'N',
+		'ň' => 'n', 'ŉ' => 'n',
+		'Ŋ' => 'N', 'ŋ' => 'n',
+		'Ō' => 'O', 'ō' => 'o',
+		'Ŏ' => 'O', 'ŏ' => 'o',
+		'Ő' => 'O', 'ő' => 'o',
+		'Œ' => 'OE','œ' => 'oe',
+		'Ŕ' => 'R','ŕ' => 'r',
+		'Ŗ' => 'R','ŗ' => 'r',
+		'Ř' => 'R','ř' => 'r',
+		'Ś' => 'S','ś' => 's',
+		'Ŝ' => 'S','ŝ' => 's',
+		'Ş' => 'S','ş' => 's',
+		'Š' => 'S', 'š' => 's',
+		'Ţ' => 'T', 'ţ' => 't',
+		'Ť' => 'T', 'ť' => 't',
+		'Ŧ' => 'T', 'ŧ' => 't',
+		'Ũ' => 'U', 'ũ' => 'u',
+		'Ū' => 'U', 'ū' => 'u',
+		'Ŭ' => 'U', 'ŭ' => 'u',
+		'Ů' => 'U', 'ů' => 'u',
+		'Ű' => 'U', 'ű' => 'u',
+		'Ų' => 'U', 'ų' => 'u',
+		'Ŵ' => 'W', 'ŵ' => 'w',
+		'Ŷ' => 'Y', 'ŷ' => 'y',
+		'Ÿ' => 'Y', 'Ź' => 'Z',
+		'ź' => 'z', 'Ż' => 'Z',
+		'ż' => 'z', 'Ž' => 'Z',
+		'ž' => 'z', 'ſ' => 's',
+		// Decompositions for Latin Extended-B
+		'Ș' => 'S', 'ș' => 's',
+		'Ț' => 'T', 'ț' => 't',
+		// Euro Sign
+		'€' => 'E',
+		// GBP (Pound) Sign
+		'£' => '',
+		// Vowels with diacritic (Vietnamese)
+		// unmarked
+		'Ơ' => 'O', 'ơ' => 'o',
+		'Ư' => 'U', 'ư' => 'u',
+		// grave accent
+		'Ầ' => 'A', 'ầ' => 'a',
+		'Ằ' => 'A', 'ằ' => 'a',
+		'Ề' => 'E', 'ề' => 'e',
+		'Ồ' => 'O', 'ồ' => 'o',
+		'Ờ' => 'O', 'ờ' => 'o',
+		'Ừ' => 'U', 'ừ' => 'u',
+		'Ỳ' => 'Y', 'ỳ' => 'y',
+		// hook
+		'Ả' => 'A', 'ả' => 'a',
+		'Ẩ' => 'A', 'ẩ' => 'a',
+		'Ẳ' => 'A', 'ẳ' => 'a',
+		'Ẻ' => 'E', 'ẻ' => 'e',
+		'Ể' => 'E', 'ể' => 'e',
+		'Ỉ' => 'I', 'ỉ' => 'i',
+		'Ỏ' => 'O', 'ỏ' => 'o',
+		'Ổ' => 'O', 'ổ' => 'o',
+		'Ở' => 'O', 'ở' => 'o',
+		'Ủ' => 'U', 'ủ' => 'u',
+		'Ử' => 'U', 'ử' => 'u',
+		'Ỷ' => 'Y', 'ỷ' => 'y',
+		// tilde
+		'Ẫ' => 'A', 'ẫ' => 'a',
+		'Ẵ' => 'A', 'ẵ' => 'a',
+		'Ẽ' => 'E', 'ẽ' => 'e',
+		'Ễ' => 'E', 'ễ' => 'e',
+		'Ỗ' => 'O', 'ỗ' => 'o',
+		'Ỡ' => 'O', 'ỡ' => 'o',
+		'Ữ' => 'U', 'ữ' => 'u',
+		'Ỹ' => 'Y', 'ỹ' => 'y',
+		// acute accent
+		'Ấ' => 'A', 'ấ' => 'a',
+		'Ắ' => 'A', 'ắ' => 'a',
+		'Ế' => 'E', 'ế' => 'e',
+		'Ố' => 'O', 'ố' => 'o',
+		'Ớ' => 'O', 'ớ' => 'o',
+		'Ứ' => 'U', 'ứ' => 'u',
+		// dot below
+		'Ạ' => 'A', 'ạ' => 'a',
+		'Ậ' => 'A', 'ậ' => 'a',
+		'Ặ' => 'A', 'ặ' => 'a',
+		'Ẹ' => 'E', 'ẹ' => 'e',
+		'Ệ' => 'E', 'ệ' => 'e',
+		'Ị' => 'I', 'ị' => 'i',
+		'Ọ' => 'O', 'ọ' => 'o',
+		'Ộ' => 'O', 'ộ' => 'o',
+		'Ợ' => 'O', 'ợ' => 'o',
+		'Ụ' => 'U', 'ụ' => 'u',
+		'Ự' => 'U', 'ự' => 'u',
+		'Ỵ' => 'Y', 'ỵ' => 'y',
+		// Vowels with diacritic (Chinese, Hanyu Pinyin)
+		'ɑ' => 'a',
+		// macron
+		'Ǖ' => 'U', 'ǖ' => 'u',
+		// acute accent
+		'Ǘ' => 'U', 'ǘ' => 'u',
+		// caron
+		'Ǎ' => 'A', 'ǎ' => 'a',
+		'Ǐ' => 'I', 'ǐ' => 'i',
+		'Ǒ' => 'O', 'ǒ' => 'o',
+		'Ǔ' => 'U', 'ǔ' => 'u',
+		'Ǚ' => 'U', 'ǚ' => 'u',
+		// grave accent
+		'Ǜ' => 'U', 'ǜ' => 'u',
+		);
+
+		// Used for locale-specific rules
+		$locale = get_locale();
+
+		if ( 'de_DE' == $locale || 'de_DE_formal' == $locale || 'de_CH' == $locale || 'de_CH_informal' == $locale ) {
+			$chars[ 'Ä' ] = 'Ae';
+			$chars[ 'ä' ] = 'ae';
+			$chars[ 'Ö' ] = 'Oe';
+			$chars[ 'ö' ] = 'oe';
+			$chars[ 'Ü' ] = 'Ue';
+			$chars[ 'ü' ] = 'ue';
+			$chars[ 'ß' ] = 'ss';
+		} elseif ( 'da_DK' === $locale ) {
+			$chars[ 'Æ' ] = 'Ae';
+ 			$chars[ 'æ' ] = 'ae';
+			$chars[ 'Ø' ] = 'Oe';
+			$chars[ 'ø' ] = 'oe';
+			$chars[ 'Å' ] = 'Aa';
+			$chars[ 'å' ] = 'aa';
+		} elseif ( 'ca' === $locale ) {
+			$chars[ 'l·l' ] = 'll';
+		} elseif ( 'sr_RS' === $locale || 'bs_BA' === $locale ) {
+			$chars[ 'Đ' ] = 'DJ';
+			$chars[ 'đ' ] = 'dj';
+		}
+
+		$string = strtr($string, $chars);
+	} else {
+		$chars = array();
+		// Assume ISO-8859-1 if not UTF-8
+		$chars['in'] = "\x80\x83\x8a\x8e\x9a\x9e"
+			."\x9f\xa2\xa5\xb5\xc0\xc1\xc2"
+			."\xc3\xc4\xc5\xc7\xc8\xc9\xca"
+			."\xcb\xcc\xcd\xce\xcf\xd1\xd2"
+			."\xd3\xd4\xd5\xd6\xd8\xd9\xda"
+			."\xdb\xdc\xdd\xe0\xe1\xe2\xe3"
+			."\xe4\xe5\xe7\xe8\xe9\xea\xeb"
+			."\xec\xed\xee\xef\xf1\xf2\xf3"
+			."\xf4\xf5\xf6\xf8\xf9\xfa\xfb"
+			."\xfc\xfd\xff";
+
+		$chars['out'] = "EfSZszYcYuAAAAAACEEEEIIIINOOOOOOUUUUYaaaaaaceeeeiiiinoooooouuuuyy";
+
+		$string = strtr($string, $chars['in'], $chars['out']);
+		$double_chars = array();
+		$double_chars['in'] = array("\x8c", "\x9c", "\xc6", "\xd0", "\xde", "\xdf", "\xe6", "\xf0", "\xfe");
+		$double_chars['out'] = array('OE', 'oe', 'AE', 'DH', 'TH', 'ss', 'ae', 'dh', 'th');
+		$string = str_replace($double_chars['in'], $double_chars['out'], $string);
+	}
+
+	return $string;
+}
+
+/**
+ * Sanitizes a filename, replacing whitespace with dashes.
+ *
+ * Removes special characters that are illegal in filenames on certain
+ * operating systems and special characters requiring special escaping
+ * to manipulate at the command line. Replaces spaces and consecutive
+ * dashes with a single dash. Trims period, dash and underscore from beginning
+ * and end of filename. It is not guaranteed that this function will return a
+ * filename that is allowed to be uploaded.
+ *
+ * @since 2.1.0
+ *
+ * @param string $filename The filename to be sanitized
+ * @return string The sanitized filename
+ */
+function sanitize_file_name( $filename ) {
+	$filename_raw = $filename;
+	$special_chars = array("?", "[", "]", "/", "\\", "=", "<", ">", ":", ";", ",", "'", "\"", "&", "$", "#", "*", "(", ")", "|", "~", "`", "!", "{", "}", "%", "+", chr(0));
+	/**
+	 * Filters the list of characters to remove from a filename.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param array  $special_chars Characters to remove.
+	 * @param string $filename_raw  Filename as it was passed into sanitize_file_name().
+	 */
+	$special_chars = apply_filters( 'sanitize_file_name_chars', $special_chars, $filename_raw );
+	$filename = preg_replace( "#\x{00a0}#siu", ' ', $filename );
+	$filename = str_replace( $special_chars, '', $filename );
+	$filename = str_replace( array( '%20', '+' ), '-', $filename );
+	$filename = preg_replace( '/[\r\n\t -]+/', '-', $filename );
+	$filename = trim( $filename, '.-_' );
+
+	if ( false === strpos( $filename, '.' ) ) {
+		$mime_types = wp_get_mime_types();
+		$filetype = wp_check_filetype( 'test.' . $filename, $mime_types );
+		if ( $filetype['ext'] === $filename ) {
+			$filename = 'unnamed-file.' . $filetype['ext'];
+		}
+	}
+
+	// Split the filename into a base and extension[s]
+	$parts = explode('.', $filename);
+
+	// Return if only one extension
+	if ( count( $parts ) <= 2 ) {
+		/**
+		 * Filters a sanitized filename string.
+		 *
+		 * @since 2.8.0
+		 *
+		 * @param string $filename     Sanitized filename.
+		 * @param string $filename_raw The filename prior to sanitization.
+		 */
+		return apply_filters( 'sanitize_file_name', $filename, $filename_raw );
+	}
+
+	// Process multiple extensions
+	$filename = array_shift($parts);
+	$extension = array_pop($parts);
+	$mimes = get_allowed_mime_types();
+
+	/*
+	 * Loop over any intermediate extensions. Postfix them with a trailing underscore
+	 * if they are a 2 - 5 character long alpha string not in the extension whitelist.
+	 */
+	foreach ( (array) $parts as $part) {
+		$filename .= '.' . $part;
+
+		if ( preg_match("/^[a-zA-Z]{2,5}\d?$/", $part) ) {
+			$allowed = false;
+			foreach ( $mimes as $ext_preg => $mime_match ) {
+				$ext_preg = '!^(' . $ext_preg . ')$!i';
+				if ( preg_match( $ext_preg, $part ) ) {
+					$allowed = true;
+					break;
+				}
+			}
+			if ( !$allowed )
+				$filename .= '_';
+		}
+	}
+	$filename .= '.' . $extension;
+	/** This filter is documented in wp-includes/formatting.php */
+	return apply_filters('sanitize_file_name', $filename, $filename_raw);
+}
+
+/**
+ * Sanitizes a username, stripping out unsafe characters.
+ *
+ * Removes tags, octets, entities, and if strict is enabled, will only keep
+ * alphanumeric, _, space, ., -, @. After sanitizing, it passes the username,
+ * raw username (the username in the parameter), and the value of $strict as
+ * parameters for the {@see 'sanitize_user'} filter.
+ *
+ * @since 2.0.0
+ *
+ * @param string $username The username to be sanitized.
+ * @param bool   $strict   If set limits $username to specific characters. Default false.
+ * @return string The sanitized username, after passing through filters.
+ */
+function sanitize_user( $username, $strict = false ) {
+	$raw_username = $username;
+	$username = wp_strip_all_tags( $username );
+	$username = remove_accents( $username );
+	// Kill octets
+	$username = preg_replace( '|%([a-fA-F0-9][a-fA-F0-9])|', '', $username );
+	$username = preg_replace( '/&.+?;/', '', $username ); // Kill entities
+
+	// If strict, reduce to ASCII for max portability.
+	if ( $strict )
+		$username = preg_replace( '|[^a-z0-9 _.
