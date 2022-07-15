@@ -2881,4 +2881,303 @@ function convert_smilies( $text ) {
  *
  * @param string $email      Email address to verify.
  * @param bool   $deprecated Deprecated.
- * @return string|bool Either fa
+ * @return string|bool Either false or the valid email address.
+ */
+function is_email( $email, $deprecated = false ) {
+	if ( ! empty( $deprecated ) )
+		_deprecated_argument( __FUNCTION__, '3.0.0' );
+
+	// Test for the minimum length the email can be
+	if ( strlen( $email ) < 6 ) {
+		/**
+		 * Filters whether an email address is valid.
+		 *
+		 * This filter is evaluated under several different contexts, such as 'email_too_short',
+		 * 'email_no_at', 'local_invalid_chars', 'domain_period_sequence', 'domain_period_limits',
+		 * 'domain_no_periods', 'sub_hyphen_limits', 'sub_invalid_chars', or no specific context.
+		 *
+		 * @since 2.8.0
+		 *
+		 * @param bool   $is_email Whether the email address has passed the is_email() checks. Default false.
+		 * @param string $email    The email address being checked.
+		 * @param string $context  Context under which the email was tested.
+		 */
+		return apply_filters( 'is_email', false, $email, 'email_too_short' );
+	}
+
+	// Test for an @ character after the first position
+	if ( strpos( $email, '@', 1 ) === false ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'is_email', false, $email, 'email_no_at' );
+	}
+
+	// Split out the local and domain parts
+	list( $local, $domain ) = explode( '@', $email, 2 );
+
+	// LOCAL PART
+	// Test for invalid characters
+	if ( !preg_match( '/^[a-zA-Z0-9!#$%&\'*+\/=?^_`{|}~\.-]+$/', $local ) ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'is_email', false, $email, 'local_invalid_chars' );
+	}
+
+	// DOMAIN PART
+	// Test for sequences of periods
+	if ( preg_match( '/\.{2,}/', $domain ) ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'is_email', false, $email, 'domain_period_sequence' );
+	}
+
+	// Test for leading and trailing periods and whitespace
+	if ( trim( $domain, " \t\n\r\0\x0B." ) !== $domain ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'is_email', false, $email, 'domain_period_limits' );
+	}
+
+	// Split the domain into subs
+	$subs = explode( '.', $domain );
+
+	// Assume the domain will have at least two subs
+	if ( 2 > count( $subs ) ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'is_email', false, $email, 'domain_no_periods' );
+	}
+
+	// Loop through each sub
+	foreach ( $subs as $sub ) {
+		// Test for leading and trailing hyphens and whitespace
+		if ( trim( $sub, " \t\n\r\0\x0B-" ) !== $sub ) {
+			/** This filter is documented in wp-includes/formatting.php */
+			return apply_filters( 'is_email', false, $email, 'sub_hyphen_limits' );
+		}
+
+		// Test for invalid characters
+		if ( !preg_match('/^[a-z0-9-]+$/i', $sub ) ) {
+			/** This filter is documented in wp-includes/formatting.php */
+			return apply_filters( 'is_email', false, $email, 'sub_invalid_chars' );
+		}
+	}
+
+	// Congratulations your email made it!
+	/** This filter is documented in wp-includes/formatting.php */
+	return apply_filters( 'is_email', $email, $email, null );
+}
+
+/**
+ * Convert to ASCII from email subjects.
+ *
+ * @since 1.2.0
+ *
+ * @param string $string Subject line
+ * @return string Converted string to ASCII
+ */
+function wp_iso_descrambler( $string ) {
+	/* this may only work with iso-8859-1, I'm afraid */
+	if (!preg_match('#\=\?(.+)\?Q\?(.+)\?\=#i', $string, $matches)) {
+		return $string;
+	} else {
+		$subject = str_replace('_', ' ', $matches[2]);
+		return preg_replace_callback( '#\=([0-9a-f]{2})#i', '_wp_iso_convert', $subject );
+	}
+}
+
+/**
+ * Helper function to convert hex encoded chars to ASCII
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param array $match The preg_replace_callback matches array
+ * @return string Converted chars
+ */
+function _wp_iso_convert( $match ) {
+	return chr( hexdec( strtolower( $match[1] ) ) );
+}
+
+/**
+ * Returns a date in the GMT equivalent.
+ *
+ * Requires and returns a date in the Y-m-d H:i:s format. If there is a
+ * timezone_string available, the date is assumed to be in that timezone,
+ * otherwise it simply subtracts the value of the 'gmt_offset' option. Return
+ * format can be overridden using the $format parameter.
+ *
+ * @since 1.2.0
+ *
+ * @param string $string The date to be converted.
+ * @param string $format The format string for the returned date (default is Y-m-d H:i:s)
+ * @return string GMT version of the date provided.
+ */
+function get_gmt_from_date( $string, $format = 'Y-m-d H:i:s' ) {
+	$tz = get_option( 'timezone_string' );
+	if ( $tz ) {
+		$datetime = date_create( $string, new DateTimeZone( $tz ) );
+		if ( ! $datetime ) {
+			return gmdate( $format, 0 );
+		}
+		$datetime->setTimezone( new DateTimeZone( 'UTC' ) );
+		$string_gmt = $datetime->format( $format );
+	} else {
+		if ( ! preg_match( '#([0-9]{1,4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})#', $string, $matches ) ) {
+			$datetime = strtotime( $string );
+			if ( false === $datetime ) {
+				return gmdate( $format, 0 );
+			}
+			return gmdate( $format, $datetime );
+		}
+		$string_time = gmmktime( $matches[4], $matches[5], $matches[6], $matches[2], $matches[3], $matches[1] );
+		$string_gmt = gmdate( $format, $string_time - get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+	}
+	return $string_gmt;
+}
+
+/**
+ * Converts a GMT date into the correct format for the blog.
+ *
+ * Requires and returns a date in the Y-m-d H:i:s format. If there is a
+ * timezone_string available, the returned date is in that timezone, otherwise
+ * it simply adds the value of gmt_offset. Return format can be overridden
+ * using the $format parameter
+ *
+ * @since 1.2.0
+ *
+ * @param string $string The date to be converted.
+ * @param string $format The format string for the returned date (default is Y-m-d H:i:s)
+ * @return string Formatted date relative to the timezone / GMT offset.
+ */
+function get_date_from_gmt( $string, $format = 'Y-m-d H:i:s' ) {
+	$tz = get_option( 'timezone_string' );
+	if ( $tz ) {
+		$datetime = date_create( $string, new DateTimeZone( 'UTC' ) );
+		if ( ! $datetime )
+			return date( $format, 0 );
+		$datetime->setTimezone( new DateTimeZone( $tz ) );
+		$string_localtime = $datetime->format( $format );
+	} else {
+		if ( ! preg_match('#([0-9]{1,4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})#', $string, $matches) )
+			return date( $format, 0 );
+		$string_time = gmmktime( $matches[4], $matches[5], $matches[6], $matches[2], $matches[3], $matches[1] );
+		$string_localtime = gmdate( $format, $string_time + get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+	}
+	return $string_localtime;
+}
+
+/**
+ * Computes an offset in seconds from an iso8601 timezone.
+ *
+ * @since 1.5.0
+ *
+ * @param string $timezone Either 'Z' for 0 offset or '±hhmm'.
+ * @return int|float The offset in seconds.
+ */
+function iso8601_timezone_to_offset( $timezone ) {
+	// $timezone is either 'Z' or '[+|-]hhmm'
+	if ($timezone == 'Z') {
+		$offset = 0;
+	} else {
+		$sign    = (substr($timezone, 0, 1) == '+') ? 1 : -1;
+		$hours   = intval(substr($timezone, 1, 2));
+		$minutes = intval(substr($timezone, 3, 4)) / 60;
+		$offset  = $sign * HOUR_IN_SECONDS * ($hours + $minutes);
+	}
+	return $offset;
+}
+
+/**
+ * Converts an iso8601 date to MySQL DateTime format used by post_date[_gmt].
+ *
+ * @since 1.5.0
+ *
+ * @param string $date_string Date and time in ISO 8601 format {@link https://en.wikipedia.org/wiki/ISO_8601}.
+ * @param string $timezone    Optional. If set to GMT returns the time minus gmt_offset. Default is 'user'.
+ * @return string The date and time in MySQL DateTime format - Y-m-d H:i:s.
+ */
+function iso8601_to_datetime( $date_string, $timezone = 'user' ) {
+	$timezone = strtolower($timezone);
+
+	if ($timezone == 'gmt') {
+
+		preg_match('#([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(Z|[\+|\-][0-9]{2,4}){0,1}#', $date_string, $date_bits);
+
+		if (!empty($date_bits[7])) { // we have a timezone, so let's compute an offset
+			$offset = iso8601_timezone_to_offset($date_bits[7]);
+		} else { // we don't have a timezone, so we assume user local timezone (not server's!)
+			$offset = HOUR_IN_SECONDS * get_option('gmt_offset');
+		}
+
+		$timestamp = gmmktime($date_bits[4], $date_bits[5], $date_bits[6], $date_bits[2], $date_bits[3], $date_bits[1]);
+		$timestamp -= $offset;
+
+		return gmdate('Y-m-d H:i:s', $timestamp);
+
+	} elseif ($timezone == 'user') {
+		return preg_replace('#([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(Z|[\+|\-][0-9]{2,4}){0,1}#', '$1-$2-$3 $4:$5:$6', $date_string);
+	}
+}
+
+/**
+ * Strips out all characters that are not allowable in an email.
+ *
+ * @since 1.5.0
+ *
+ * @param string $email Email address to filter.
+ * @return string Filtered email address.
+ */
+function sanitize_email( $email ) {
+	// Test for the minimum length the email can be
+	if ( strlen( $email ) < 6 ) {
+		/**
+		 * Filters a sanitized email address.
+		 *
+		 * This filter is evaluated under several contexts, including 'email_too_short',
+		 * 'email_no_at', 'local_invalid_chars', 'domain_period_sequence', 'domain_period_limits',
+		 * 'domain_no_periods', 'domain_no_valid_subs', or no context.
+		 *
+		 * @since 2.8.0
+		 *
+		 * @param string $email   The sanitized email address.
+		 * @param string $email   The email address, as provided to sanitize_email().
+		 * @param string $message A message to pass to the user.
+		 */
+		return apply_filters( 'sanitize_email', '', $email, 'email_too_short' );
+	}
+
+	// Test for an @ character after the first position
+	if ( strpos( $email, '@', 1 ) === false ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'email_no_at' );
+	}
+
+	// Split out the local and domain parts
+	list( $local, $domain ) = explode( '@', $email, 2 );
+
+	// LOCAL PART
+	// Test for invalid characters
+	$local = preg_replace( '/[^a-zA-Z0-9!#$%&\'*+\/=?^_`{|}~\.-]/', '', $local );
+	if ( '' === $local ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'local_invalid_chars' );
+	}
+
+	// DOMAIN PART
+	// Test for sequences of periods
+	$domain = preg_replace( '/\.{2,}/', '', $domain );
+	if ( '' === $domain ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'domain_period_sequence' );
+	}
+
+	// Test for leading and trailing periods and whitespace
+	$domain = trim( $domain, " \t\n\r\0\x0B." );
+	if ( '' === $domain ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'domain_period_limits' );
+	}
+
+	// Split the domain into subs
+	$subs = explode( '.', $domain );
+
+	// Assume the domain will have at least two subs
+	if ( 2 > count( $subs ) ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'domain_no_peri
