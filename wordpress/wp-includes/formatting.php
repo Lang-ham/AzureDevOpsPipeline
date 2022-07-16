@@ -3180,4 +3180,345 @@ function sanitize_email( $email ) {
 	// Assume the domain will have at least two subs
 	if ( 2 > count( $subs ) ) {
 		/** This filter is documented in wp-includes/formatting.php */
-		return apply_filters( 'sanitize_email', '', $email, 'domain_no_peri
+		return apply_filters( 'sanitize_email', '', $email, 'domain_no_periods' );
+	}
+
+	// Create an array that will contain valid subs
+	$new_subs = array();
+
+	// Loop through each sub
+	foreach ( $subs as $sub ) {
+		// Test for leading and trailing hyphens
+		$sub = trim( $sub, " \t\n\r\0\x0B-" );
+
+		// Test for invalid characters
+		$sub = preg_replace( '/[^a-z0-9-]+/i', '', $sub );
+
+		// If there's anything left, add it to the valid subs
+		if ( '' !== $sub ) {
+			$new_subs[] = $sub;
+		}
+	}
+
+	// If there aren't 2 or more valid subs
+	if ( 2 > count( $new_subs ) ) {
+		/** This filter is documented in wp-includes/formatting.php */
+		return apply_filters( 'sanitize_email', '', $email, 'domain_no_valid_subs' );
+	}
+
+	// Join valid subs into the new domain
+	$domain = join( '.', $new_subs );
+
+	// Put the email back together
+	$email = $local . '@' . $domain;
+
+	// Congratulations your email made it!
+	/** This filter is documented in wp-includes/formatting.php */
+	return apply_filters( 'sanitize_email', $email, $email, null );
+}
+
+/**
+ * Determines the difference between two timestamps.
+ *
+ * The difference is returned in a human readable format such as "1 hour",
+ * "5 mins", "2 days".
+ *
+ * @since 1.5.0
+ *
+ * @param int $from Unix timestamp from which the difference begins.
+ * @param int $to   Optional. Unix timestamp to end the time difference. Default becomes time() if not set.
+ * @return string Human readable time difference.
+ */
+function human_time_diff( $from, $to = '' ) {
+	if ( empty( $to ) ) {
+		$to = time();
+	}
+
+	$diff = (int) abs( $to - $from );
+
+	if ( $diff < HOUR_IN_SECONDS ) {
+		$mins = round( $diff / MINUTE_IN_SECONDS );
+		if ( $mins <= 1 )
+			$mins = 1;
+		/* translators: Time difference between two dates, in minutes (min=minute). 1: Number of minutes */
+		$since = sprintf( _n( '%s min', '%s mins', $mins ), $mins );
+	} elseif ( $diff < DAY_IN_SECONDS && $diff >= HOUR_IN_SECONDS ) {
+		$hours = round( $diff / HOUR_IN_SECONDS );
+		if ( $hours <= 1 )
+			$hours = 1;
+		/* translators: Time difference between two dates, in hours. 1: Number of hours */
+		$since = sprintf( _n( '%s hour', '%s hours', $hours ), $hours );
+	} elseif ( $diff < WEEK_IN_SECONDS && $diff >= DAY_IN_SECONDS ) {
+		$days = round( $diff / DAY_IN_SECONDS );
+		if ( $days <= 1 )
+			$days = 1;
+		/* translators: Time difference between two dates, in days. 1: Number of days */
+		$since = sprintf( _n( '%s day', '%s days', $days ), $days );
+	} elseif ( $diff < MONTH_IN_SECONDS && $diff >= WEEK_IN_SECONDS ) {
+		$weeks = round( $diff / WEEK_IN_SECONDS );
+		if ( $weeks <= 1 )
+			$weeks = 1;
+		/* translators: Time difference between two dates, in weeks. 1: Number of weeks */
+		$since = sprintf( _n( '%s week', '%s weeks', $weeks ), $weeks );
+	} elseif ( $diff < YEAR_IN_SECONDS && $diff >= MONTH_IN_SECONDS ) {
+		$months = round( $diff / MONTH_IN_SECONDS );
+		if ( $months <= 1 )
+			$months = 1;
+		/* translators: Time difference between two dates, in months. 1: Number of months */
+		$since = sprintf( _n( '%s month', '%s months', $months ), $months );
+	} elseif ( $diff >= YEAR_IN_SECONDS ) {
+		$years = round( $diff / YEAR_IN_SECONDS );
+		if ( $years <= 1 )
+			$years = 1;
+		/* translators: Time difference between two dates, in years. 1: Number of years */
+		$since = sprintf( _n( '%s year', '%s years', $years ), $years );
+	}
+
+	/**
+	 * Filters the human readable difference between two timestamps.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $since The difference in human readable text.
+	 * @param int    $diff  The difference in seconds.
+	 * @param int    $from  Unix timestamp from which the difference begins.
+	 * @param int    $to    Unix timestamp to end the time difference.
+	 */
+	return apply_filters( 'human_time_diff', $since, $diff, $from, $to );
+}
+
+/**
+ * Generates an excerpt from the content, if needed.
+ *
+ * The excerpt word amount will be 55 words and if the amount is greater than
+ * that, then the string ' [&hellip;]' will be appended to the excerpt. If the string
+ * is less than 55 words, then the content will be returned as is.
+ *
+ * The 55 word limit can be modified by plugins/themes using the {@see 'excerpt_length'} filter
+ * The ' [&hellip;]' string can be modified by plugins/themes using the {@see 'excerpt_more'} filter
+ *
+ * @since 1.5.0
+ *
+ * @param string $text Optional. The excerpt. If set to empty, an excerpt is generated.
+ * @return string The excerpt.
+ */
+function wp_trim_excerpt( $text = '' ) {
+	$raw_excerpt = $text;
+	if ( '' == $text ) {
+		$text = get_the_content('');
+
+		$text = strip_shortcodes( $text );
+
+		/** This filter is documented in wp-includes/post-template.php */
+		$text = apply_filters( 'the_content', $text );
+		$text = str_replace(']]>', ']]&gt;', $text);
+
+		/**
+		 * Filters the number of words in an excerpt.
+		 *
+		 * @since 2.7.0
+		 *
+		 * @param int $number The number of words. Default 55.
+		 */
+		$excerpt_length = apply_filters( 'excerpt_length', 55 );
+		/**
+		 * Filters the string in the "more" link displayed after a trimmed excerpt.
+		 *
+		 * @since 2.9.0
+		 *
+		 * @param string $more_string The string shown within the more link.
+		 */
+		$excerpt_more = apply_filters( 'excerpt_more', ' ' . '[&hellip;]' );
+		$text = wp_trim_words( $text, $excerpt_length, $excerpt_more );
+	}
+	/**
+	 * Filters the trimmed excerpt string.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $text        The trimmed text.
+	 * @param string $raw_excerpt The text prior to trimming.
+	 */
+	return apply_filters( 'wp_trim_excerpt', $text, $raw_excerpt );
+}
+
+/**
+ * Trims text to a certain number of words.
+ *
+ * This function is localized. For languages that count 'words' by the individual
+ * character (such as East Asian languages), the $num_words argument will apply
+ * to the number of individual characters.
+ *
+ * @since 3.3.0
+ *
+ * @param string $text      Text to trim.
+ * @param int    $num_words Number of words. Default 55.
+ * @param string $more      Optional. What to append if $text needs to be trimmed. Default '&hellip;'.
+ * @return string Trimmed text.
+ */
+function wp_trim_words( $text, $num_words = 55, $more = null ) {
+	if ( null === $more ) {
+		$more = __( '&hellip;' );
+	}
+
+	$original_text = $text;
+	$text = wp_strip_all_tags( $text );
+
+	/*
+	 * translators: If your word count is based on single characters (e.g. East Asian characters),
+	 * enter 'characters_excluding_spaces' or 'characters_including_spaces'. Otherwise, enter 'words'.
+	 * Do not translate into your own language.
+	 */
+	if ( strpos( _x( 'words', 'Word count type. Do not translate!' ), 'characters' ) === 0 && preg_match( '/^utf\-?8$/i', get_option( 'blog_charset' ) ) ) {
+		$text = trim( preg_replace( "/[\n\r\t ]+/", ' ', $text ), ' ' );
+		preg_match_all( '/./u', $text, $words_array );
+		$words_array = array_slice( $words_array[0], 0, $num_words + 1 );
+		$sep = '';
+	} else {
+		$words_array = preg_split( "/[\n\r\t ]+/", $text, $num_words + 1, PREG_SPLIT_NO_EMPTY );
+		$sep = ' ';
+	}
+
+	if ( count( $words_array ) > $num_words ) {
+		array_pop( $words_array );
+		$text = implode( $sep, $words_array );
+		$text = $text . $more;
+	} else {
+		$text = implode( $sep, $words_array );
+	}
+
+	/**
+	 * Filters the text content after words have been trimmed.
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param string $text          The trimmed text.
+	 * @param int    $num_words     The number of words to trim the text to. Default 55.
+	 * @param string $more          An optional string to append to the end of the trimmed text, e.g. &hellip;.
+	 * @param string $original_text The text before it was trimmed.
+	 */
+	return apply_filters( 'wp_trim_words', $text, $num_words, $more, $original_text );
+}
+
+/**
+ * Converts named entities into numbered entities.
+ *
+ * @since 1.5.1
+ *
+ * @param string $text The text within which entities will be converted.
+ * @return string Text with converted entities.
+ */
+function ent2ncr( $text ) {
+
+	/**
+	 * Filters text before named entities are converted into numbered entities.
+	 *
+	 * A non-null string must be returned for the filter to be evaluated.
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param null   $converted_text The text to be converted. Default null.
+	 * @param string $text           The text prior to entity conversion.
+	 */
+	$filtered = apply_filters( 'pre_ent2ncr', null, $text );
+	if ( null !== $filtered )
+		return $filtered;
+
+	$to_ncr = array(
+		'&quot;' => '&#34;',
+		'&amp;' => '&#38;',
+		'&lt;' => '&#60;',
+		'&gt;' => '&#62;',
+		'|' => '&#124;',
+		'&nbsp;' => '&#160;',
+		'&iexcl;' => '&#161;',
+		'&cent;' => '&#162;',
+		'&pound;' => '&#163;',
+		'&curren;' => '&#164;',
+		'&yen;' => '&#165;',
+		'&brvbar;' => '&#166;',
+		'&brkbar;' => '&#166;',
+		'&sect;' => '&#167;',
+		'&uml;' => '&#168;',
+		'&die;' => '&#168;',
+		'&copy;' => '&#169;',
+		'&ordf;' => '&#170;',
+		'&laquo;' => '&#171;',
+		'&not;' => '&#172;',
+		'&shy;' => '&#173;',
+		'&reg;' => '&#174;',
+		'&macr;' => '&#175;',
+		'&hibar;' => '&#175;',
+		'&deg;' => '&#176;',
+		'&plusmn;' => '&#177;',
+		'&sup2;' => '&#178;',
+		'&sup3;' => '&#179;',
+		'&acute;' => '&#180;',
+		'&micro;' => '&#181;',
+		'&para;' => '&#182;',
+		'&middot;' => '&#183;',
+		'&cedil;' => '&#184;',
+		'&sup1;' => '&#185;',
+		'&ordm;' => '&#186;',
+		'&raquo;' => '&#187;',
+		'&frac14;' => '&#188;',
+		'&frac12;' => '&#189;',
+		'&frac34;' => '&#190;',
+		'&iquest;' => '&#191;',
+		'&Agrave;' => '&#192;',
+		'&Aacute;' => '&#193;',
+		'&Acirc;' => '&#194;',
+		'&Atilde;' => '&#195;',
+		'&Auml;' => '&#196;',
+		'&Aring;' => '&#197;',
+		'&AElig;' => '&#198;',
+		'&Ccedil;' => '&#199;',
+		'&Egrave;' => '&#200;',
+		'&Eacute;' => '&#201;',
+		'&Ecirc;' => '&#202;',
+		'&Euml;' => '&#203;',
+		'&Igrave;' => '&#204;',
+		'&Iacute;' => '&#205;',
+		'&Icirc;' => '&#206;',
+		'&Iuml;' => '&#207;',
+		'&ETH;' => '&#208;',
+		'&Ntilde;' => '&#209;',
+		'&Ograve;' => '&#210;',
+		'&Oacute;' => '&#211;',
+		'&Ocirc;' => '&#212;',
+		'&Otilde;' => '&#213;',
+		'&Ouml;' => '&#214;',
+		'&times;' => '&#215;',
+		'&Oslash;' => '&#216;',
+		'&Ugrave;' => '&#217;',
+		'&Uacute;' => '&#218;',
+		'&Ucirc;' => '&#219;',
+		'&Uuml;' => '&#220;',
+		'&Yacute;' => '&#221;',
+		'&THORN;' => '&#222;',
+		'&szlig;' => '&#223;',
+		'&agrave;' => '&#224;',
+		'&aacute;' => '&#225;',
+		'&acirc;' => '&#226;',
+		'&atilde;' => '&#227;',
+		'&auml;' => '&#228;',
+		'&aring;' => '&#229;',
+		'&aelig;' => '&#230;',
+		'&ccedil;' => '&#231;',
+		'&egrave;' => '&#232;',
+		'&eacute;' => '&#233;',
+		'&ecirc;' => '&#234;',
+		'&euml;' => '&#235;',
+		'&igrave;' => '&#236;',
+		'&iacute;' => '&#237;',
+		'&icirc;' => '&#238;',
+		'&iuml;' => '&#239;',
+		'&eth;' => '&#240;',
+		'&ntilde;' => '&#241;',
+		'&ograve;' => '&#242;',
+		'&oacute;' => '&#243;',
+		'&ocirc;' => '&#244;',
+		'&otilde;' => '&#245;',
+		'&ouml;' => '&#246;',
+		'&divide;' => '&#247;',
+		'&oslash;
