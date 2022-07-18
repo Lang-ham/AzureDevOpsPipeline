@@ -3905,4 +3905,379 @@ function esc_url_raw( $url, $protocols = null ) {
 function htmlentities2( $myHTML ) {
 	$translation_table = get_html_translation_table( HTML_ENTITIES, ENT_QUOTES );
 	$translation_table[chr(38)] = '&';
-	return preg_replace( 
+	return preg_replace( "/&(?![A-Za-z]{0,4}\w{2,3};|#[0-9]{2,3};)/", "&amp;", strtr($myHTML, $translation_table) );
+}
+
+/**
+ * Escape single quotes, htmlspecialchar " < > &, and fix line endings.
+ *
+ * Escapes text strings for echoing in JS. It is intended to be used for inline JS
+ * (in a tag attribute, for example onclick="..."). Note that the strings have to
+ * be in single quotes. The {@see 'js_escape'} filter is also applied here.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text The text to be escaped.
+ * @return string Escaped text.
+ */
+function esc_js( $text ) {
+	$safe_text = wp_check_invalid_utf8( $text );
+	$safe_text = _wp_specialchars( $safe_text, ENT_COMPAT );
+	$safe_text = preg_replace( '/&#(x)?0*(?(1)27|39);?/i', "'", stripslashes( $safe_text ) );
+	$safe_text = str_replace( "\r", '', $safe_text );
+	$safe_text = str_replace( "\n", '\\n', addslashes( $safe_text ) );
+	/**
+	 * Filters a string cleaned and escaped for output in JavaScript.
+	 *
+	 * Text passed to esc_js() is stripped of invalid or special characters,
+	 * and properly slashed for output.
+	 *
+	 * @since 2.0.6
+	 *
+	 * @param string $safe_text The text after it has been escaped.
+ 	 * @param string $text      The text prior to being escaped.
+	 */
+	return apply_filters( 'js_escape', $safe_text, $text );
+}
+
+/**
+ * Escaping for HTML blocks.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text
+ * @return string
+ */
+function esc_html( $text ) {
+	$safe_text = wp_check_invalid_utf8( $text );
+	$safe_text = _wp_specialchars( $safe_text, ENT_QUOTES );
+	/**
+	 * Filters a string cleaned and escaped for output in HTML.
+	 *
+	 * Text passed to esc_html() is stripped of invalid or special characters
+	 * before output.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $safe_text The text after it has been escaped.
+ 	 * @param string $text      The text prior to being escaped.
+	 */
+	return apply_filters( 'esc_html', $safe_text, $text );
+}
+
+/**
+ * Escaping for HTML attributes.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text
+ * @return string
+ */
+function esc_attr( $text ) {
+	$safe_text = wp_check_invalid_utf8( $text );
+	$safe_text = _wp_specialchars( $safe_text, ENT_QUOTES );
+	/**
+	 * Filters a string cleaned and escaped for output in an HTML attribute.
+	 *
+	 * Text passed to esc_attr() is stripped of invalid or special characters
+	 * before output.
+	 *
+	 * @since 2.0.6
+	 *
+	 * @param string $safe_text The text after it has been escaped.
+ 	 * @param string $text      The text prior to being escaped.
+	 */
+	return apply_filters( 'attribute_escape', $safe_text, $text );
+}
+
+/**
+ * Escaping for textarea values.
+ *
+ * @since 3.1.0
+ *
+ * @param string $text
+ * @return string
+ */
+function esc_textarea( $text ) {
+	$safe_text = htmlspecialchars( $text, ENT_QUOTES, get_option( 'blog_charset' ) );
+	/**
+	 * Filters a string cleaned and escaped for output in a textarea element.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $safe_text The text after it has been escaped.
+ 	 * @param string $text      The text prior to being escaped.
+	 */
+	return apply_filters( 'esc_textarea', $safe_text, $text );
+}
+
+/**
+ * Escape an HTML tag name.
+ *
+ * @since 2.5.0
+ *
+ * @param string $tag_name
+ * @return string
+ */
+function tag_escape( $tag_name ) {
+	$safe_tag = strtolower( preg_replace('/[^a-zA-Z0-9_:]/', '', $tag_name) );
+	/**
+	 * Filters a string cleaned and escaped for output as an HTML tag.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $safe_tag The tag name after it has been escaped.
+ 	 * @param string $tag_name The text before it was escaped.
+	 */
+	return apply_filters( 'tag_escape', $safe_tag, $tag_name );
+}
+
+/**
+ * Convert full URL paths to absolute paths.
+ *
+ * Removes the http or https protocols and the domain. Keeps the path '/' at the
+ * beginning, so it isn't a true relative link, but from the web root base.
+ *
+ * @since 2.1.0
+ * @since 4.1.0 Support was added for relative URLs.
+ *
+ * @param string $link Full URL path.
+ * @return string Absolute path.
+ */
+function wp_make_link_relative( $link ) {
+	return preg_replace( '|^(https?:)?//[^/]+(/?.*)|i', '$2', $link );
+}
+
+/**
+ * Sanitises various option values based on the nature of the option.
+ *
+ * This is basically a switch statement which will pass $value through a number
+ * of functions depending on the $option.
+ *
+ * @since 2.0.5
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $option The name of the option.
+ * @param string $value  The unsanitised value.
+ * @return string Sanitized value.
+ */
+function sanitize_option( $option, $value ) {
+	global $wpdb;
+
+	$original_value = $value;
+	$error = '';
+
+	switch ( $option ) {
+		case 'admin_email' :
+		case 'new_admin_email' :
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				$value = sanitize_email( $value );
+				if ( ! is_email( $value ) ) {
+					$error = __( 'The email address entered did not appear to be a valid email address. Please enter a valid email address.' );
+				}
+			}
+			break;
+
+		case 'thumbnail_size_w':
+		case 'thumbnail_size_h':
+		case 'medium_size_w':
+		case 'medium_size_h':
+		case 'medium_large_size_w':
+		case 'medium_large_size_h':
+		case 'large_size_w':
+		case 'large_size_h':
+		case 'mailserver_port':
+		case 'comment_max_links':
+		case 'page_on_front':
+		case 'page_for_posts':
+		case 'rss_excerpt_length':
+		case 'default_category':
+		case 'default_email_category':
+		case 'default_link_category':
+		case 'close_comments_days_old':
+		case 'comments_per_page':
+		case 'thread_comments_depth':
+		case 'users_can_register':
+		case 'start_of_week':
+		case 'site_icon':
+			$value = absint( $value );
+			break;
+
+		case 'posts_per_page':
+		case 'posts_per_rss':
+			$value = (int) $value;
+			if ( empty($value) )
+				$value = 1;
+			if ( $value < -1 )
+				$value = abs($value);
+			break;
+
+		case 'default_ping_status':
+		case 'default_comment_status':
+			// Options that if not there have 0 value but need to be something like "closed"
+			if ( $value == '0' || $value == '')
+				$value = 'closed';
+			break;
+
+		case 'blogdescription':
+		case 'blogname':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( $value !== $original_value ) {
+				$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', wp_encode_emoji( $original_value ) );
+			}
+
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				$value = esc_html( $value );
+			}
+			break;
+
+		case 'blog_charset':
+			$value = preg_replace('/[^a-zA-Z0-9_-]/', '', $value); // strips slashes
+			break;
+
+		case 'blog_public':
+			// This is the value if the settings checkbox is not checked on POST. Don't rely on this.
+			if ( null === $value )
+				$value = 1;
+			else
+				$value = intval( $value );
+			break;
+
+		case 'date_format':
+		case 'time_format':
+		case 'mailserver_url':
+		case 'mailserver_login':
+		case 'mailserver_pass':
+		case 'upload_path':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				$value = strip_tags( $value );
+				$value = wp_kses_data( $value );
+			}
+			break;
+
+		case 'ping_sites':
+			$value = explode( "\n", $value );
+			$value = array_filter( array_map( 'trim', $value ) );
+			$value = array_filter( array_map( 'esc_url_raw', $value ) );
+			$value = implode( "\n", $value );
+			break;
+
+		case 'gmt_offset':
+			$value = preg_replace('/[^0-9:.-]/', '', $value); // strips slashes
+			break;
+
+		case 'siteurl':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				if ( preg_match( '#http(s?)://(.+)#i', $value ) ) {
+					$value = esc_url_raw( $value );
+				} else {
+					$error = __( 'The WordPress address you entered did not appear to be a valid URL. Please enter a valid URL.' );
+				}
+			}
+			break;
+
+		case 'home':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				if ( preg_match( '#http(s?)://(.+)#i', $value ) ) {
+					$value = esc_url_raw( $value );
+				} else {
+					$error = __( 'The Site address you entered did not appear to be a valid URL. Please enter a valid URL.' );
+				}
+			}
+			break;
+
+		case 'WPLANG':
+			$allowed = get_available_languages();
+			if ( ! is_multisite() && defined( 'WPLANG' ) && '' !== WPLANG && 'en_US' !== WPLANG ) {
+				$allowed[] = WPLANG;
+			}
+			if ( ! in_array( $value, $allowed ) && ! empty( $value ) ) {
+				$value = get_option( $option );
+			}
+			break;
+
+		case 'illegal_names':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				if ( ! is_array( $value ) )
+					$value = explode( ' ', $value );
+
+				$value = array_values( array_filter( array_map( 'trim', $value ) ) );
+
+				if ( ! $value )
+					$value = '';
+			}
+			break;
+
+		case 'limited_email_domains':
+		case 'banned_email_domains':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				if ( ! is_array( $value ) )
+					$value = explode( "\n", $value );
+
+				$domains = array_values( array_filter( array_map( 'trim', $value ) ) );
+				$value = array();
+
+				foreach ( $domains as $domain ) {
+					if ( ! preg_match( '/(--|\.\.)/', $domain ) && preg_match( '|^([a-zA-Z0-9-\.])+$|', $domain ) ) {
+						$value[] = $domain;
+					}
+				}
+				if ( ! $value )
+					$value = '';
+			}
+			break;
+
+		case 'timezone_string':
+			$allowed_zones = timezone_identifiers_list();
+			if ( ! in_array( $value, $allowed_zones ) && ! empty( $value ) ) {
+				$error = __( 'The timezone you have entered is not valid. Please select a valid timezone.' );
+			}
+			break;
+
+		case 'permalink_structure':
+		case 'category_base':
+		case 'tag_base':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				$value = esc_url_raw( $value );
+				$value = str_replace( 'http://', '', $value );
+			}
+
+			if ( 'permalink_structure' === $option && '' !== $value && ! preg_match( '/%[^\/%]+%/', $value ) ) {
+				$error = sprintf(
+					/* translators: %s: Codex URL */
+					__( 'A structure tag is required when using custom permalinks. <a href="%s">Learn more</a>' ),
+					__( 'https://codex.wordpress.org/Using_Permalinks#Choosing_your_permalink_structure' )
+				);
+			}
+			break;
+
+		case 'default_role' :
+			if ( ! get_role( $value ) && get_role( 'subscriber' ) )
+				$value = 'subscriber';
+			break;
+
+		ca
