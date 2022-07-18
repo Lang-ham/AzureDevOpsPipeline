@@ -4280,4 +4280,361 @@ function sanitize_option( $option, $value ) {
 				$value = 'subscriber';
 			break;
 
-		ca
+		case 'moderation_keys':
+		case 'blacklist_keys':
+			$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value );
+			if ( is_wp_error( $value ) ) {
+				$error = $value->get_error_message();
+			} else {
+				$value = explode( "\n", $value );
+				$value = array_filter( array_map( 'trim', $value ) );
+				$value = array_unique( $value );
+				$value = implode( "\n", $value );
+			}
+			break;
+	}
+
+	if ( ! empty( $error ) ) {
+		$value = get_option( $option );
+		if ( function_exists( 'add_settings_error' ) ) {
+			add_settings_error( $option, "invalid_{$option}", $error );
+		}
+	}
+
+	/**
+	 * Filters an option value following sanitization.
+	 *
+	 * @since 2.3.0
+	 * @since 4.3.0 Added the `$original_value` parameter.
+	 *
+	 * @param string $value          The sanitized option value.
+	 * @param string $option         The option name.
+	 * @param string $original_value The original value passed to the function.
+	 */
+	return apply_filters( "sanitize_option_{$option}", $value, $option, $original_value );
+}
+
+/**
+ * Maps a function to all non-iterable elements of an array or an object.
+ *
+ * This is similar to `array_walk_recursive()` but acts upon objects too.
+ *
+ * @since 4.4.0
+ *
+ * @param mixed    $value    The array, object, or scalar.
+ * @param callable $callback The function to map onto $value.
+ * @return mixed The value with the callback applied to all non-arrays and non-objects inside it.
+ */
+function map_deep( $value, $callback ) {
+	if ( is_array( $value ) ) {
+		foreach ( $value as $index => $item ) {
+			$value[ $index ] = map_deep( $item, $callback );
+		}
+	} elseif ( is_object( $value ) ) {
+		$object_vars = get_object_vars( $value );
+		foreach ( $object_vars as $property_name => $property_value ) {
+			$value->$property_name = map_deep( $property_value, $callback );
+		}
+	} else {
+		$value = call_user_func( $callback, $value );
+	}
+
+	return $value;
+}
+
+/**
+ * Parses a string into variables to be stored in an array.
+ *
+ * Uses {@link https://secure.php.net/parse_str parse_str()} and stripslashes if
+ * {@link https://secure.php.net/magic_quotes magic_quotes_gpc} is on.
+ *
+ * @since 2.2.1
+ *
+ * @param string $string The string to be parsed.
+ * @param array  $array  Variables will be stored in this array.
+ */
+function wp_parse_str( $string, &$array ) {
+	parse_str( $string, $array );
+	if ( get_magic_quotes_gpc() )
+		$array = stripslashes_deep( $array );
+	/**
+	 * Filters the array of variables derived from a parsed string.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param array $array The array populated with variables.
+	 */
+	$array = apply_filters( 'wp_parse_str', $array );
+}
+
+/**
+ * Convert lone less than signs.
+ *
+ * KSES already converts lone greater than signs.
+ *
+ * @since 2.3.0
+ *
+ * @param string $text Text to be converted.
+ * @return string Converted text.
+ */
+function wp_pre_kses_less_than( $text ) {
+	return preg_replace_callback('%<[^>]*?((?=<)|>|$)%', 'wp_pre_kses_less_than_callback', $text);
+}
+
+/**
+ * Callback function used by preg_replace.
+ *
+ * @since 2.3.0
+ *
+ * @param array $matches Populated by matches to preg_replace.
+ * @return string The text returned after esc_html if needed.
+ */
+function wp_pre_kses_less_than_callback( $matches ) {
+	if ( false === strpos($matches[0], '>') )
+		return esc_html($matches[0]);
+	return $matches[0];
+}
+
+/**
+ * WordPress implementation of PHP sprintf() with filters.
+ *
+ * @since 2.5.0
+ * @link https://secure.php.net/sprintf
+ *
+ * @param string $pattern   The string which formatted args are inserted.
+ * @param mixed  $args ,... Arguments to be formatted into the $pattern string.
+ * @return string The formatted string.
+ */
+function wp_sprintf( $pattern ) {
+	$args = func_get_args();
+	$len = strlen($pattern);
+	$start = 0;
+	$result = '';
+	$arg_index = 0;
+	while ( $len > $start ) {
+		// Last character: append and break
+		if ( strlen($pattern) - 1 == $start ) {
+			$result .= substr($pattern, -1);
+			break;
+		}
+
+		// Literal %: append and continue
+		if ( substr($pattern, $start, 2) == '%%' ) {
+			$start += 2;
+			$result .= '%';
+			continue;
+		}
+
+		// Get fragment before next %
+		$end = strpos($pattern, '%', $start + 1);
+		if ( false === $end )
+			$end = $len;
+		$fragment = substr($pattern, $start, $end - $start);
+
+		// Fragment has a specifier
+		if ( $pattern[$start] == '%' ) {
+			// Find numbered arguments or take the next one in order
+			if ( preg_match('/^%(\d+)\$/', $fragment, $matches) ) {
+				$arg = isset($args[$matches[1]]) ? $args[$matches[1]] : '';
+				$fragment = str_replace("%{$matches[1]}$", '%', $fragment);
+			} else {
+				++$arg_index;
+				$arg = isset($args[$arg_index]) ? $args[$arg_index] : '';
+			}
+
+			/**
+			 * Filters a fragment from the pattern passed to wp_sprintf().
+			 *
+			 * If the fragment is unchanged, then sprintf() will be run on the fragment.
+			 *
+			 * @since 2.5.0
+			 *
+			 * @param string $fragment A fragment from the pattern.
+			 * @param string $arg      The argument.
+			 */
+			$_fragment = apply_filters( 'wp_sprintf', $fragment, $arg );
+			if ( $_fragment != $fragment )
+				$fragment = $_fragment;
+			else
+				$fragment = sprintf($fragment, strval($arg) );
+		}
+
+		// Append to result and move to next fragment
+		$result .= $fragment;
+		$start = $end;
+	}
+	return $result;
+}
+
+/**
+ * Localize list items before the rest of the content.
+ *
+ * The '%l' must be at the first characters can then contain the rest of the
+ * content. The list items will have ', ', ', and', and ' and ' added depending
+ * on the amount of list items in the $args parameter.
+ *
+ * @since 2.5.0
+ *
+ * @param string $pattern Content containing '%l' at the beginning.
+ * @param array  $args    List items to prepend to the content and replace '%l'.
+ * @return string Localized list items and rest of the content.
+ */
+function wp_sprintf_l( $pattern, $args ) {
+	// Not a match
+	if ( substr($pattern, 0, 2) != '%l' )
+		return $pattern;
+
+	// Nothing to work with
+	if ( empty($args) )
+		return '';
+
+	/**
+	 * Filters the translated delimiters used by wp_sprintf_l().
+	 * Placeholders (%s) are included to assist translators and then
+	 * removed before the array of strings reaches the filter.
+	 *
+	 * Please note: Ampersands and entities should be avoided here.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param array $delimiters An array of translated delimiters.
+	 */
+	$l = apply_filters( 'wp_sprintf_l', array(
+		/* translators: used to join items in a list with more than 2 items */
+		'between'          => sprintf( __('%s, %s'), '', '' ),
+		/* translators: used to join last two items in a list with more than 2 times */
+		'between_last_two' => sprintf( __('%s, and %s'), '', '' ),
+		/* translators: used to join items in a list with only 2 items */
+		'between_only_two' => sprintf( __('%s and %s'), '', '' ),
+	) );
+
+	$args = (array) $args;
+	$result = array_shift($args);
+	if ( count($args) == 1 )
+		$result .= $l['between_only_two'] . array_shift($args);
+	// Loop when more than two args
+	$i = count($args);
+	while ( $i ) {
+		$arg = array_shift($args);
+		$i--;
+		if ( 0 == $i )
+			$result .= $l['between_last_two'] . $arg;
+		else
+			$result .= $l['between'] . $arg;
+	}
+	return $result . substr($pattern, 2);
+}
+
+/**
+ * Safely extracts not more than the first $count characters from html string.
+ *
+ * UTF-8, tags and entities safe prefix extraction. Entities inside will *NOT*
+ * be counted as one character. For example &amp; will be counted as 4, &lt; as
+ * 3, etc.
+ *
+ * @since 2.5.0
+ *
+ * @param string $str   String to get the excerpt from.
+ * @param int    $count Maximum number of characters to take.
+ * @param string $more  Optional. What to append if $str needs to be trimmed. Defaults to empty string.
+ * @return string The excerpt.
+ */
+function wp_html_excerpt( $str, $count, $more = null ) {
+	if ( null === $more )
+		$more = '';
+	$str = wp_strip_all_tags( $str, true );
+	$excerpt = mb_substr( $str, 0, $count );
+	// remove part of an entity at the end
+	$excerpt = preg_replace( '/&[^;\s]{0,6}$/', '', $excerpt );
+	if ( $str != $excerpt )
+		$excerpt = trim( $excerpt ) . $more;
+	return $excerpt;
+}
+
+/**
+ * Add a Base url to relative links in passed content.
+ *
+ * By default it supports the 'src' and 'href' attributes. However this can be
+ * changed via the 3rd param.
+ *
+ * @since 2.7.0
+ *
+ * @global string $_links_add_base
+ *
+ * @param string $content String to search for links in.
+ * @param string $base    The base URL to prefix to links.
+ * @param array  $attrs   The attributes which should be processed.
+ * @return string The processed content.
+ */
+function links_add_base_url( $content, $base, $attrs = array('src', 'href') ) {
+	global $_links_add_base;
+	$_links_add_base = $base;
+	$attrs = implode('|', (array)$attrs);
+	return preg_replace_callback( "!($attrs)=(['\"])(.+?)\\2!i", '_links_add_base', $content );
+}
+
+/**
+ * Callback to add a base url to relative links in passed content.
+ *
+ * @since 2.7.0
+ * @access private
+ *
+ * @global string $_links_add_base
+ *
+ * @param string $m The matched link.
+ * @return string The processed link.
+ */
+function _links_add_base( $m ) {
+	global $_links_add_base;
+	//1 = attribute name  2 = quotation mark  3 = URL
+	return $m[1] . '=' . $m[2] .
+		( preg_match( '#^(\w{1,20}):#', $m[3], $protocol ) && in_array( $protocol[1], wp_allowed_protocols() ) ?
+			$m[3] :
+			WP_Http::make_absolute_url( $m[3], $_links_add_base )
+		)
+		. $m[2];
+}
+
+/**
+ * Adds a Target attribute to all links in passed content.
+ *
+ * This function by default only applies to `<a>` tags, however this can be
+ * modified by the 3rd param.
+ *
+ * *NOTE:* Any current target attributed will be stripped and replaced.
+ *
+ * @since 2.7.0
+ *
+ * @global string $_links_add_target
+ *
+ * @param string $content String to search for links in.
+ * @param string $target  The Target to add to the links.
+ * @param array  $tags    An array of tags to apply to.
+ * @return string The processed content.
+ */
+function links_add_target( $content, $target = '_blank', $tags = array('a') ) {
+	global $_links_add_target;
+	$_links_add_target = $target;
+	$tags = implode('|', (array)$tags);
+	return preg_replace_callback( "!<($tags)([^>]*)>!i", '_links_add_target', $content );
+}
+
+/**
+ * Callback to add a target attribute to all links in passed content.
+ *
+ * @since 2.7.0
+ * @access private
+ *
+ * @global string $_links_add_target
+ *
+ * @param string $m The matched link.
+ * @return string The processed link.
+ */
+function _links_add_target( $m ) {
+	global $_links_add_target;
+	$tag = $m[1];
+	$link = preg_replace('|( target=([\'"])(.*?)\2)|i', '', $m[2]);
+	return '<' . $tag . $link . ' target="' . esc_attr( $_links_add_target ) . '">';
+}
+
+/**
