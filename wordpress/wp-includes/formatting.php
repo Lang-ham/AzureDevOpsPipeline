@@ -4638,3 +4638,406 @@ function _links_add_target( $m ) {
 }
 
 /**
+ * Normalize EOL characters and strip duplicate whitespace.
+ *
+ * @since 2.7.0
+ *
+ * @param string $str The string to normalize.
+ * @return string The normalized string.
+ */
+function normalize_whitespace( $str ) {
+	$str  = trim( $str );
+	$str  = str_replace( "\r", "\n", $str );
+	$str  = preg_replace( array( '/\n+/', '/[ \t]+/' ), array( "\n", ' ' ), $str );
+	return $str;
+}
+
+/**
+ * Properly strip all HTML tags including script and style
+ *
+ * This differs from strip_tags() because it removes the contents of
+ * the `<script>` and `<style>` tags. E.g. `strip_tags( '<script>something</script>' )`
+ * will return 'something'. wp_strip_all_tags will return ''
+ *
+ * @since 2.9.0
+ *
+ * @param string $string        String containing HTML tags
+ * @param bool   $remove_breaks Optional. Whether to remove left over line breaks and white space chars
+ * @return string The processed string.
+ */
+function wp_strip_all_tags($string, $remove_breaks = false) {
+	$string = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $string );
+	$string = strip_tags($string);
+
+	if ( $remove_breaks )
+		$string = preg_replace('/[\r\n\t ]+/', ' ', $string);
+
+	return trim( $string );
+}
+
+/**
+ * Sanitizes a string from user input or from the database.
+ *
+ * - Checks for invalid UTF-8,
+ * - Converts single `<` characters to entities
+ * - Strips all tags
+ * - Removes line breaks, tabs, and extra whitespace
+ * - Strips octets
+ *
+ * @since 2.9.0
+ *
+ * @see sanitize_textarea_field()
+ * @see wp_check_invalid_utf8()
+ * @see wp_strip_all_tags()
+ *
+ * @param string $str String to sanitize.
+ * @return string Sanitized string.
+ */
+function sanitize_text_field( $str ) {
+	$filtered = _sanitize_text_fields( $str, false );
+
+	/**
+	 * Filters a sanitized text field string.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param string $filtered The sanitized string.
+	 * @param string $str      The string prior to being sanitized.
+	 */
+	return apply_filters( 'sanitize_text_field', $filtered, $str );
+}
+
+/**
+ * Sanitizes a multiline string from user input or from the database.
+ *
+ * The function is like sanitize_text_field(), but preserves
+ * new lines (\n) and other whitespace, which are legitimate
+ * input in textarea elements.
+ *
+ * @see sanitize_text_field()
+ *
+ * @since 4.7.0
+ *
+ * @param string $str String to sanitize.
+ * @return string Sanitized string.
+ */
+function sanitize_textarea_field( $str ) {
+	$filtered = _sanitize_text_fields( $str, true );
+
+	/**
+	 * Filters a sanitized textarea field string.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string $filtered The sanitized string.
+	 * @param string $str      The string prior to being sanitized.
+	 */
+	return apply_filters( 'sanitize_textarea_field', $filtered, $str );
+}
+
+/**
+ * Internal helper function to sanitize a string from user input or from the db
+ *
+ * @since 4.7.0
+ * @access private
+ *
+ * @param string $str String to sanitize.
+ * @param bool $keep_newlines optional Whether to keep newlines. Default: false.
+ * @return string Sanitized string.
+ */
+function _sanitize_text_fields( $str, $keep_newlines = false ) {
+	$filtered = wp_check_invalid_utf8( $str );
+
+	if ( strpos($filtered, '<') !== false ) {
+		$filtered = wp_pre_kses_less_than( $filtered );
+		// This will strip extra whitespace for us.
+		$filtered = wp_strip_all_tags( $filtered, false );
+
+		// Use html entities in a special case to make sure no later
+		// newline stripping stage could lead to a functional tag
+		$filtered = str_replace("<\n", "&lt;\n", $filtered);
+	}
+
+	if ( ! $keep_newlines ) {
+		$filtered = preg_replace( '/[\r\n\t ]+/', ' ', $filtered );
+	}
+	$filtered = trim( $filtered );
+
+	$found = false;
+	while ( preg_match('/%[a-f0-9]{2}/i', $filtered, $match) ) {
+		$filtered = str_replace($match[0], '', $filtered);
+		$found = true;
+	}
+
+	if ( $found ) {
+		// Strip out the whitespace that may now exist after removing the octets.
+		$filtered = trim( preg_replace('/ +/', ' ', $filtered) );
+	}
+
+	return $filtered;
+}
+
+/**
+ * i18n friendly version of basename()
+ *
+ * @since 3.1.0
+ *
+ * @param string $path   A path.
+ * @param string $suffix If the filename ends in suffix this will also be cut off.
+ * @return string
+ */
+function wp_basename( $path, $suffix = '' ) {
+	return urldecode( basename( str_replace( array( '%2F', '%5C' ), '/', urlencode( $path ) ), $suffix ) );
+}
+
+/**
+ * Forever eliminate "Wordpress" from the planet (or at least the little bit we can influence).
+ *
+ * Violating our coding standards for a good function name.
+ *
+ * @since 3.0.0
+ *
+ * @staticvar string|false $dblq
+ *
+ * @param string $text The text to be modified.
+ * @return string The modified text.
+ */
+function capital_P_dangit( $text ) {
+	// Simple replacement for titles
+	$current_filter = current_filter();
+	if ( 'the_title' === $current_filter || 'wp_title' === $current_filter )
+		return str_replace( 'Wordpress', 'WordPress', $text );
+	// Still here? Use the more judicious replacement
+	static $dblq = false;
+	if ( false === $dblq ) {
+		$dblq = _x( '&#8220;', 'opening curly double quote' );
+	}
+	return str_replace(
+		array( ' Wordpress', '&#8216;Wordpress', $dblq . 'Wordpress', '>Wordpress', '(Wordpress' ),
+		array( ' WordPress', '&#8216;WordPress', $dblq . 'WordPress', '>WordPress', '(WordPress' ),
+	$text );
+}
+
+/**
+ * Sanitize a mime type
+ *
+ * @since 3.1.3
+ *
+ * @param string $mime_type Mime type
+ * @return string Sanitized mime type
+ */
+function sanitize_mime_type( $mime_type ) {
+	$sani_mime_type = preg_replace( '/[^-+*.a-zA-Z0-9\/]/', '', $mime_type );
+	/**
+	 * Filters a mime type following sanitization.
+	 *
+	 * @since 3.1.3
+	 *
+	 * @param string $sani_mime_type The sanitized mime type.
+	 * @param string $mime_type      The mime type prior to sanitization.
+	 */
+	return apply_filters( 'sanitize_mime_type', $sani_mime_type, $mime_type );
+}
+
+/**
+ * Sanitize space or carriage return separated URLs that are used to send trackbacks.
+ *
+ * @since 3.4.0
+ *
+ * @param string $to_ping Space or carriage return separated URLs
+ * @return string URLs starting with the http or https protocol, separated by a carriage return.
+ */
+function sanitize_trackback_urls( $to_ping ) {
+	$urls_to_ping = preg_split( '/[\r\n\t ]/', trim( $to_ping ), -1, PREG_SPLIT_NO_EMPTY );
+	foreach ( $urls_to_ping as $k => $url ) {
+		if ( !preg_match( '#^https?://.#i', $url ) )
+			unset( $urls_to_ping[$k] );
+	}
+	$urls_to_ping = array_map( 'esc_url_raw', $urls_to_ping );
+	$urls_to_ping = implode( "\n", $urls_to_ping );
+	/**
+	 * Filters a list of trackback URLs following sanitization.
+	 *
+	 * The string returned here consists of a space or carriage return-delimited list
+	 * of trackback URLs.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param string $urls_to_ping Sanitized space or carriage return separated URLs.
+	 * @param string $to_ping      Space or carriage return separated URLs before sanitization.
+	 */
+	return apply_filters( 'sanitize_trackback_urls', $urls_to_ping, $to_ping );
+}
+
+/**
+ * Add slashes to a string or array of strings.
+ *
+ * This should be used when preparing data for core API that expects slashed data.
+ * This should not be used to escape data going directly into an SQL query.
+ *
+ * @since 3.6.0
+ *
+ * @param string|array $value String or array of strings to slash.
+ * @return string|array Slashed $value
+ */
+function wp_slash( $value ) {
+	if ( is_array( $value ) ) {
+		foreach ( $value as $k => $v ) {
+			if ( is_array( $v ) ) {
+				$value[$k] = wp_slash( $v );
+			} else {
+				$value[$k] = addslashes( $v );
+			}
+		}
+	} else {
+		$value = addslashes( $value );
+	}
+
+	return $value;
+}
+
+/**
+ * Remove slashes from a string or array of strings.
+ *
+ * This should be used to remove slashes from data passed to core API that
+ * expects data to be unslashed.
+ *
+ * @since 3.6.0
+ *
+ * @param string|array $value String or array of strings to unslash.
+ * @return string|array Unslashed $value
+ */
+function wp_unslash( $value ) {
+	return stripslashes_deep( $value );
+}
+
+/**
+ * Extract and return the first URL from passed content.
+ *
+ * @since 3.6.0
+ *
+ * @param string $content A string which might contain a URL.
+ * @return string|false The found URL.
+ */
+function get_url_in_content( $content ) {
+	if ( empty( $content ) ) {
+		return false;
+	}
+
+	if ( preg_match( '/<a\s[^>]*?href=([\'"])(.+?)\1/is', $content, $matches ) ) {
+		return esc_url_raw( $matches[2] );
+	}
+
+	return false;
+}
+
+/**
+ * Returns the regexp for common whitespace characters.
+ *
+ * By default, spaces include new lines, tabs, nbsp entities, and the UTF-8 nbsp.
+ * This is designed to replace the PCRE \s sequence.  In ticket #22692, that
+ * sequence was found to be unreliable due to random inclusion of the A0 byte.
+ *
+ * @since 4.0.0
+ *
+ * @staticvar string $spaces
+ *
+ * @return string The spaces regexp.
+ */
+function wp_spaces_regexp() {
+	static $spaces = '';
+
+	if ( empty( $spaces ) ) {
+		/**
+		 * Filters the regexp for common whitespace characters.
+		 *
+		 * This string is substituted for the \s sequence as needed in regular
+		 * expressions. For websites not written in English, different characters
+		 * may represent whitespace. For websites not encoded in UTF-8, the 0xC2 0xA0
+		 * sequence may not be in use.
+		 *
+		 * @since 4.0.0
+		 *
+		 * @param string $spaces Regexp pattern for matching common whitespace characters.
+		 */
+		$spaces = apply_filters( 'wp_spaces_regexp', '[\r\n\t ]|\xC2\xA0|&nbsp;' );
+	}
+
+	return $spaces;
+}
+
+/**
+ * Print the important emoji-related styles.
+ *
+ * @since 4.2.0
+ *
+ * @staticvar bool $printed
+ */
+function print_emoji_styles() {
+	static $printed = false;
+
+	if ( $printed ) {
+		return;
+	}
+
+	$printed = true;
+?>
+<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<?php
+}
+
+/**
+ * Print the inline Emoji detection script if it is not already printed.
+ *
+ * @since 4.2.0
+ * @staticvar bool $printed
+ */
+function print_emoji_detection_script() {
+	static $printed = false;
+
+	if ( $printed ) {
+		return;
+	}
+
+	$printed = true;
+
+	_print_emoji_detection_script();
+}
+
+/**
+ * Prints inline Emoji dection script
+ *
+ * @ignore
+ * @since 4.6.0
+ * @access private
+ */
+function _print_emoji_detection_script() {
+	$settings = array(
+		/**
+		 * Filters the URL where emoji png images are hosted.
+		 *
+		 * @since 4.2.0
+		 *
+		 * @param string The emoji base URL for png images.
+		 */
+		'baseUrl' => apply_filters( 'emoji_url', 'https://s.w.org/images/core/emoji/2.4/72x72/' ),
+
+		/**
+		 * Filters the extension of the emoji png files.
+		 *
+		 * @since 4.2.0
+		 *
+		 * @param string The emoji extension for png files
