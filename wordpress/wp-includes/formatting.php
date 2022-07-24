@@ -5331,4 +5331,80 @@ function _wp_emoji_list( $type = 'entities' ) {
  * @since 4.4.0 Moved to wp-includes/formatting.php from wp-admin/includes/misc.php and added $length param.
  *
  * @param string $url    URL to shorten.
- * @param int    $length Optiona
+ * @param int    $length Optional. Maximum length of the shortened URL. Default 35 characters.
+ * @return string Shortened URL.
+ */
+function url_shorten( $url, $length = 35 ) {
+	$stripped = str_replace( array( 'https://', 'http://', 'www.' ), '', $url );
+	$short_url = untrailingslashit( $stripped );
+
+	if ( strlen( $short_url ) > $length ) {
+		$short_url = substr( $short_url, 0, $length - 3 ) . '&hellip;';
+	}
+	return $short_url;
+}
+
+/**
+ * Sanitizes a hex color.
+ *
+ * Returns either '', a 3 or 6 digit hex color (with #), or nothing.
+ * For sanitizing values without a #, see sanitize_hex_color_no_hash().
+ *
+ * @since 3.4.0
+ *
+ * @param string $color
+ * @return string|void
+ */
+function sanitize_hex_color( $color ) {
+	if ( '' === $color ) {
+		return '';
+	}
+
+	// 3 or 6 hex digits, or the empty string.
+	if ( preg_match('|^#([A-Fa-f0-9]{3}){1,2}$|', $color ) ) {
+		return $color;
+	}
+}
+
+/**
+ * Sanitizes a hex color without a hash. Use sanitize_hex_color() when possible.
+ *
+ * Saving hex colors without a hash puts the burden of adding the hash on the
+ * UI, which makes it difficult to use or upgrade to other color types such as
+ * rgba, hsl, rgb, and html color names.
+ *
+ * Returns either '', a 3 or 6 digit hex color (without a #), or null.
+ *
+ * @since 3.4.0
+ *
+ * @param string $color
+ * @return string|null
+ */
+function sanitize_hex_color_no_hash( $color ) {
+	$color = ltrim( $color, '#' );
+
+	if ( '' === $color ) {
+		return '';
+	}
+
+	return sanitize_hex_color( '#' . $color ) ? $color : null;
+}
+
+/**
+ * Ensures that any hex color is properly hashed.
+ * Otherwise, returns value untouched.
+ *
+ * This method should only be necessary if using sanitize_hex_color_no_hash().
+ *
+ * @since 3.4.0
+ *
+ * @param string $color
+ * @return string
+ */
+function maybe_hash_hex_color( $color ) {
+	if ( $unhashed = sanitize_hex_color_no_hash( $color ) ) {
+		return '#' . $unhashed;
+	}
+
+	return $color;
+}
