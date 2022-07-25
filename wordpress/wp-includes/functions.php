@@ -622,4 +622,420 @@ function do_enclose( $content, $post_ID ) {
 							}
 						}
 					}
-		
+				}
+
+				if ( in_array( substr( $type, 0, strpos( $type, "/" ) ), $allowed_types ) ) {
+					add_post_meta( $post_ID, 'enclosure', "$url\n$len\n$mime\n" );
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Retrieve HTTP Headers from URL.
+ *
+ * @since 1.5.1
+ *
+ * @param string $url        URL to retrieve HTTP headers from.
+ * @param bool   $deprecated Not Used.
+ * @return bool|string False on failure, headers on success.
+ */
+function wp_get_http_headers( $url, $deprecated = false ) {
+	if ( !empty( $deprecated ) )
+		_deprecated_argument( __FUNCTION__, '2.7.0' );
+
+	$response = wp_safe_remote_head( $url );
+
+	if ( is_wp_error( $response ) )
+		return false;
+
+	return wp_remote_retrieve_headers( $response );
+}
+
+/**
+ * Whether the publish date of the current post in the loop is different from the
+ * publish date of the previous post in the loop.
+ *
+ * @since 0.71
+ *
+ * @global string $currentday  The day of the current post in the loop.
+ * @global string $previousday The day of the previous post in the loop.
+ *
+ * @return int 1 when new day, 0 if not a new day.
+ */
+function is_new_day() {
+	global $currentday, $previousday;
+	if ( $currentday != $previousday )
+		return 1;
+	else
+		return 0;
+}
+
+/**
+ * Build URL query based on an associative and, or indexed array.
+ *
+ * This is a convenient function for easily building url queries. It sets the
+ * separator to '&' and uses _http_build_query() function.
+ *
+ * @since 2.3.0
+ *
+ * @see _http_build_query() Used to build the query
+ * @link https://secure.php.net/manual/en/function.http-build-query.php for more on what
+ *		 http_build_query() does.
+ *
+ * @param array $data URL-encode key/value pairs.
+ * @return string URL-encoded string.
+ */
+function build_query( $data ) {
+	return _http_build_query( $data, null, '&', '', false );
+}
+
+/**
+ * From php.net (modified by Mark Jaquith to behave like the native PHP5 function).
+ *
+ * @since 3.2.0
+ * @access private
+ *
+ * @see https://secure.php.net/manual/en/function.http-build-query.php
+ *
+ * @param array|object  $data       An array or object of data. Converted to array.
+ * @param string        $prefix     Optional. Numeric index. If set, start parameter numbering with it.
+ *                                  Default null.
+ * @param string        $sep        Optional. Argument separator; defaults to 'arg_separator.output'.
+ *                                  Default null.
+ * @param string        $key        Optional. Used to prefix key name. Default empty.
+ * @param bool          $urlencode  Optional. Whether to use urlencode() in the result. Default true.
+ *
+ * @return string The query string.
+ */
+function _http_build_query( $data, $prefix = null, $sep = null, $key = '', $urlencode = true ) {
+	$ret = array();
+
+	foreach ( (array) $data as $k => $v ) {
+		if ( $urlencode)
+			$k = urlencode($k);
+		if ( is_int($k) && $prefix != null )
+			$k = $prefix.$k;
+		if ( !empty($key) )
+			$k = $key . '%5B' . $k . '%5D';
+		if ( $v === null )
+			continue;
+		elseif ( $v === false )
+			$v = '0';
+
+		if ( is_array($v) || is_object($v) )
+			array_push($ret,_http_build_query($v, '', $sep, $k, $urlencode));
+		elseif ( $urlencode )
+			array_push($ret, $k.'='.urlencode($v));
+		else
+			array_push($ret, $k.'='.$v);
+	}
+
+	if ( null === $sep )
+		$sep = ini_get('arg_separator.output');
+
+	return implode($sep, $ret);
+}
+
+/**
+ * Retrieves a modified URL query string.
+ *
+ * You can rebuild the URL and append query variables to the URL query by using this function.
+ * There are two ways to use this function; either a single key and value, or an associative array.
+ *
+ * Using a single key and value:
+ *
+ *     add_query_arg( 'key', 'value', 'http://example.com' );
+ *
+ * Using an associative array:
+ *
+ *     add_query_arg( array(
+ *         'key1' => 'value1',
+ *         'key2' => 'value2',
+ *     ), 'http://example.com' );
+ *
+ * Omitting the URL from either use results in the current URL being used
+ * (the value of `$_SERVER['REQUEST_URI']`).
+ *
+ * Values are expected to be encoded appropriately with urlencode() or rawurlencode().
+ *
+ * Setting any query variable's value to boolean false removes the key (see remove_query_arg()).
+ *
+ * Important: The return value of add_query_arg() is not escaped by default. Output should be
+ * late-escaped with esc_url() or similar to help prevent vulnerability to cross-site scripting
+ * (XSS) attacks.
+ *
+ * @since 1.5.0
+ *
+ * @param string|array $key   Either a query variable key, or an associative array of query variables.
+ * @param string       $value Optional. Either a query variable value, or a URL to act upon.
+ * @param string       $url   Optional. A URL to act upon.
+ * @return string New URL query string (unescaped).
+ */
+function add_query_arg() {
+	$args = func_get_args();
+	if ( is_array( $args[0] ) ) {
+		if ( count( $args ) < 2 || false === $args[1] )
+			$uri = $_SERVER['REQUEST_URI'];
+		else
+			$uri = $args[1];
+	} else {
+		if ( count( $args ) < 3 || false === $args[2] )
+			$uri = $_SERVER['REQUEST_URI'];
+		else
+			$uri = $args[2];
+	}
+
+	if ( $frag = strstr( $uri, '#' ) )
+		$uri = substr( $uri, 0, -strlen( $frag ) );
+	else
+		$frag = '';
+
+	if ( 0 === stripos( $uri, 'http://' ) ) {
+		$protocol = 'http://';
+		$uri = substr( $uri, 7 );
+	} elseif ( 0 === stripos( $uri, 'https://' ) ) {
+		$protocol = 'https://';
+		$uri = substr( $uri, 8 );
+	} else {
+		$protocol = '';
+	}
+
+	if ( strpos( $uri, '?' ) !== false ) {
+		list( $base, $query ) = explode( '?', $uri, 2 );
+		$base .= '?';
+	} elseif ( $protocol || strpos( $uri, '=' ) === false ) {
+		$base = $uri . '?';
+		$query = '';
+	} else {
+		$base = '';
+		$query = $uri;
+	}
+
+	wp_parse_str( $query, $qs );
+	$qs = urlencode_deep( $qs ); // this re-URL-encodes things that were already in the query string
+	if ( is_array( $args[0] ) ) {
+		foreach ( $args[0] as $k => $v ) {
+			$qs[ $k ] = $v;
+		}
+	} else {
+		$qs[ $args[0] ] = $args[1];
+	}
+
+	foreach ( $qs as $k => $v ) {
+		if ( $v === false )
+			unset( $qs[$k] );
+	}
+
+	$ret = build_query( $qs );
+	$ret = trim( $ret, '?' );
+	$ret = preg_replace( '#=(&|$)#', '$1', $ret );
+	$ret = $protocol . $base . $ret . $frag;
+	$ret = rtrim( $ret, '?' );
+	return $ret;
+}
+
+/**
+ * Removes an item or items from a query string.
+ *
+ * @since 1.5.0
+ *
+ * @param string|array $key   Query key or keys to remove.
+ * @param bool|string  $query Optional. When false uses the current URL. Default false.
+ * @return string New URL query string.
+ */
+function remove_query_arg( $key, $query = false ) {
+	if ( is_array( $key ) ) { // removing multiple keys
+		foreach ( $key as $k )
+			$query = add_query_arg( $k, false, $query );
+		return $query;
+	}
+	return add_query_arg( $key, false, $query );
+}
+
+/**
+ * Returns an array of single-use query variable names that can be removed from a URL.
+ *
+ * @since 4.4.0
+ *
+ * @return array An array of parameters to remove from the URL.
+ */
+function wp_removable_query_args() {
+	$removable_query_args = array(
+		'activate',
+		'activated',
+		'approved',
+		'deactivate',
+		'deleted',
+		'disabled',
+		'enabled',
+		'error',
+		'hotkeys_highlight_first',
+		'hotkeys_highlight_last',
+		'locked',
+		'message',
+		'same',
+		'saved',
+		'settings-updated',
+		'skipped',
+		'spammed',
+		'trashed',
+		'unspammed',
+		'untrashed',
+		'update',
+		'updated',
+		'wp-post-new-reload',
+	);
+
+	/**
+	 * Filters the list of query variables to remove.
+	 *
+	 * @since 4.2.0
+	 *
+	 * @param array $removable_query_args An array of query variables to remove from a URL.
+	 */
+	return apply_filters( 'removable_query_args', $removable_query_args );
+}
+
+/**
+ * Walks the array while sanitizing the contents.
+ *
+ * @since 0.71
+ *
+ * @param array $array Array to walk while sanitizing contents.
+ * @return array Sanitized $array.
+ */
+function add_magic_quotes( $array ) {
+	foreach ( (array) $array as $k => $v ) {
+		if ( is_array( $v ) ) {
+			$array[$k] = add_magic_quotes( $v );
+		} else {
+			$array[$k] = addslashes( $v );
+		}
+	}
+	return $array;
+}
+
+/**
+ * HTTP request for URI to retrieve content.
+ *
+ * @since 1.5.1
+ *
+ * @see wp_safe_remote_get()
+ *
+ * @param string $uri URI/URL of web page to retrieve.
+ * @return false|string HTTP content. False on failure.
+ */
+function wp_remote_fopen( $uri ) {
+	$parsed_url = @parse_url( $uri );
+
+	if ( !$parsed_url || !is_array( $parsed_url ) )
+		return false;
+
+	$options = array();
+	$options['timeout'] = 10;
+
+	$response = wp_safe_remote_get( $uri, $options );
+
+	if ( is_wp_error( $response ) )
+		return false;
+
+	return wp_remote_retrieve_body( $response );
+}
+
+/**
+ * Set up the WordPress query.
+ *
+ * @since 2.0.0
+ *
+ * @global WP       $wp_locale
+ * @global WP_Query $wp_query
+ * @global WP_Query $wp_the_query
+ *
+ * @param string|array $query_vars Default WP_Query arguments.
+ */
+function wp( $query_vars = '' ) {
+	global $wp, $wp_query, $wp_the_query;
+	$wp->main( $query_vars );
+
+	if ( !isset($wp_the_query) )
+		$wp_the_query = $wp_query;
+}
+
+/**
+ * Retrieve the description for the HTTP status.
+ *
+ * @since 2.3.0
+ *
+ * @global array $wp_header_to_desc
+ *
+ * @param int $code HTTP status code.
+ * @return string Empty string if not found, or description if found.
+ */
+function get_status_header_desc( $code ) {
+	global $wp_header_to_desc;
+
+	$code = absint( $code );
+
+	if ( !isset( $wp_header_to_desc ) ) {
+		$wp_header_to_desc = array(
+			100 => 'Continue',
+			101 => 'Switching Protocols',
+			102 => 'Processing',
+
+			200 => 'OK',
+			201 => 'Created',
+			202 => 'Accepted',
+			203 => 'Non-Authoritative Information',
+			204 => 'No Content',
+			205 => 'Reset Content',
+			206 => 'Partial Content',
+			207 => 'Multi-Status',
+			226 => 'IM Used',
+
+			300 => 'Multiple Choices',
+			301 => 'Moved Permanently',
+			302 => 'Found',
+			303 => 'See Other',
+			304 => 'Not Modified',
+			305 => 'Use Proxy',
+			306 => 'Reserved',
+			307 => 'Temporary Redirect',
+			308 => 'Permanent Redirect',
+
+			400 => 'Bad Request',
+			401 => 'Unauthorized',
+			402 => 'Payment Required',
+			403 => 'Forbidden',
+			404 => 'Not Found',
+			405 => 'Method Not Allowed',
+			406 => 'Not Acceptable',
+			407 => 'Proxy Authentication Required',
+			408 => 'Request Timeout',
+			409 => 'Conflict',
+			410 => 'Gone',
+			411 => 'Length Required',
+			412 => 'Precondition Failed',
+			413 => 'Request Entity Too Large',
+			414 => 'Request-URI Too Long',
+			415 => 'Unsupported Media Type',
+			416 => 'Requested Range Not Satisfiable',
+			417 => 'Expectation Failed',
+			418 => 'I\'m a teapot',
+			421 => 'Misdirected Request',
+			422 => 'Unprocessable Entity',
+			423 => 'Locked',
+			424 => 'Failed Dependency',
+			426 => 'Upgrade Required',
+			428 => 'Precondition Required',
+			429 => 'Too Many Requests',
+			431 => 'Request Header Fields Too Large',
+			451 => 'Unavailable For Legal Reasons',
+
+			500 => 'Internal Server Error',
+			501 => 'Not Implemented',
+			502 => 'Bad Gateway',
+			503 => 'Service Unavailable',
+			504 => 'Gateway Timeout',
+			505 => 
