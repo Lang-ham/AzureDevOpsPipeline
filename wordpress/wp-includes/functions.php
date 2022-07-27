@@ -1038,4 +1038,410 @@ function get_status_header_desc( $code ) {
 			502 => 'Bad Gateway',
 			503 => 'Service Unavailable',
 			504 => 'Gateway Timeout',
-			505 => 
+			505 => 'HTTP Version Not Supported',
+			506 => 'Variant Also Negotiates',
+			507 => 'Insufficient Storage',
+			510 => 'Not Extended',
+			511 => 'Network Authentication Required',
+		);
+	}
+
+	if ( isset( $wp_header_to_desc[$code] ) )
+		return $wp_header_to_desc[$code];
+	else
+		return '';
+}
+
+/**
+ * Set HTTP status header.
+ *
+ * @since 2.0.0
+ * @since 4.4.0 Added the `$description` parameter.
+ *
+ * @see get_status_header_desc()
+ *
+ * @param int    $code        HTTP status code.
+ * @param string $description Optional. A custom description for the HTTP status.
+ */
+function status_header( $code, $description = '' ) {
+	if ( ! $description ) {
+		$description = get_status_header_desc( $code );
+	}
+
+	if ( empty( $description ) ) {
+		return;
+	}
+
+	$protocol = wp_get_server_protocol();
+	$status_header = "$protocol $code $description";
+	if ( function_exists( 'apply_filters' ) )
+
+		/**
+		 * Filters an HTTP status header.
+		 *
+		 * @since 2.2.0
+		 *
+		 * @param string $status_header HTTP status header.
+		 * @param int    $code          HTTP status code.
+		 * @param string $description   Description for the status code.
+		 * @param string $protocol      Server protocol.
+		 */
+		$status_header = apply_filters( 'status_header', $status_header, $code, $description, $protocol );
+
+	@header( $status_header, true, $code );
+}
+
+/**
+ * Get the header information to prevent caching.
+ *
+ * The several different headers cover the different ways cache prevention
+ * is handled by different browsers
+ *
+ * @since 2.8.0
+ *
+ * @return array The associative array of header names and field values.
+ */
+function wp_get_nocache_headers() {
+	$headers = array(
+		'Expires' => 'Wed, 11 Jan 1984 05:00:00 GMT',
+		'Cache-Control' => 'no-cache, must-revalidate, max-age=0',
+	);
+
+	if ( function_exists('apply_filters') ) {
+		/**
+		 * Filters the cache-controlling headers.
+		 *
+		 * @since 2.8.0
+		 *
+		 * @see wp_get_nocache_headers()
+		 *
+		 * @param array $headers {
+		 *     Header names and field values.
+		 *
+		 *     @type string $Expires       Expires header.
+		 *     @type string $Cache-Control Cache-Control header.
+		 * }
+		 */
+		$headers = (array) apply_filters( 'nocache_headers', $headers );
+	}
+	$headers['Last-Modified'] = false;
+	return $headers;
+}
+
+/**
+ * Set the headers to prevent caching for the different browsers.
+ *
+ * Different browsers support different nocache headers, so several
+ * headers must be sent so that all of them get the point that no
+ * caching should occur.
+ *
+ * @since 2.0.0
+ *
+ * @see wp_get_nocache_headers()
+ */
+function nocache_headers() {
+	$headers = wp_get_nocache_headers();
+
+	unset( $headers['Last-Modified'] );
+
+	// In PHP 5.3+, make sure we are not sending a Last-Modified header.
+	if ( function_exists( 'header_remove' ) ) {
+		@header_remove( 'Last-Modified' );
+	} else {
+		// In PHP 5.2, send an empty Last-Modified header, but only as a
+		// last resort to override a header already sent. #WP23021
+		foreach ( headers_list() as $header ) {
+			if ( 0 === stripos( $header, 'Last-Modified' ) ) {
+				$headers['Last-Modified'] = '';
+				break;
+			}
+		}
+	}
+
+	foreach ( $headers as $name => $field_value )
+		@header("{$name}: {$field_value}");
+}
+
+/**
+ * Set the headers for caching for 10 days with JavaScript content type.
+ *
+ * @since 2.1.0
+ */
+function cache_javascript_headers() {
+	$expiresOffset = 10 * DAY_IN_SECONDS;
+
+	header( "Content-Type: text/javascript; charset=" . get_bloginfo( 'charset' ) );
+	header( "Vary: Accept-Encoding" ); // Handle proxies
+	header( "Expires: " . gmdate( "D, d M Y H:i:s", time() + $expiresOffset ) . " GMT" );
+}
+
+/**
+ * Retrieve the number of database queries during the WordPress execution.
+ *
+ * @since 2.0.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @return int Number of database queries.
+ */
+function get_num_queries() {
+	global $wpdb;
+	return $wpdb->num_queries;
+}
+
+/**
+ * Whether input is yes or no.
+ *
+ * Must be 'y' to be true.
+ *
+ * @since 1.0.0
+ *
+ * @param string $yn Character string containing either 'y' (yes) or 'n' (no).
+ * @return bool True if yes, false on anything else.
+ */
+function bool_from_yn( $yn ) {
+	return ( strtolower( $yn ) == 'y' );
+}
+
+/**
+ * Load the feed template from the use of an action hook.
+ *
+ * If the feed action does not have a hook, then the function will die with a
+ * message telling the visitor that the feed is not valid.
+ *
+ * It is better to only have one hook for each feed.
+ *
+ * @since 2.1.0
+ *
+ * @global WP_Query $wp_query Used to tell if the use a comment feed.
+ */
+function do_feed() {
+	global $wp_query;
+
+	$feed = get_query_var( 'feed' );
+
+	// Remove the pad, if present.
+	$feed = preg_replace( '/^_+/', '', $feed );
+
+	if ( $feed == '' || $feed == 'feed' )
+		$feed = get_default_feed();
+
+	if ( ! has_action( "do_feed_{$feed}" ) ) {
+		wp_die( __( 'ERROR: This is not a valid feed template.' ), '', array( 'response' => 404 ) );
+	}
+
+	/**
+	 * Fires once the given feed is loaded.
+	 *
+	 * The dynamic portion of the hook name, `$feed`, refers to the feed template name.
+	 * Possible values include: 'rdf', 'rss', 'rss2', and 'atom'.
+	 *
+	 * @since 2.1.0
+	 * @since 4.4.0 The `$feed` parameter was added.
+	 *
+	 * @param bool   $is_comment_feed Whether the feed is a comment feed.
+	 * @param string $feed            The feed name.
+	 */
+	do_action( "do_feed_{$feed}", $wp_query->is_comment_feed, $feed );
+}
+
+/**
+ * Load the RDF RSS 0.91 Feed template.
+ *
+ * @since 2.1.0
+ *
+ * @see load_template()
+ */
+function do_feed_rdf() {
+	load_template( ABSPATH . WPINC . '/feed-rdf.php' );
+}
+
+/**
+ * Load the RSS 1.0 Feed Template.
+ *
+ * @since 2.1.0
+ *
+ * @see load_template()
+ */
+function do_feed_rss() {
+	load_template( ABSPATH . WPINC . '/feed-rss.php' );
+}
+
+/**
+ * Load either the RSS2 comment feed or the RSS2 posts feed.
+ *
+ * @since 2.1.0
+ *
+ * @see load_template()
+ *
+ * @param bool $for_comments True for the comment feed, false for normal feed.
+ */
+function do_feed_rss2( $for_comments ) {
+	if ( $for_comments )
+		load_template( ABSPATH . WPINC . '/feed-rss2-comments.php' );
+	else
+		load_template( ABSPATH . WPINC . '/feed-rss2.php' );
+}
+
+/**
+ * Load either Atom comment feed or Atom posts feed.
+ *
+ * @since 2.1.0
+ *
+ * @see load_template()
+ *
+ * @param bool $for_comments True for the comment feed, false for normal feed.
+ */
+function do_feed_atom( $for_comments ) {
+	if ($for_comments)
+		load_template( ABSPATH . WPINC . '/feed-atom-comments.php');
+	else
+		load_template( ABSPATH . WPINC . '/feed-atom.php' );
+}
+
+/**
+ * Display the robots.txt file content.
+ *
+ * The echo content should be with usage of the permalinks or for creating the
+ * robots.txt file.
+ *
+ * @since 2.1.0
+ */
+function do_robots() {
+	header( 'Content-Type: text/plain; charset=utf-8' );
+
+	/**
+	 * Fires when displaying the robots.txt file.
+	 *
+	 * @since 2.1.0
+	 */
+	do_action( 'do_robotstxt' );
+
+	$output = "User-agent: *\n";
+	$public = get_option( 'blog_public' );
+	if ( '0' == $public ) {
+		$output .= "Disallow: /\n";
+	} else {
+		$site_url = parse_url( site_url() );
+		$path = ( !empty( $site_url['path'] ) ) ? $site_url['path'] : '';
+		$output .= "Disallow: $path/wp-admin/\n";
+		$output .= "Allow: $path/wp-admin/admin-ajax.php\n";
+	}
+
+	/**
+	 * Filters the robots.txt output.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $output Robots.txt output.
+	 * @param bool   $public Whether the site is considered "public".
+	 */
+	echo apply_filters( 'robots_txt', $output, $public );
+}
+
+/**
+ * Test whether WordPress is already installed.
+ *
+ * The cache will be checked first. If you have a cache plugin, which saves
+ * the cache values, then this will work. If you use the default WordPress
+ * cache, and the database goes away, then you might have problems.
+ *
+ * Checks for the 'siteurl' option for whether WordPress is installed.
+ *
+ * @since 2.1.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @return bool Whether the site is already installed.
+ */
+function is_blog_installed() {
+	global $wpdb;
+
+	/*
+	 * Check cache first. If options table goes away and we have true
+	 * cached, oh well.
+	 */
+	if ( wp_cache_get( 'is_blog_installed' ) )
+		return true;
+
+	$suppress = $wpdb->suppress_errors();
+	if ( ! wp_installing() ) {
+		$alloptions = wp_load_alloptions();
+	}
+	// If siteurl is not set to autoload, check it specifically
+	if ( !isset( $alloptions['siteurl'] ) )
+		$installed = $wpdb->get_var( "SELECT option_value FROM $wpdb->options WHERE option_name = 'siteurl'" );
+	else
+		$installed = $alloptions['siteurl'];
+	$wpdb->suppress_errors( $suppress );
+
+	$installed = !empty( $installed );
+	wp_cache_set( 'is_blog_installed', $installed );
+
+	if ( $installed )
+		return true;
+
+	// If visiting repair.php, return true and let it take over.
+	if ( defined( 'WP_REPAIRING' ) )
+		return true;
+
+	$suppress = $wpdb->suppress_errors();
+
+	/*
+	 * Loop over the WP tables. If none exist, then scratch installation is allowed.
+	 * If one or more exist, suggest table repair since we got here because the
+	 * options table could not be accessed.
+	 */
+	$wp_tables = $wpdb->tables();
+	foreach ( $wp_tables as $table ) {
+		// The existence of custom user tables shouldn't suggest an insane state or prevent a clean installation.
+		if ( defined( 'CUSTOM_USER_TABLE' ) && CUSTOM_USER_TABLE == $table )
+			continue;
+		if ( defined( 'CUSTOM_USER_META_TABLE' ) && CUSTOM_USER_META_TABLE == $table )
+			continue;
+
+		if ( ! $wpdb->get_results( "DESCRIBE $table;" ) )
+			continue;
+
+		// One or more tables exist. We are insane.
+
+		wp_load_translations_early();
+
+		// Die with a DB error.
+		$wpdb->error = sprintf(
+			/* translators: %s: database repair URL */
+			__( 'One or more database tables are unavailable. The database may need to be <a href="%s">repaired</a>.' ),
+			'maint/repair.php?referrer=is_blog_installed'
+		);
+
+		dead_db();
+	}
+
+	$wpdb->suppress_errors( $suppress );
+
+	wp_cache_set( 'is_blog_installed', false );
+
+	return false;
+}
+
+/**
+ * Retrieve URL with nonce added to URL query.
+ *
+ * @since 2.0.4
+ *
+ * @param string     $actionurl URL to add nonce action.
+ * @param int|string $action    Optional. Nonce action name. Default -1.
+ * @param string     $name      Optional. Nonce name. Default '_wpnonce'.
+ * @return string Escaped URL with nonce action added.
+ */
+function wp_nonce_url( $actionurl, $action = -1, $name = '_wpnonce' ) {
+	$actionurl = str_replace( '&amp;', '&', $actionurl );
+	return esc_html( add_query_arg( $name, wp_create_nonce( $action ), $actionurl ) );
+}
+
+/**
+ * Retrieve or display nonce hidden field for forms.
+ *
+ * The nonce field is used to validate that the contents of the form came from
+ * the location on the current site and not somewhere else. The nonce does not
+ * offer absolute protection, but should protect against most ca
