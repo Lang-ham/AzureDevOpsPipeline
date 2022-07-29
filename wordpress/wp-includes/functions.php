@@ -1813,4 +1813,303 @@ function win_is_writable( $path ) {
 }
 
 /**
- * Retrieves uploads directory inform
+ * Retrieves uploads directory information.
+ *
+ * Same as wp_upload_dir() but "light weight" as it doesn't attempt to create the uploads directory.
+ * Intended for use in themes, when only 'basedir' and 'baseurl' are needed, generally in all cases
+ * when not uploading files.
+ *
+ * @since 4.5.0
+ *
+ * @see wp_upload_dir()
+ *
+ * @return array See wp_upload_dir() for description.
+ */
+function wp_get_upload_dir() {
+	return wp_upload_dir( null, false );
+}
+
+/**
+ * Get an array containing the current upload directory's path and url.
+ *
+ * Checks the 'upload_path' option, which should be from the web root folder,
+ * and if it isn't empty it will be used. If it is empty, then the path will be
+ * 'WP_CONTENT_DIR/uploads'. If the 'UPLOADS' constant is defined, then it will
+ * override the 'upload_path' option and 'WP_CONTENT_DIR/uploads' path.
+ *
+ * The upload URL path is set either by the 'upload_url_path' option or by using
+ * the 'WP_CONTENT_URL' constant and appending '/uploads' to the path.
+ *
+ * If the 'uploads_use_yearmonth_folders' is set to true (checkbox if checked in
+ * the administration settings panel), then the time will be used. The format
+ * will be year first and then month.
+ *
+ * If the path couldn't be created, then an error will be returned with the key
+ * 'error' containing the error message. The error suggests that the parent
+ * directory is not writable by the server.
+ *
+ * On success, the returned array will have many indices:
+ * 'path' - base directory and sub directory or full path to upload directory.
+ * 'url' - base url and sub directory or absolute URL to upload directory.
+ * 'subdir' - sub directory if uploads use year/month folders option is on.
+ * 'basedir' - path without subdir.
+ * 'baseurl' - URL path without subdir.
+ * 'error' - false or error message.
+ *
+ * @since 2.0.0
+ * @uses _wp_upload_dir()
+ *
+ * @staticvar array $cache
+ * @staticvar array $tested_paths
+ *
+ * @param string $time Optional. Time formatted in 'yyyy/mm'. Default null.
+ * @param bool   $create_dir Optional. Whether to check and create the uploads directory.
+ *                           Default true for backward compatibility.
+ * @param bool   $refresh_cache Optional. Whether to refresh the cache. Default false.
+ * @return array See above for description.
+ */
+function wp_upload_dir( $time = null, $create_dir = true, $refresh_cache = false ) {
+	static $cache = array(), $tested_paths = array();
+
+	$key = sprintf( '%d-%s', get_current_blog_id(), (string) $time );
+
+	if ( $refresh_cache || empty( $cache[ $key ] ) ) {
+		$cache[ $key ] = _wp_upload_dir( $time );
+	}
+
+	/**
+	 * Filters the uploads directory data.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param array $uploads Array of upload directory data with keys of 'path',
+	 *                       'url', 'subdir, 'basedir', and 'error'.
+	 */
+	$uploads = apply_filters( 'upload_dir', $cache[ $key ] );
+
+	if ( $create_dir ) {
+		$path = $uploads['path'];
+
+		if ( array_key_exists( $path, $tested_paths ) ) {
+			$uploads['error'] = $tested_paths[ $path ];
+		} else {
+			if ( ! wp_mkdir_p( $path ) ) {
+				if ( 0 === strpos( $uploads['basedir'], ABSPATH ) ) {
+					$error_path = str_replace( ABSPATH, '', $uploads['basedir'] ) . $uploads['subdir'];
+				} else {
+					$error_path = basename( $uploads['basedir'] ) . $uploads['subdir'];
+				}
+
+				$uploads['error'] = sprintf(
+					/* translators: %s: directory path */
+					__( 'Unable to create directory %s. Is its parent directory writable by the server?' ),
+					esc_html( $error_path )
+				);
+			}
+
+			$tested_paths[ $path ] = $uploads['error'];
+		}
+	}
+
+	return $uploads;
+}
+
+/**
+ * A non-filtered, non-cached version of wp_upload_dir() that doesn't check the path.
+ *
+ * @since 4.5.0
+ * @access private
+ *
+ * @param string $time Optional. Time formatted in 'yyyy/mm'. Default null.
+ * @return array See wp_upload_dir()
+ */
+function _wp_upload_dir( $time = null ) {
+	$siteurl = get_option( 'siteurl' );
+	$upload_path = trim( get_option( 'upload_path' ) );
+
+	if ( empty( $upload_path ) || 'wp-content/uploads' == $upload_path ) {
+		$dir = WP_CONTENT_DIR . '/uploads';
+	} elseif ( 0 !== strpos( $upload_path, ABSPATH ) ) {
+		// $dir is absolute, $upload_path is (maybe) relative to ABSPATH
+		$dir = path_join( ABSPATH, $upload_path );
+	} else {
+		$dir = $upload_path;
+	}
+
+	if ( !$url = get_option( 'upload_url_path' ) ) {
+		if ( empty($upload_path) || ( 'wp-content/uploads' == $upload_path ) || ( $upload_path == $dir ) )
+			$url = WP_CONTENT_URL . '/uploads';
+		else
+			$url = trailingslashit( $siteurl ) . $upload_path;
+	}
+
+	/*
+	 * Honor the value of UPLOADS. This happens as long as ms-files rewriting is disabled.
+	 * We also sometimes obey UPLOADS when rewriting is enabled -- see the next block.
+	 */
+	if ( defined( 'UPLOADS' ) && ! ( is_multisite() && get_site_option( 'ms_files_rewriting' ) ) ) {
+		$dir = ABSPATH . UPLOADS;
+		$url = trailingslashit( $siteurl ) . UPLOADS;
+	}
+
+	// If multisite (and if not the main site in a post-MU network)
+	if ( is_multisite() && ! ( is_main_network() && is_main_site() && defined( 'MULTISITE' ) ) ) {
+
+		if ( ! get_site_option( 'ms_files_rewriting' ) ) {
+			/*
+			 * If ms-files rewriting is disabled (networks created post-3.5), it is fairly
+			 * straightforward: Append sites/%d if we're not on the main site (for post-MU
+			 * networks). (The extra directory prevents a four-digit ID from conflicting with
+			 * a year-based directory for the main site. But if a MU-era network has disabled
+			 * ms-files rewriting manually, they don't need the extra directory, as they never
+			 * had wp-content/uploads for the main site.)
+			 */
+
+			if ( defined( 'MULTISITE' ) )
+				$ms_dir = '/sites/' . get_current_blog_id();
+			else
+				$ms_dir = '/' . get_current_blog_id();
+
+			$dir .= $ms_dir;
+			$url .= $ms_dir;
+
+		} elseif ( defined( 'UPLOADS' ) && ! ms_is_switched() ) {
+			/*
+			 * Handle the old-form ms-files.php rewriting if the network still has that enabled.
+			 * When ms-files rewriting is enabled, then we only listen to UPLOADS when:
+			 * 1) We are not on the main site in a post-MU network, as wp-content/uploads is used
+			 *    there, and
+			 * 2) We are not switched, as ms_upload_constants() hardcodes these constants to reflect
+			 *    the original blog ID.
+			 *
+			 * Rather than UPLOADS, we actually use BLOGUPLOADDIR if it is set, as it is absolute.
+			 * (And it will be set, see ms_upload_constants().) Otherwise, UPLOADS can be used, as
+			 * as it is relative to ABSPATH. For the final piece: when UPLOADS is used with ms-files
+			 * rewriting in multisite, the resulting URL is /files. (#WP22702 for background.)
+			 */
+
+			if ( defined( 'BLOGUPLOADDIR' ) )
+				$dir = untrailingslashit( BLOGUPLOADDIR );
+			else
+				$dir = ABSPATH . UPLOADS;
+			$url = trailingslashit( $siteurl ) . 'files';
+		}
+	}
+
+	$basedir = $dir;
+	$baseurl = $url;
+
+	$subdir = '';
+	if ( get_option( 'uploads_use_yearmonth_folders' ) ) {
+		// Generate the yearly and monthly dirs
+		if ( !$time )
+			$time = current_time( 'mysql' );
+		$y = substr( $time, 0, 4 );
+		$m = substr( $time, 5, 2 );
+		$subdir = "/$y/$m";
+	}
+
+	$dir .= $subdir;
+	$url .= $subdir;
+
+	return array(
+		'path'    => $dir,
+		'url'     => $url,
+		'subdir'  => $subdir,
+		'basedir' => $basedir,
+		'baseurl' => $baseurl,
+		'error'   => false,
+	);
+}
+
+/**
+ * Get a filename that is sanitized and unique for the given directory.
+ *
+ * If the filename is not unique, then a number will be added to the filename
+ * before the extension, and will continue adding numbers until the filename is
+ * unique.
+ *
+ * The callback is passed three parameters, the first one is the directory, the
+ * second is the filename, and the third is the extension.
+ *
+ * @since 2.5.0
+ *
+ * @param string   $dir                      Directory.
+ * @param string   $filename                 File name.
+ * @param callable $unique_filename_callback Callback. Default null.
+ * @return string New filename, if given wasn't unique.
+ */
+function wp_unique_filename( $dir, $filename, $unique_filename_callback = null ) {
+	// Sanitize the file name before we begin processing.
+	$filename = sanitize_file_name($filename);
+
+	// Separate the filename into a name and extension.
+	$ext = pathinfo( $filename, PATHINFO_EXTENSION );
+	$name = pathinfo( $filename, PATHINFO_BASENAME );
+	if ( $ext ) {
+		$ext = '.' . $ext;
+	}
+
+	// Edge case: if file is named '.ext', treat as an empty name.
+	if ( $name === $ext ) {
+		$name = '';
+	}
+
+	/*
+	 * Increment the file number until we have a unique file to save in $dir.
+	 * Use callback if supplied.
+	 */
+	if ( $unique_filename_callback && is_callable( $unique_filename_callback ) ) {
+		$filename = call_user_func( $unique_filename_callback, $dir, $name, $ext );
+	} else {
+		$number = '';
+
+		// Change '.ext' to lower case.
+		if ( $ext && strtolower($ext) != $ext ) {
+			$ext2 = strtolower($ext);
+			$filename2 = preg_replace( '|' . preg_quote($ext) . '$|', $ext2, $filename );
+
+			// Check for both lower and upper case extension or image sub-sizes may be overwritten.
+			while ( file_exists($dir . "/$filename") || file_exists($dir . "/$filename2") ) {
+				$new_number = (int) $number + 1;
+				$filename = str_replace( array( "-$number$ext", "$number$ext" ), "-$new_number$ext", $filename );
+				$filename2 = str_replace( array( "-$number$ext2", "$number$ext2" ), "-$new_number$ext2", $filename2 );
+				$number = $new_number;
+			}
+
+			/**
+			 * Filters the result when generating a unique file name.
+			 *
+			 * @since 4.5.0
+			 *
+			 * @param string        $filename                 Unique file name.
+			 * @param string        $ext                      File extension, eg. ".png".
+			 * @param string        $dir                      Directory path.
+			 * @param callable|null $unique_filename_callback Callback function that generates the unique file name.
+			 */
+			return apply_filters( 'wp_unique_filename', $filename2, $ext, $dir, $unique_filename_callback );
+		}
+
+		while ( file_exists( $dir . "/$filename" ) ) {
+			$new_number = (int) $number + 1;
+			if ( '' == "$number$ext" ) {
+				$filename = "$filename-" . $new_number;
+			} else {
+				$filename = str_replace( array( "-$number$ext", "$number$ext" ), "-" . $new_number . $ext, $filename );
+			}
+			$number = $new_number;
+		}
+	}
+
+	/** This filter is documented in wp-includes/functions.php */
+	return apply_filters( 'wp_unique_filename', $filename, $ext, $dir, $unique_filename_callback );
+}
+
+/**
+ * Create a file in the upload folder with given content.
+ *
+ * If there is an error, then the key 'error' will exist with the error message.
+ * If success, then the key 'file' will have the unique file path, the 'url' key
+ * will have the link to the new file. and the 'error' key will be set to false.
+ *
+ * This function will not move an uploade
