@@ -1444,4 +1444,373 @@ function wp_nonce_url( $actionurl, $action = -1, $name = '_wpnonce' ) {
  *
  * The nonce field is used to validate that the contents of the form came from
  * the location on the current site and not somewhere else. The nonce does not
- * offer absolute protection, but should protect against most ca
+ * offer absolute protection, but should protect against most cases. It is very
+ * important to use nonce field in forms.
+ *
+ * The $action and $name are optional, but if you want to have better security,
+ * it is strongly suggested to set those two parameters. It is easier to just
+ * call the function without any parameters, because validation of the nonce
+ * doesn't require any parameters, but since crackers know what the default is
+ * it won't be difficult for them to find a way around your nonce and cause
+ * damage.
+ *
+ * The input name will be whatever $name value you gave. The input value will be
+ * the nonce creation value.
+ *
+ * @since 2.0.4
+ *
+ * @param int|string $action  Optional. Action name. Default -1.
+ * @param string     $name    Optional. Nonce name. Default '_wpnonce'.
+ * @param bool       $referer Optional. Whether to set the referer field for validation. Default true.
+ * @param bool       $echo    Optional. Whether to display or return hidden form field. Default true.
+ * @return string Nonce field HTML markup.
+ */
+function wp_nonce_field( $action = -1, $name = "_wpnonce", $referer = true , $echo = true ) {
+	$name = esc_attr( $name );
+	$nonce_field = '<input type="hidden" id="' . $name . '" name="' . $name . '" value="' . wp_create_nonce( $action ) . '" />';
+
+	if ( $referer )
+		$nonce_field .= wp_referer_field( false );
+
+	if ( $echo )
+		echo $nonce_field;
+
+	return $nonce_field;
+}
+
+/**
+ * Retrieve or display referer hidden field for forms.
+ *
+ * The referer link is the current Request URI from the server super global. The
+ * input name is '_wp_http_referer', in case you wanted to check manually.
+ *
+ * @since 2.0.4
+ *
+ * @param bool $echo Optional. Whether to echo or return the referer field. Default true.
+ * @return string Referer field HTML markup.
+ */
+function wp_referer_field( $echo = true ) {
+	$referer_field = '<input type="hidden" name="_wp_http_referer" value="'. esc_attr( wp_unslash( $_SERVER['REQUEST_URI'] ) ) . '" />';
+
+	if ( $echo )
+		echo $referer_field;
+	return $referer_field;
+}
+
+/**
+ * Retrieve or display original referer hidden field for forms.
+ *
+ * The input name is '_wp_original_http_referer' and will be either the same
+ * value of wp_referer_field(), if that was posted already or it will be the
+ * current page, if it doesn't exist.
+ *
+ * @since 2.0.4
+ *
+ * @param bool   $echo         Optional. Whether to echo the original http referer. Default true.
+ * @param string $jump_back_to Optional. Can be 'previous' or page you want to jump back to.
+ *                             Default 'current'.
+ * @return string Original referer field.
+ */
+function wp_original_referer_field( $echo = true, $jump_back_to = 'current' ) {
+	if ( ! $ref = wp_get_original_referer() ) {
+		$ref = 'previous' == $jump_back_to ? wp_get_referer() : wp_unslash( $_SERVER['REQUEST_URI'] );
+	}
+	$orig_referer_field = '<input type="hidden" name="_wp_original_http_referer" value="' . esc_attr( $ref ) . '" />';
+	if ( $echo )
+		echo $orig_referer_field;
+	return $orig_referer_field;
+}
+
+/**
+ * Retrieve referer from '_wp_http_referer' or HTTP referer.
+ *
+ * If it's the same as the current request URL, will return false.
+ *
+ * @since 2.0.4
+ *
+ * @return false|string False on failure. Referer URL on success.
+ */
+function wp_get_referer() {
+	if ( ! function_exists( 'wp_validate_redirect' ) ) {
+		return false;
+	}
+
+	$ref = wp_get_raw_referer();
+
+	if ( $ref && $ref !== wp_unslash( $_SERVER['REQUEST_URI'] ) && $ref !== home_url() . wp_unslash( $_SERVER['REQUEST_URI'] ) ) {
+		return wp_validate_redirect( $ref, false );
+	}
+
+	return false;
+}
+
+/**
+ * Retrieves unvalidated referer from '_wp_http_referer' or HTTP referer.
+ *
+ * Do not use for redirects, use wp_get_referer() instead.
+ *
+ * @since 4.5.0
+ *
+ * @return string|false Referer URL on success, false on failure.
+ */
+function wp_get_raw_referer() {
+	if ( ! empty( $_REQUEST['_wp_http_referer'] ) ) {
+		return wp_unslash( $_REQUEST['_wp_http_referer'] );
+	} else if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
+		return wp_unslash( $_SERVER['HTTP_REFERER'] );
+	}
+
+	return false;
+}
+
+/**
+ * Retrieve original referer that was posted, if it exists.
+ *
+ * @since 2.0.4
+ *
+ * @return string|false False if no original referer or original referer if set.
+ */
+function wp_get_original_referer() {
+	if ( ! empty( $_REQUEST['_wp_original_http_referer'] ) && function_exists( 'wp_validate_redirect' ) )
+		return wp_validate_redirect( wp_unslash( $_REQUEST['_wp_original_http_referer'] ), false );
+	return false;
+}
+
+/**
+ * Recursive directory creation based on full path.
+ *
+ * Will attempt to set permissions on folders.
+ *
+ * @since 2.0.1
+ *
+ * @param string $target Full path to attempt to create.
+ * @return bool Whether the path was created. True if path already exists.
+ */
+function wp_mkdir_p( $target ) {
+	$wrapper = null;
+
+	// Strip the protocol.
+	if ( wp_is_stream( $target ) ) {
+		list( $wrapper, $target ) = explode( '://', $target, 2 );
+	}
+
+	// From php.net/mkdir user contributed notes.
+	$target = str_replace( '//', '/', $target );
+
+	// Put the wrapper back on the target.
+	if ( $wrapper !== null ) {
+		$target = $wrapper . '://' . $target;
+	}
+
+	/*
+	 * Safe mode fails with a trailing slash under certain PHP versions.
+	 * Use rtrim() instead of untrailingslashit to avoid formatting.php dependency.
+	 */
+	$target = rtrim($target, '/');
+	if ( empty($target) )
+		$target = '/';
+
+	if ( file_exists( $target ) )
+		return @is_dir( $target );
+
+	// We need to find the permissions of the parent folder that exists and inherit that.
+	$target_parent = dirname( $target );
+	while ( '.' != $target_parent && ! is_dir( $target_parent ) ) {
+		$target_parent = dirname( $target_parent );
+	}
+
+	// Get the permission bits.
+	if ( $stat = @stat( $target_parent ) ) {
+		$dir_perms = $stat['mode'] & 0007777;
+	} else {
+		$dir_perms = 0777;
+	}
+
+	if ( @mkdir( $target, $dir_perms, true ) ) {
+
+		/*
+		 * If a umask is set that modifies $dir_perms, we'll have to re-set
+		 * the $dir_perms correctly with chmod()
+		 */
+		if ( $dir_perms != ( $dir_perms & ~umask() ) ) {
+			$folder_parts = explode( '/', substr( $target, strlen( $target_parent ) + 1 ) );
+			for ( $i = 1, $c = count( $folder_parts ); $i <= $c; $i++ ) {
+				@chmod( $target_parent . '/' . implode( '/', array_slice( $folder_parts, 0, $i ) ), $dir_perms );
+			}
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Test if a given filesystem path is absolute.
+ *
+ * For example, '/foo/bar', or 'c:\windows'.
+ *
+ * @since 2.5.0
+ *
+ * @param string $path File path.
+ * @return bool True if path is absolute, false is not absolute.
+ */
+function path_is_absolute( $path ) {
+	/*
+	 * This is definitive if true but fails if $path does not exist or contains
+	 * a symbolic link.
+	 */
+	if ( realpath($path) == $path )
+		return true;
+
+	if ( strlen($path) == 0 || $path[0] == '.' )
+		return false;
+
+	// Windows allows absolute paths like this.
+	if ( preg_match('#^[a-zA-Z]:\\\\#', $path) )
+		return true;
+
+	// A path starting with / or \ is absolute; anything else is relative.
+	return ( $path[0] == '/' || $path[0] == '\\' );
+}
+
+/**
+ * Join two filesystem paths together.
+ *
+ * For example, 'give me $path relative to $base'. If the $path is absolute,
+ * then it the full path is returned.
+ *
+ * @since 2.5.0
+ *
+ * @param string $base Base path.
+ * @param string $path Path relative to $base.
+ * @return string The path with the base or absolute path.
+ */
+function path_join( $base, $path ) {
+	if ( path_is_absolute($path) )
+		return $path;
+
+	return rtrim($base, '/') . '/' . ltrim($path, '/');
+}
+
+/**
+ * Normalize a filesystem path.
+ *
+ * On windows systems, replaces backslashes with forward slashes
+ * and forces upper-case drive letters.
+ * Allows for two leading slashes for Windows network shares, but
+ * ensures that all other duplicate slashes are reduced to a single.
+ *
+ * @since 3.9.0
+ * @since 4.4.0 Ensures upper-case drive letters on Windows systems.
+ * @since 4.5.0 Allows for Windows network shares.
+ *
+ * @param string $path Path to normalize.
+ * @return string Normalized path.
+ */
+function wp_normalize_path( $path ) {
+	$path = str_replace( '\\', '/', $path );
+	$path = preg_replace( '|(?<=.)/+|', '/', $path );
+	if ( ':' === substr( $path, 1, 1 ) ) {
+		$path = ucfirst( $path );
+	}
+	return $path;
+}
+
+/**
+ * Determine a writable directory for temporary files.
+ *
+ * Function's preference is the return value of sys_get_temp_dir(),
+ * followed by your PHP temporary upload directory, followed by WP_CONTENT_DIR,
+ * before finally defaulting to /tmp/
+ *
+ * In the event that this function does not find a writable location,
+ * It may be overridden by the WP_TEMP_DIR constant in your wp-config.php file.
+ *
+ * @since 2.5.0
+ *
+ * @staticvar string $temp
+ *
+ * @return string Writable temporary directory.
+ */
+function get_temp_dir() {
+	static $temp = '';
+	if ( defined('WP_TEMP_DIR') )
+		return trailingslashit(WP_TEMP_DIR);
+
+	if ( $temp )
+		return trailingslashit( $temp );
+
+	if ( function_exists('sys_get_temp_dir') ) {
+		$temp = sys_get_temp_dir();
+		if ( @is_dir( $temp ) && wp_is_writable( $temp ) )
+			return trailingslashit( $temp );
+	}
+
+	$temp = ini_get('upload_tmp_dir');
+	if ( @is_dir( $temp ) && wp_is_writable( $temp ) )
+		return trailingslashit( $temp );
+
+	$temp = WP_CONTENT_DIR . '/';
+	if ( is_dir( $temp ) && wp_is_writable( $temp ) )
+		return $temp;
+
+	return '/tmp/';
+}
+
+/**
+ * Determine if a directory is writable.
+ *
+ * This function is used to work around certain ACL issues in PHP primarily
+ * affecting Windows Servers.
+ *
+ * @since 3.6.0
+ *
+ * @see win_is_writable()
+ *
+ * @param string $path Path to check for write-ability.
+ * @return bool Whether the path is writable.
+ */
+function wp_is_writable( $path ) {
+	if ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) )
+		return win_is_writable( $path );
+	else
+		return @is_writable( $path );
+}
+
+/**
+ * Workaround for Windows bug in is_writable() function
+ *
+ * PHP has issues with Windows ACL's for determine if a
+ * directory is writable or not, this works around them by
+ * checking the ability to open files rather than relying
+ * upon PHP to interprate the OS ACL.
+ *
+ * @since 2.8.0
+ *
+ * @see https://bugs.php.net/bug.php?id=27609
+ * @see https://bugs.php.net/bug.php?id=30931
+ *
+ * @param string $path Windows path to check for write-ability.
+ * @return bool Whether the path is writable.
+ */
+function win_is_writable( $path ) {
+
+	if ( $path[strlen( $path ) - 1] == '/' ) { // if it looks like a directory, check a random file within the directory
+		return win_is_writable( $path . uniqid( mt_rand() ) . '.tmp');
+	} elseif ( is_dir( $path ) ) { // If it's a directory (and not a file) check a random file within the directory
+		return win_is_writable( $path . '/' . uniqid( mt_rand() ) . '.tmp' );
+	}
+	// check tmp file for read/write capabilities
+	$should_delete_tmp_file = !file_exists( $path );
+	$f = @fopen( $path, 'a' );
+	if ( $f === false )
+		return false;
+	fclose( $f );
+	if ( $should_delete_tmp_file )
+		unlink( $path );
+	return true;
+}
+
+/**
+ * Retrieves uploads directory inform
