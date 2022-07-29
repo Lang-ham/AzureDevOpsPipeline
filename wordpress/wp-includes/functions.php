@@ -2112,4 +2112,334 @@ function wp_unique_filename( $dir, $filename, $unique_filename_callback = null )
  * If success, then the key 'file' will have the unique file path, the 'url' key
  * will have the link to the new file. and the 'error' key will be set to false.
  *
- * This function will not move an uploade
+ * This function will not move an uploaded file to the upload folder. It will
+ * create a new file with the content in $bits parameter. If you move the upload
+ * file, read the content of the uploaded file, and then you can give the
+ * filename and content to this function, which will add it to the upload
+ * folder.
+ *
+ * The permissions will be set on the new file automatically by this function.
+ *
+ * @since 2.0.0
+ *
+ * @param string       $name       Filename.
+ * @param null|string  $deprecated Never used. Set to null.
+ * @param mixed        $bits       File content
+ * @param string       $time       Optional. Time formatted in 'yyyy/mm'. Default null.
+ * @return array
+ */
+function wp_upload_bits( $name, $deprecated, $bits, $time = null ) {
+	if ( !empty( $deprecated ) )
+		_deprecated_argument( __FUNCTION__, '2.0.0' );
+
+	if ( empty( $name ) )
+		return array( 'error' => __( 'Empty filename' ) );
+
+	$wp_filetype = wp_check_filetype( $name );
+	if ( ! $wp_filetype['ext'] && ! current_user_can( 'unfiltered_upload' ) )
+		return array( 'error' => __( 'Sorry, this file type is not permitted for security reasons.' ) );
+
+	$upload = wp_upload_dir( $time );
+
+	if ( $upload['error'] !== false )
+		return $upload;
+
+	/**
+	 * Filters whether to treat the upload bits as an error.
+	 *
+	 * Passing a non-array to the filter will effectively short-circuit preparing
+	 * the upload bits, returning that value instead.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param mixed $upload_bits_error An array of upload bits data, or a non-array error to return.
+	 */
+	$upload_bits_error = apply_filters( 'wp_upload_bits', array( 'name' => $name, 'bits' => $bits, 'time' => $time ) );
+	if ( !is_array( $upload_bits_error ) ) {
+		$upload[ 'error' ] = $upload_bits_error;
+		return $upload;
+	}
+
+	$filename = wp_unique_filename( $upload['path'], $name );
+
+	$new_file = $upload['path'] . "/$filename";
+	if ( ! wp_mkdir_p( dirname( $new_file ) ) ) {
+		if ( 0 === strpos( $upload['basedir'], ABSPATH ) )
+			$error_path = str_replace( ABSPATH, '', $upload['basedir'] ) . $upload['subdir'];
+		else
+			$error_path = basename( $upload['basedir'] ) . $upload['subdir'];
+
+		$message = sprintf(
+			/* translators: %s: directory path */
+			__( 'Unable to create directory %s. Is its parent directory writable by the server?' ),
+			$error_path
+		);
+		return array( 'error' => $message );
+	}
+
+	$ifp = @ fopen( $new_file, 'wb' );
+	if ( ! $ifp )
+		return array( 'error' => sprintf( __( 'Could not write file %s' ), $new_file ) );
+
+	@fwrite( $ifp, $bits );
+	fclose( $ifp );
+	clearstatcache();
+
+	// Set correct file permissions
+	$stat = @ stat( dirname( $new_file ) );
+	$perms = $stat['mode'] & 0007777;
+	$perms = $perms & 0000666;
+	@ chmod( $new_file, $perms );
+	clearstatcache();
+
+	// Compute the URL
+	$url = $upload['url'] . "/$filename";
+
+	/** This filter is documented in wp-admin/includes/file.php */
+	return apply_filters( 'wp_handle_upload', array( 'file' => $new_file, 'url' => $url, 'type' => $wp_filetype['type'], 'error' => false ), 'sideload' );
+}
+
+/**
+ * Retrieve the file type based on the extension name.
+ *
+ * @since 2.5.0
+ *
+ * @param string $ext The extension to search.
+ * @return string|void The file type, example: audio, video, document, spreadsheet, etc.
+ */
+function wp_ext2type( $ext ) {
+	$ext = strtolower( $ext );
+
+	$ext2type = wp_get_ext_types();
+	foreach ( $ext2type as $type => $exts )
+		if ( in_array( $ext, $exts ) )
+			return $type;
+}
+
+/**
+ * Retrieve the file type from the file name.
+ *
+ * You can optionally define the mime array, if needed.
+ *
+ * @since 2.0.4
+ *
+ * @param string $filename File name or path.
+ * @param array  $mimes    Optional. Key is the file extension with value as the mime type.
+ * @return array Values with extension first and mime type.
+ */
+function wp_check_filetype( $filename, $mimes = null ) {
+	if ( empty($mimes) )
+		$mimes = get_allowed_mime_types();
+	$type = false;
+	$ext = false;
+
+	foreach ( $mimes as $ext_preg => $mime_match ) {
+		$ext_preg = '!\.(' . $ext_preg . ')$!i';
+		if ( preg_match( $ext_preg, $filename, $ext_matches ) ) {
+			$type = $mime_match;
+			$ext = $ext_matches[1];
+			break;
+		}
+	}
+
+	return compact( 'ext', 'type' );
+}
+
+/**
+ * Attempt to determine the real file type of a file.
+ *
+ * If unable to, the file name extension will be used to determine type.
+ *
+ * If it's determined that the extension does not match the file's real type,
+ * then the "proper_filename" value will be set with a proper filename and extension.
+ *
+ * Currently this function only supports renaming images validated via wp_get_image_mime().
+ *
+ * @since 3.0.0
+ *
+ * @param string $file     Full path to the file.
+ * @param string $filename The name of the file (may differ from $file due to $file being
+ *                         in a tmp directory).
+ * @param array   $mimes   Optional. Key is the file extension with value as the mime type.
+ * @return array Values for the extension, MIME, and either a corrected filename or false
+ *               if original $filename is valid.
+ */
+function wp_check_filetype_and_ext( $file, $filename, $mimes = null ) {
+	$proper_filename = false;
+
+	// Do basic extension validation and MIME mapping
+	$wp_filetype = wp_check_filetype( $filename, $mimes );
+	$ext = $wp_filetype['ext'];
+	$type = $wp_filetype['type'];
+
+	// We can't do any further validation without a file to work with
+	if ( ! file_exists( $file ) ) {
+		return compact( 'ext', 'type', 'proper_filename' );
+	}
+
+	$real_mime = false;
+
+	// Validate image types.
+	if ( $type && 0 === strpos( $type, 'image/' ) ) {
+
+		// Attempt to figure out what type of image it actually is
+		$real_mime = wp_get_image_mime( $file );
+
+		if ( $real_mime && $real_mime != $type ) {
+			/**
+			 * Filters the list mapping image mime types to their respective extensions.
+			 *
+			 * @since 3.0.0
+			 *
+			 * @param  array $mime_to_ext Array of image mime types and their matching extensions.
+			 */
+			$mime_to_ext = apply_filters( 'getimagesize_mimes_to_exts', array(
+				'image/jpeg' => 'jpg',
+				'image/png'  => 'png',
+				'image/gif'  => 'gif',
+				'image/bmp'  => 'bmp',
+				'image/tiff' => 'tif',
+			) );
+
+			// Replace whatever is after the last period in the filename with the correct extension
+			if ( ! empty( $mime_to_ext[ $real_mime ] ) ) {
+				$filename_parts = explode( '.', $filename );
+				array_pop( $filename_parts );
+				$filename_parts[] = $mime_to_ext[ $real_mime ];
+				$new_filename = implode( '.', $filename_parts );
+
+				if ( $new_filename != $filename ) {
+					$proper_filename = $new_filename; // Mark that it changed
+				}
+				// Redefine the extension / MIME
+				$wp_filetype = wp_check_filetype( $new_filename, $mimes );
+				$ext = $wp_filetype['ext'];
+				$type = $wp_filetype['type'];
+			} else {
+				// Reset $real_mime and try validating again.
+				$real_mime = false;
+			}
+		}
+	}
+
+	// Validate files that didn't get validated during previous checks.
+	if ( $type && ! $real_mime && extension_loaded( 'fileinfo' ) ) {
+		$finfo = finfo_open( FILEINFO_MIME_TYPE );
+		$real_mime = finfo_file( $finfo, $file );
+		finfo_close( $finfo );
+
+		/*
+		 * If $real_mime doesn't match what we're expecting, we need to do some extra
+		 * vetting of application mime types to make sure this type of file is allowed.
+		 * Other mime types are assumed to be safe, but should be considered unverified.
+		 */
+		if ( $real_mime && ( $real_mime !== $type ) && ( 0 === strpos( $real_mime, 'application' ) ) ) {
+			$allowed = get_allowed_mime_types();
+
+			if ( ! in_array( $real_mime, $allowed ) ) {
+				$type = $ext = false;
+			}
+		}
+	}
+
+	/**
+	 * Filters the "real" file type of the given file.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param array  $wp_check_filetype_and_ext File data array containing 'ext', 'type', and
+	 *                                          'proper_filename' keys.
+	 * @param string $file                      Full path to the file.
+	 * @param string $filename                  The name of the file (may differ from $file due to
+	 *                                          $file being in a tmp directory).
+	 * @param array  $mimes                     Key is the file extension with value as the mime type.
+	 */
+	return apply_filters( 'wp_check_filetype_and_ext', compact( 'ext', 'type', 'proper_filename' ), $file, $filename, $mimes );
+}
+
+/**
+ * Returns the real mime type of an image file.
+ *
+ * This depends on exif_imagetype() or getimagesize() to determine real mime types.
+ *
+ * @since 4.7.1
+ *
+ * @param string $file Full path to the file.
+ * @return string|false The actual mime type or false if the type cannot be determined.
+ */
+function wp_get_image_mime( $file ) {
+	/*
+	 * Use exif_imagetype() to check the mimetype if available or fall back to
+	 * getimagesize() if exif isn't avaialbe. If either function throws an Exception
+	 * we assume the file could not be validated.
+	 */
+	try {
+		if ( is_callable( 'exif_imagetype' ) ) {
+			$imagetype = exif_imagetype( $file );
+			$mime = ( $imagetype ) ? image_type_to_mime_type( $imagetype ) : false;
+		} elseif ( function_exists( 'getimagesize' ) ) {
+			$imagesize = getimagesize( $file );
+			$mime = ( isset( $imagesize['mime'] ) ) ? $imagesize['mime'] : false;
+		} else {
+			$mime = false;
+		}
+	} catch ( Exception $e ) {
+		$mime = false;
+	}
+
+	return $mime;
+}
+
+/**
+ * Retrieve list of mime types and file extensions.
+ *
+ * @since 3.5.0
+ * @since 4.2.0 Support was added for GIMP (xcf) files.
+ *
+ * @return array Array of mime types keyed by the file extension regex corresponding to those types.
+ */
+function wp_get_mime_types() {
+	/**
+	 * Filters the list of mime types and file extensions.
+	 *
+	 * This filter should be used to add, not remove, mime types. To remove
+	 * mime types, use the {@see 'upload_mimes'} filter.
+	 *
+	 * @since 3.5.0
+	 *
+	 * @param array $wp_get_mime_types Mime types keyed by the file extension regex
+	 *                                 corresponding to those types.
+	 */
+	return apply_filters( 'mime_types', array(
+	// Image formats.
+	'jpg|jpeg|jpe' => 'image/jpeg',
+	'gif' => 'image/gif',
+	'png' => 'image/png',
+	'bmp' => 'image/bmp',
+	'tiff|tif' => 'image/tiff',
+	'ico' => 'image/x-icon',
+	// Video formats.
+	'asf|asx' => 'video/x-ms-asf',
+	'wmv' => 'video/x-ms-wmv',
+	'wmx' => 'video/x-ms-wmx',
+	'wm' => 'video/x-ms-wm',
+	'avi' => 'video/avi',
+	'divx' => 'video/divx',
+	'flv' => 'video/x-flv',
+	'mov|qt' => 'video/quicktime',
+	'mpeg|mpg|mpe' => 'video/mpeg',
+	'mp4|m4v' => 'video/mp4',
+	'ogv' => 'video/ogg',
+	'webm' => 'video/webm',
+	'mkv' => 'video/x-matroska',
+	'3gp|3gpp' => 'video/3gpp', // Can also be audio
+	'3g2|3gp2' => 'video/3gpp2', // Can also be audio
+	// Text formats.
+	'txt|asc|c|cc|h|srt' => 'text/plain',
+	'csv' => 'text/csv',
+	'tsv' => 'text/tab-separated-values',
+	'ics' => 'text/calendar',
+	'rtx' => 'text/richtext',
+	'css' => 'text/css',
+	'htm|html' => 'text/html',
+	'vtt' => '
