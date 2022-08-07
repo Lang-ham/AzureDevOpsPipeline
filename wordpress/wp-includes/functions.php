@@ -2442,4 +2442,267 @@ function wp_get_mime_types() {
 	'rtx' => 'text/richtext',
 	'css' => 'text/css',
 	'htm|html' => 'text/html',
-	'vtt' => '
+	'vtt' => 'text/vtt',
+	'dfxp' => 'application/ttaf+xml',
+	// Audio formats.
+	'mp3|m4a|m4b' => 'audio/mpeg',
+	'ra|ram' => 'audio/x-realaudio',
+	'wav' => 'audio/wav',
+	'ogg|oga' => 'audio/ogg',
+	'flac' => 'audio/flac',
+	'mid|midi' => 'audio/midi',
+	'wma' => 'audio/x-ms-wma',
+	'wax' => 'audio/x-ms-wax',
+	'mka' => 'audio/x-matroska',
+	// Misc application formats.
+	'rtf' => 'application/rtf',
+	'js' => 'application/javascript',
+	'pdf' => 'application/pdf',
+	'swf' => 'application/x-shockwave-flash',
+	'class' => 'application/java',
+	'tar' => 'application/x-tar',
+	'zip' => 'application/zip',
+	'gz|gzip' => 'application/x-gzip',
+	'rar' => 'application/rar',
+	'7z' => 'application/x-7z-compressed',
+	'exe' => 'application/x-msdownload',
+	'psd' => 'application/octet-stream',
+	'xcf' => 'application/octet-stream',
+	// MS Office formats.
+	'doc' => 'application/msword',
+	'pot|pps|ppt' => 'application/vnd.ms-powerpoint',
+	'wri' => 'application/vnd.ms-write',
+	'xla|xls|xlt|xlw' => 'application/vnd.ms-excel',
+	'mdb' => 'application/vnd.ms-access',
+	'mpp' => 'application/vnd.ms-project',
+	'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+	'docm' => 'application/vnd.ms-word.document.macroEnabled.12',
+	'dotx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+	'dotm' => 'application/vnd.ms-word.template.macroEnabled.12',
+	'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+	'xlsm' => 'application/vnd.ms-excel.sheet.macroEnabled.12',
+	'xlsb' => 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+	'xltx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+	'xltm' => 'application/vnd.ms-excel.template.macroEnabled.12',
+	'xlam' => 'application/vnd.ms-excel.addin.macroEnabled.12',
+	'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+	'pptm' => 'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+	'ppsx' => 'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+	'ppsm' => 'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',
+	'potx' => 'application/vnd.openxmlformats-officedocument.presentationml.template',
+	'potm' => 'application/vnd.ms-powerpoint.template.macroEnabled.12',
+	'ppam' => 'application/vnd.ms-powerpoint.addin.macroEnabled.12',
+	'sldx' => 'application/vnd.openxmlformats-officedocument.presentationml.slide',
+	'sldm' => 'application/vnd.ms-powerpoint.slide.macroEnabled.12',
+	'onetoc|onetoc2|onetmp|onepkg' => 'application/onenote',
+	'oxps' => 'application/oxps',
+	'xps' => 'application/vnd.ms-xpsdocument',
+	// OpenOffice formats.
+	'odt' => 'application/vnd.oasis.opendocument.text',
+	'odp' => 'application/vnd.oasis.opendocument.presentation',
+	'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+	'odg' => 'application/vnd.oasis.opendocument.graphics',
+	'odc' => 'application/vnd.oasis.opendocument.chart',
+	'odb' => 'application/vnd.oasis.opendocument.database',
+	'odf' => 'application/vnd.oasis.opendocument.formula',
+	// WordPerfect formats.
+	'wp|wpd' => 'application/wordperfect',
+	// iWork formats.
+	'key' => 'application/vnd.apple.keynote',
+	'numbers' => 'application/vnd.apple.numbers',
+	'pages' => 'application/vnd.apple.pages',
+	) );
+}
+
+/**
+ * Retrieves the list of common file extensions and their types.
+ *
+ * @since 4.6.0
+ *
+ * @return array Array of file extensions types keyed by the type of file.
+ */
+function wp_get_ext_types() {
+
+	/**
+	 * Filters file type based on the extension name.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @see wp_ext2type()
+	 *
+	 * @param array $ext2type Multi-dimensional array with extensions for a default set
+	 *                        of file types.
+	 */
+	return apply_filters( 'ext2type', array(
+		'image'       => array( 'jpg', 'jpeg', 'jpe',  'gif',  'png',  'bmp',   'tif',  'tiff', 'ico' ),
+		'audio'       => array( 'aac', 'ac3',  'aif',  'aiff', 'flac', 'm3a',  'm4a',   'm4b',  'mka',  'mp1',  'mp2',  'mp3', 'ogg', 'oga', 'ram', 'wav', 'wma' ),
+		'video'       => array( '3g2',  '3gp', '3gpp', 'asf', 'avi',  'divx', 'dv',   'flv',  'm4v',   'mkv',  'mov',  'mp4',  'mpeg', 'mpg', 'mpv', 'ogm', 'ogv', 'qt',  'rm', 'vob', 'wmv' ),
+		'document'    => array( 'doc', 'docx', 'docm', 'dotm', 'odt',  'pages', 'pdf',  'xps',  'oxps', 'rtf',  'wp', 'wpd', 'psd', 'xcf' ),
+		'spreadsheet' => array( 'numbers',     'ods',  'xls',  'xlsx', 'xlsm',  'xlsb' ),
+		'interactive' => array( 'swf', 'key',  'ppt',  'pptx', 'pptm', 'pps',   'ppsx', 'ppsm', 'sldx', 'sldm', 'odp' ),
+		'text'        => array( 'asc', 'csv',  'tsv',  'txt' ),
+		'archive'     => array( 'bz2', 'cab',  'dmg',  'gz',   'rar',  'sea',   'sit',  'sqx',  'tar',  'tgz',  'zip', '7z' ),
+		'code'        => array( 'css', 'htm',  'html', 'php',  'js' ),
+	) );
+}
+
+/**
+ * Retrieve list of allowed mime types and file extensions.
+ *
+ * @since 2.8.6
+ *
+ * @param int|WP_User $user Optional. User to check. Defaults to current user.
+ * @return array Array of mime types keyed by the file extension regex corresponding
+ *               to those types.
+ */
+function get_allowed_mime_types( $user = null ) {
+	$t = wp_get_mime_types();
+
+	unset( $t['swf'], $t['exe'] );
+	if ( function_exists( 'current_user_can' ) )
+		$unfiltered = $user ? user_can( $user, 'unfiltered_html' ) : current_user_can( 'unfiltered_html' );
+
+	if ( empty( $unfiltered ) ) {
+		unset( $t['htm|html'], $t['js'] );
+	}
+
+	/**
+	 * Filters list of allowed mime types and file extensions.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param array            $t    Mime types keyed by the file extension regex corresponding to
+	 *                               those types. 'swf' and 'exe' removed from full list. 'htm|html' also
+	 *                               removed depending on '$user' capabilities.
+	 * @param int|WP_User|null $user User ID, User object or null if not provided (indicates current user).
+	 */
+	return apply_filters( 'upload_mimes', $t, $user );
+}
+
+/**
+ * Display "Are You Sure" message to confirm the action being taken.
+ *
+ * If the action has the nonce explain message, then it will be displayed
+ * along with the "Are you sure?" message.
+ *
+ * @since 2.0.4
+ *
+ * @param string $action The nonce action.
+ */
+function wp_nonce_ays( $action ) {
+	if ( 'log-out' == $action ) {
+		$html = sprintf(
+			/* translators: %s: site name */
+			__( 'You are attempting to log out of %s' ),
+			get_bloginfo( 'name' )
+		);
+		$html .= '</p><p>';
+		$redirect_to = isset( $_REQUEST['redirect_to'] ) ? $_REQUEST['redirect_to'] : '';
+		$html .= sprintf(
+			/* translators: %s: logout URL */
+			__( 'Do you really want to <a href="%s">log out</a>?' ),
+			wp_logout_url( $redirect_to )
+		);
+	} else {
+		$html = __( 'Are you sure you want to do this?' );
+		if ( wp_get_referer() ) {
+			$html .= '</p><p>';
+			$html .= sprintf( '<a href="%s">%s</a>',
+				esc_url( remove_query_arg( 'updated', wp_get_referer() ) ),
+				__( 'Please try again.' )
+			);
+		}
+	}
+
+	wp_die( $html, __( 'WordPress Failure Notice' ), 403 );
+}
+
+/**
+ * Kill WordPress execution and display HTML message with error message.
+ *
+ * This function complements the `die()` PHP function. The difference is that
+ * HTML will be displayed to the user. It is recommended to use this function
+ * only when the execution should not continue any further. It is not recommended
+ * to call this function very often, and try to handle as many errors as possible
+ * silently or more gracefully.
+ *
+ * As a shorthand, the desired HTTP response code may be passed as an integer to
+ * the `$title` parameter (the default title would apply) or the `$args` parameter.
+ *
+ * @since 2.0.4
+ * @since 4.1.0 The `$title` and `$args` parameters were changed to optionally accept
+ *              an integer to be used as the response code.
+ *
+ * @param string|WP_Error  $message Optional. Error message. If this is a WP_Error object,
+ *                                  and not an Ajax or XML-RPC request, the error's messages are used.
+ *                                  Default empty.
+ * @param string|int       $title   Optional. Error title. If `$message` is a `WP_Error` object,
+ *                                  error data with the key 'title' may be used to specify the title.
+ *                                  If `$title` is an integer, then it is treated as the response
+ *                                  code. Default empty.
+ * @param string|array|int $args {
+ *     Optional. Arguments to control behavior. If `$args` is an integer, then it is treated
+ *     as the response code. Default empty array.
+ *
+ *     @type int    $response       The HTTP response code. Default 200 for Ajax requests, 500 otherwise.
+ *     @type bool   $back_link      Whether to include a link to go back. Default false.
+ *     @type string $text_direction The text direction. This is only useful internally, when WordPress
+ *                                  is still loading and the site's locale is not set up yet. Accepts 'rtl'.
+ *                                  Default is the value of is_rtl().
+ * }
+ */
+function wp_die( $message = '', $title = '', $args = array() ) {
+
+	if ( is_int( $args ) ) {
+		$args = array( 'response' => $args );
+	} elseif ( is_int( $title ) ) {
+		$args  = array( 'response' => $title );
+		$title = '';
+	}
+
+	if ( wp_doing_ajax() ) {
+		/**
+		 * Filters the callback for killing WordPress execution for Ajax requests.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param callable $function Callback function name.
+		 */
+		$function = apply_filters( 'wp_die_ajax_handler', '_ajax_wp_die_handler' );
+	} elseif ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) {
+		/**
+		 * Filters the callback for killing WordPress execution for XML-RPC requests.
+		 *
+		 * @since 3.4.0
+		 *
+		 * @param callable $function Callback function name.
+		 */
+		$function = apply_filters( 'wp_die_xmlrpc_handler', '_xmlrpc_wp_die_handler' );
+	} else {
+		/**
+		 * Filters the callback for killing WordPress execution for all non-Ajax, non-XML-RPC requests.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param callable $function Callback function name.
+		 */
+		$function = apply_filters( 'wp_die_handler', '_default_wp_die_handler' );
+	}
+
+	call_user_func( $function, $message, $title, $args );
+}
+
+/**
+ * Kills WordPress execution and display HTML message with error message.
+ *
+ * This is the default handler for wp_die if you want a custom one for your
+ * site then you can overload using the {@see 'wp_die_handler'} filter in wp_die().
+ *
+ * @since 3.0.0
+ * @access private
+ *
+ * @param string|WP_Error $message Error message or WP_Error object.
+ * @param string          $title   Optional. Error title. Default empty.
+ * @param string|array    $args    Optional. Arguments to control behavior. Default empty array.
+ */
+function _default_wp_die_handler( $message
