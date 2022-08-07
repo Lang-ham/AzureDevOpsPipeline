@@ -2705,4 +2705,411 @@ function wp_die( $message = '', $title = '', $args = array() ) {
  * @param string          $title   Optional. Error title. Default empty.
  * @param string|array    $args    Optional. Arguments to control behavior. Default empty array.
  */
-function _default_wp_die_handler( $message
+function _default_wp_die_handler( $message, $title = '', $args = array() ) {
+	$defaults = array( 'response' => 500 );
+	$r = wp_parse_args($args, $defaults);
+
+	$have_gettext = function_exists('__');
+
+	if ( function_exists( 'is_wp_error' ) && is_wp_error( $message ) ) {
+		if ( empty( $title ) ) {
+			$error_data = $message->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['title'] ) )
+				$title = $error_data['title'];
+		}
+		$errors = $message->get_error_messages();
+		switch ( count( $errors ) ) {
+		case 0 :
+			$message = '';
+			break;
+		case 1 :
+			$message = "<p>{$errors[0]}</p>";
+			break;
+		default :
+			$message = "<ul>\n\t\t<li>" . join( "</li>\n\t\t<li>", $errors ) . "</li>\n\t</ul>";
+			break;
+		}
+	} elseif ( is_string( $message ) ) {
+		$message = "<p>$message</p>";
+	}
+
+	if ( isset( $r['back_link'] ) && $r['back_link'] ) {
+		$back_text = $have_gettext? __('&laquo; Back') : '&laquo; Back';
+		$message .= "\n<p><a href='javascript:history.back()'>$back_text</a></p>";
+	}
+
+	if ( ! did_action( 'admin_head' ) ) :
+		if ( !headers_sent() ) {
+			status_header( $r['response'] );
+			nocache_headers();
+			header( 'Content-Type: text/html; charset=utf-8' );
+		}
+
+		if ( empty($title) )
+			$title = $have_gettext ? __('WordPress &rsaquo; Error') : 'WordPress &rsaquo; Error';
+
+		$text_direction = 'ltr';
+		if ( isset($r['text_direction']) && 'rtl' == $r['text_direction'] )
+			$text_direction = 'rtl';
+		elseif ( function_exists( 'is_rtl' ) && is_rtl() )
+			$text_direction = 'rtl';
+?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" <?php if ( function_exists( 'language_attributes' ) && function_exists( 'is_rtl' ) ) language_attributes(); else echo "dir='$text_direction'"; ?>>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width">
+	<?php
+	if ( function_exists( 'wp_no_robots' ) ) {
+		wp_no_robots();
+	}
+	?>
+	<title><?php echo $title ?></title>
+	<style type="text/css">
+		html {
+			background: #f1f1f1;
+		}
+		body {
+			background: #fff;
+			color: #444;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+			margin: 2em auto;
+			padding: 1em 2em;
+			max-width: 700px;
+			-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.13);
+			box-shadow: 0 1px 3px rgba(0,0,0,0.13);
+		}
+		h1 {
+			border-bottom: 1px solid #dadada;
+			clear: both;
+			color: #666;
+			font-size: 24px;
+			margin: 30px 0 0 0;
+			padding: 0;
+			padding-bottom: 7px;
+		}
+		#error-page {
+			margin-top: 50px;
+		}
+		#error-page p {
+			font-size: 14px;
+			line-height: 1.5;
+			margin: 25px 0 20px;
+		}
+		#error-page code {
+			font-family: Consolas, Monaco, monospace;
+		}
+		ul li {
+			margin-bottom: 10px;
+			font-size: 14px ;
+		}
+		a {
+			color: #0073aa;
+		}
+		a:hover,
+		a:active {
+			color: #00a0d2;
+		}
+		a:focus {
+			color: #124964;
+		    -webkit-box-shadow:
+		    	0 0 0 1px #5b9dd9,
+				0 0 2px 1px rgba(30, 140, 190, .8);
+		    box-shadow:
+		    	0 0 0 1px #5b9dd9,
+				0 0 2px 1px rgba(30, 140, 190, .8);
+			outline: none;
+		}
+		.button {
+			background: #f7f7f7;
+			border: 1px solid #ccc;
+			color: #555;
+			display: inline-block;
+			text-decoration: none;
+			font-size: 13px;
+			line-height: 26px;
+			height: 28px;
+			margin: 0;
+			padding: 0 10px 1px;
+			cursor: pointer;
+			-webkit-border-radius: 3px;
+			-webkit-appearance: none;
+			border-radius: 3px;
+			white-space: nowrap;
+			-webkit-box-sizing: border-box;
+			-moz-box-sizing:    border-box;
+			box-sizing:         border-box;
+
+			-webkit-box-shadow: 0 1px 0 #ccc;
+			box-shadow: 0 1px 0 #ccc;
+		 	vertical-align: top;
+		}
+
+		.button.button-large {
+			height: 30px;
+			line-height: 28px;
+			padding: 0 12px 2px;
+		}
+
+		.button:hover,
+		.button:focus {
+			background: #fafafa;
+			border-color: #999;
+			color: #23282d;
+		}
+
+		.button:focus  {
+			border-color: #5b9dd9;
+			-webkit-box-shadow: 0 0 3px rgba( 0, 115, 170, .8 );
+			box-shadow: 0 0 3px rgba( 0, 115, 170, .8 );
+			outline: none;
+		}
+
+		.button:active {
+			background: #eee;
+			border-color: #999;
+		 	-webkit-box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, 0.5 );
+		 	box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, 0.5 );
+		 	-webkit-transform: translateY(1px);
+		 	-ms-transform: translateY(1px);
+		 	transform: translateY(1px);
+		}
+
+		<?php
+		if ( 'rtl' == $text_direction ) {
+			echo 'body { font-family: Tahoma, Arial; }';
+		}
+		?>
+	</style>
+</head>
+<body id="error-page">
+<?php endif; // ! did_action( 'admin_head' ) ?>
+	<?php echo $message; ?>
+</body>
+</html>
+<?php
+	die();
+}
+
+/**
+ * Kill WordPress execution and display XML message with error message.
+ *
+ * This is the handler for wp_die when processing XMLRPC requests.
+ *
+ * @since 3.2.0
+ * @access private
+ *
+ * @global wp_xmlrpc_server $wp_xmlrpc_server
+ *
+ * @param string       $message Error message.
+ * @param string       $title   Optional. Error title. Default empty.
+ * @param string|array $args    Optional. Arguments to control behavior. Default empty array.
+ */
+function _xmlrpc_wp_die_handler( $message, $title = '', $args = array() ) {
+	global $wp_xmlrpc_server;
+	$defaults = array( 'response' => 500 );
+
+	$r = wp_parse_args($args, $defaults);
+
+	if ( $wp_xmlrpc_server ) {
+		$error = new IXR_Error( $r['response'] , $message);
+		$wp_xmlrpc_server->output( $error->getXml() );
+	}
+	die();
+}
+
+/**
+ * Kill WordPress ajax execution.
+ *
+ * This is the handler for wp_die when processing Ajax requests.
+ *
+ * @since 3.4.0
+ * @access private
+ *
+ * @param string       $message Error message.
+ * @param string       $title   Optional. Error title (unused). Default empty.
+ * @param string|array $args    Optional. Arguments to control behavior. Default empty array.
+ */
+function _ajax_wp_die_handler( $message, $title = '', $args = array() ) {
+	$defaults = array(
+		'response' => 200,
+	);
+	$r = wp_parse_args( $args, $defaults );
+
+	if ( ! headers_sent() && null !== $r['response'] ) {
+		status_header( $r['response'] );
+	}
+
+	if ( is_scalar( $message ) )
+		die( (string) $message );
+	die( '0' );
+}
+
+/**
+ * Kill WordPress execution.
+ *
+ * This is the handler for wp_die when processing APP requests.
+ *
+ * @since 3.4.0
+ * @access private
+ *
+ * @param string $message Optional. Response to print. Default empty.
+ */
+function _scalar_wp_die_handler( $message = '' ) {
+	if ( is_scalar( $message ) )
+		die( (string) $message );
+	die();
+}
+
+/**
+ * Encode a variable into JSON, with some sanity checks.
+ *
+ * @since 4.1.0
+ *
+ * @param mixed $data    Variable (usually an array or object) to encode as JSON.
+ * @param int   $options Optional. Options to be passed to json_encode(). Default 0.
+ * @param int   $depth   Optional. Maximum depth to walk through $data. Must be
+ *                       greater than 0. Default 512.
+ * @return string|false The JSON encoded string, or false if it cannot be encoded.
+ */
+function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+	/*
+	 * json_encode() has had extra params added over the years.
+	 * $options was added in 5.3, and $depth in 5.5.
+	 * We need to make sure we call it with the correct arguments.
+	 */
+	if ( version_compare( PHP_VERSION, '5.5', '>=' ) ) {
+		$args = array( $data, $options, $depth );
+	} elseif ( version_compare( PHP_VERSION, '5.3', '>=' ) ) {
+		$args = array( $data, $options );
+	} else {
+		$args = array( $data );
+	}
+
+	// Prepare the data for JSON serialization.
+	$args[0] = _wp_json_prepare_data( $data );
+
+	$json = @call_user_func_array( 'json_encode', $args );
+
+	// If json_encode() was successful, no need to do more sanity checking.
+	// ... unless we're in an old version of PHP, and json_encode() returned
+	// a string containing 'null'. Then we need to do more sanity checking.
+	if ( false !== $json && ( version_compare( PHP_VERSION, '5.5', '>=' ) || false === strpos( $json, 'null' ) ) )  {
+		return $json;
+	}
+
+	try {
+		$args[0] = _wp_json_sanity_check( $data, $depth );
+	} catch ( Exception $e ) {
+		return false;
+	}
+
+	return call_user_func_array( 'json_encode', $args );
+}
+
+/**
+ * Perform sanity checks on data that shall be encoded to JSON.
+ *
+ * @ignore
+ * @since 4.1.0
+ * @access private
+ *
+ * @see wp_json_encode()
+ *
+ * @param mixed $data  Variable (usually an array or object) to encode as JSON.
+ * @param int   $depth Maximum depth to walk through $data. Must be greater than 0.
+ * @return mixed The sanitized data that shall be encoded to JSON.
+ */
+function _wp_json_sanity_check( $data, $depth ) {
+	if ( $depth < 0 ) {
+		throw new Exception( 'Reached depth limit' );
+	}
+
+	if ( is_array( $data ) ) {
+		$output = array();
+		foreach ( $data as $id => $el ) {
+			// Don't forget to sanitize the ID!
+			if ( is_string( $id ) ) {
+				$clean_id = _wp_json_convert_string( $id );
+			} else {
+				$clean_id = $id;
+			}
+
+			// Check the element type, so that we're only recursing if we really have to.
+			if ( is_array( $el ) || is_object( $el ) ) {
+				$output[ $clean_id ] = _wp_json_sanity_check( $el, $depth - 1 );
+			} elseif ( is_string( $el ) ) {
+				$output[ $clean_id ] = _wp_json_convert_string( $el );
+			} else {
+				$output[ $clean_id ] = $el;
+			}
+		}
+	} elseif ( is_object( $data ) ) {
+		$output = new stdClass;
+		foreach ( $data as $id => $el ) {
+			if ( is_string( $id ) ) {
+				$clean_id = _wp_json_convert_string( $id );
+			} else {
+				$clean_id = $id;
+			}
+
+			if ( is_array( $el ) || is_object( $el ) ) {
+				$output->$clean_id = _wp_json_sanity_check( $el, $depth - 1 );
+			} elseif ( is_string( $el ) ) {
+				$output->$clean_id = _wp_json_convert_string( $el );
+			} else {
+				$output->$clean_id = $el;
+			}
+		}
+	} elseif ( is_string( $data ) ) {
+		return _wp_json_convert_string( $data );
+	} else {
+		return $data;
+	}
+
+	return $output;
+}
+
+/**
+ * Convert a string to UTF-8, so that it can be safely encoded to JSON.
+ *
+ * @ignore
+ * @since 4.1.0
+ * @access private
+ *
+ * @see _wp_json_sanity_check()
+ *
+ * @staticvar bool $use_mb
+ *
+ * @param string $string The string which is to be converted.
+ * @return string The checked string.
+ */
+function _wp_json_convert_string( $string ) {
+	static $use_mb = null;
+	if ( is_null( $use_mb ) ) {
+		$use_mb = function_exists( 'mb_convert_encoding' );
+	}
+
+	if ( $use_mb ) {
+		$encoding = mb_detect_encoding( $string, mb_detect_order(), true );
+		if ( $encoding ) {
+			return mb_convert_encoding( $string, 'UTF-8', $encoding );
+		} else {
+			return mb_convert_encoding( $string, 'UTF-8', 'UTF-8' );
+		}
+	} else {
+		return wp_check_invalid_utf8( $string, true );
+	}
+}
+
+/**
+ * Prepares response data to be serialized to JSON.
+ *
+ * This supports the JsonSerializable interface for PHP 5.2-5.3 as well.
+ *
+ * @ignore
+ * @since 4.4.0
+ * @access private
+ *
+ * @param mixed $data Native representation.
+ * @return bool|int
