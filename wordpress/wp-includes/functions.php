@@ -3112,4 +3112,376 @@ function _wp_json_convert_string( $string ) {
  * @access private
  *
  * @param mixed $data Native representation.
- * @return bool|int
+ * @return bool|int|float|null|string|array Data ready for `json_encode()`.
+ */
+function _wp_json_prepare_data( $data ) {
+	if ( ! defined( 'WP_JSON_SERIALIZE_COMPATIBLE' ) || WP_JSON_SERIALIZE_COMPATIBLE === false ) {
+		return $data;
+	}
+
+	switch ( gettype( $data ) ) {
+		case 'boolean':
+		case 'integer':
+		case 'double':
+		case 'string':
+		case 'NULL':
+			// These values can be passed through.
+			return $data;
+
+		case 'array':
+			// Arrays must be mapped in case they also return objects.
+			return array_map( '_wp_json_prepare_data', $data );
+
+		case 'object':
+			// If this is an incomplete object (__PHP_Incomplete_Class), bail.
+			if ( ! is_object( $data ) ) {
+				return null;
+			}
+
+			if ( $data instanceof JsonSerializable ) {
+				$data = $data->jsonSerialize();
+			} else {
+				$data = get_object_vars( $data );
+			}
+
+			// Now, pass the array (or whatever was returned from jsonSerialize through).
+			return _wp_json_prepare_data( $data );
+
+		default:
+			return null;
+	}
+}
+
+/**
+ * Send a JSON response back to an Ajax request.
+ *
+ * @since 3.5.0
+ * @since 4.7.0 The `$status_code` parameter was added.
+ *
+ * @param mixed $response    Variable (usually an array or object) to encode as JSON,
+ *                           then print and die.
+ * @param int   $status_code The HTTP status code to output.
+ */
+function wp_send_json( $response, $status_code = null ) {
+	@header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
+	if ( null !== $status_code ) {
+		status_header( $status_code );
+	}
+	echo wp_json_encode( $response );
+
+	if ( wp_doing_ajax() ) {
+		wp_die( '', '', array(
+			'response' => null,
+		) );
+	} else {
+		die;
+	}
+}
+
+/**
+ * Send a JSON response back to an Ajax request, indicating success.
+ *
+ * @since 3.5.0
+ * @since 4.7.0 The `$status_code` parameter was added.
+ *
+ * @param mixed $data        Data to encode as JSON, then print and die.
+ * @param int   $status_code The HTTP status code to output.
+ */
+function wp_send_json_success( $data = null, $status_code = null ) {
+	$response = array( 'success' => true );
+
+	if ( isset( $data ) )
+		$response['data'] = $data;
+
+	wp_send_json( $response, $status_code );
+}
+
+/**
+ * Send a JSON response back to an Ajax request, indicating failure.
+ *
+ * If the `$data` parameter is a WP_Error object, the errors
+ * within the object are processed and output as an array of error
+ * codes and corresponding messages. All other types are output
+ * without further processing.
+ *
+ * @since 3.5.0
+ * @since 4.1.0 The `$data` parameter is now processed if a WP_Error object is passed in.
+ * @since 4.7.0 The `$status_code` parameter was added.
+ *
+ * @param mixed $data        Data to encode as JSON, then print and die.
+ * @param int   $status_code The HTTP status code to output.
+ */
+function wp_send_json_error( $data = null, $status_code = null ) {
+	$response = array( 'success' => false );
+
+	if ( isset( $data ) ) {
+		if ( is_wp_error( $data ) ) {
+			$result = array();
+			foreach ( $data->errors as $code => $messages ) {
+				foreach ( $messages as $message ) {
+					$result[] = array( 'code' => $code, 'message' => $message );
+				}
+			}
+
+			$response['data'] = $result;
+		} else {
+			$response['data'] = $data;
+		}
+	}
+
+	wp_send_json( $response, $status_code );
+}
+
+/**
+ * Checks that a JSONP callback is a valid JavaScript callback.
+ *
+ * Only allows alphanumeric characters and the dot character in callback
+ * function names. This helps to mitigate XSS attacks caused by directly
+ * outputting user input.
+ *
+ * @since 4.6.0
+ *
+ * @param string $callback Supplied JSONP callback function.
+ * @return bool True if valid callback, otherwise false.
+ */
+function wp_check_jsonp_callback( $callback ) {
+	if ( ! is_string( $callback ) ) {
+		return false;
+	}
+
+	preg_replace( '/[^\w\.]/', '', $callback, -1, $illegal_char_count );
+
+	return 0 === $illegal_char_count;
+}
+
+/**
+ * Retrieve the WordPress home page URL.
+ *
+ * If the constant named 'WP_HOME' exists, then it will be used and returned
+ * by the function. This can be used to counter the redirection on your local
+ * development environment.
+ *
+ * @since 2.2.0
+ * @access private
+ *
+ * @see WP_HOME
+ *
+ * @param string $url URL for the home location.
+ * @return string Homepage location.
+ */
+function _config_wp_home( $url = '' ) {
+	if ( defined( 'WP_HOME' ) )
+		return untrailingslashit( WP_HOME );
+	return $url;
+}
+
+/**
+ * Retrieve the WordPress site URL.
+ *
+ * If the constant named 'WP_SITEURL' is defined, then the value in that
+ * constant will always be returned. This can be used for debugging a site
+ * on your localhost while not having to change the database to your URL.
+ *
+ * @since 2.2.0
+ * @access private
+ *
+ * @see WP_SITEURL
+ *
+ * @param string $url URL to set the WordPress site location.
+ * @return string The WordPress Site URL.
+ */
+function _config_wp_siteurl( $url = '' ) {
+	if ( defined( 'WP_SITEURL' ) )
+		return untrailingslashit( WP_SITEURL );
+	return $url;
+}
+
+/**
+ * Delete the fresh site option.
+ *
+ * @since 4.7.0
+ * @access private
+ */
+function _delete_option_fresh_site() {
+	update_option( 'fresh_site', '0' );
+}
+
+/**
+ * Set the localized direction for MCE plugin.
+ *
+ * Will only set the direction to 'rtl', if the WordPress locale has
+ * the text direction set to 'rtl'.
+ *
+ * Fills in the 'directionality' setting, enables the 'directionality'
+ * plugin, and adds the 'ltr' button to 'toolbar1', formerly
+ * 'theme_advanced_buttons1' array keys. These keys are then returned
+ * in the $mce_init (TinyMCE settings) array.
+ *
+ * @since 2.1.0
+ * @access private
+ *
+ * @param array $mce_init MCE settings array.
+ * @return array Direction set for 'rtl', if needed by locale.
+ */
+function _mce_set_direction( $mce_init ) {
+	if ( is_rtl() ) {
+		$mce_init['directionality'] = 'rtl';
+		$mce_init['rtl_ui'] = true;
+
+		if ( ! empty( $mce_init['plugins'] ) && strpos( $mce_init['plugins'], 'directionality' ) === false ) {
+			$mce_init['plugins'] .= ',directionality';
+		}
+
+		if ( ! empty( $mce_init['toolbar1'] ) && ! preg_match( '/\bltr\b/', $mce_init['toolbar1'] ) ) {
+			$mce_init['toolbar1'] .= ',ltr';
+		}
+	}
+
+	return $mce_init;
+}
+
+
+/**
+ * Convert smiley code to the icon graphic file equivalent.
+ *
+ * You can turn off smilies, by going to the write setting screen and unchecking
+ * the box, or by setting 'use_smilies' option to false or removing the option.
+ *
+ * Plugins may override the default smiley list by setting the $wpsmiliestrans
+ * to an array, with the key the code the blogger types in and the value the
+ * image file.
+ *
+ * The $wp_smiliessearch global is for the regular expression and is set each
+ * time the function is called.
+ *
+ * The full list of smilies can be found in the function and won't be listed in
+ * the description. Probably should create a Codex page for it, so that it is
+ * available.
+ *
+ * @global array $wpsmiliestrans
+ * @global array $wp_smiliessearch
+ *
+ * @since 2.2.0
+ */
+function smilies_init() {
+	global $wpsmiliestrans, $wp_smiliessearch;
+
+	// don't bother setting up smilies if they are disabled
+	if ( !get_option( 'use_smilies' ) )
+		return;
+
+	if ( !isset( $wpsmiliestrans ) ) {
+		$wpsmiliestrans = array(
+		':mrgreen:' => 'mrgreen.png',
+		':neutral:' => "\xf0\x9f\x98\x90",
+		':twisted:' => "\xf0\x9f\x98\x88",
+		  ':arrow:' => "\xe2\x9e\xa1",
+		  ':shock:' => "\xf0\x9f\x98\xaf",
+		  ':smile:' => "\xf0\x9f\x99\x82",
+		    ':???:' => "\xf0\x9f\x98\x95",
+		   ':cool:' => "\xf0\x9f\x98\x8e",
+		   ':evil:' => "\xf0\x9f\x91\xbf",
+		   ':grin:' => "\xf0\x9f\x98\x80",
+		   ':idea:' => "\xf0\x9f\x92\xa1",
+		   ':oops:' => "\xf0\x9f\x98\xb3",
+		   ':razz:' => "\xf0\x9f\x98\x9b",
+		   ':roll:' => "\xf0\x9f\x99\x84",
+		   ':wink:' => "\xf0\x9f\x98\x89",
+		    ':cry:' => "\xf0\x9f\x98\xa5",
+		    ':eek:' => "\xf0\x9f\x98\xae",
+		    ':lol:' => "\xf0\x9f\x98\x86",
+		    ':mad:' => "\xf0\x9f\x98\xa1",
+		    ':sad:' => "\xf0\x9f\x99\x81",
+		      '8-)' => "\xf0\x9f\x98\x8e",
+		      '8-O' => "\xf0\x9f\x98\xaf",
+		      ':-(' => "\xf0\x9f\x99\x81",
+		      ':-)' => "\xf0\x9f\x99\x82",
+		      ':-?' => "\xf0\x9f\x98\x95",
+		      ':-D' => "\xf0\x9f\x98\x80",
+		      ':-P' => "\xf0\x9f\x98\x9b",
+		      ':-o' => "\xf0\x9f\x98\xae",
+		      ':-x' => "\xf0\x9f\x98\xa1",
+		      ':-|' => "\xf0\x9f\x98\x90",
+		      ';-)' => "\xf0\x9f\x98\x89",
+		// This one transformation breaks regular text with frequency.
+		//     '8)' => "\xf0\x9f\x98\x8e",
+		       '8O' => "\xf0\x9f\x98\xaf",
+		       ':(' => "\xf0\x9f\x99\x81",
+		       ':)' => "\xf0\x9f\x99\x82",
+		       ':?' => "\xf0\x9f\x98\x95",
+		       ':D' => "\xf0\x9f\x98\x80",
+		       ':P' => "\xf0\x9f\x98\x9b",
+		       ':o' => "\xf0\x9f\x98\xae",
+		       ':x' => "\xf0\x9f\x98\xa1",
+		       ':|' => "\xf0\x9f\x98\x90",
+		       ';)' => "\xf0\x9f\x98\x89",
+		      ':!:' => "\xe2\x9d\x97",
+		      ':?:' => "\xe2\x9d\x93",
+		);
+	}
+
+	/**
+	 * Filters all the smilies.
+	 *
+	 * This filter must be added before `smilies_init` is run, as
+	 * it is normally only run once to setup the smilies regex.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array $wpsmiliestrans List of the smilies.
+	 */
+	$wpsmiliestrans = apply_filters('smilies', $wpsmiliestrans);
+
+	if (count($wpsmiliestrans) == 0) {
+		return;
+	}
+
+	/*
+	 * NOTE: we sort the smilies in reverse key order. This is to make sure
+	 * we match the longest possible smilie (:???: vs :?) as the regular
+	 * expression used below is first-match
+	 */
+	krsort($wpsmiliestrans);
+
+	$spaces = wp_spaces_regexp();
+
+	// Begin first "subpattern"
+	$wp_smiliessearch = '/(?<=' . $spaces . '|^)';
+
+	$subchar = '';
+	foreach ( (array) $wpsmiliestrans as $smiley => $img ) {
+		$firstchar = substr($smiley, 0, 1);
+		$rest = substr($smiley, 1);
+
+		// new subpattern?
+		if ($firstchar != $subchar) {
+			if ($subchar != '') {
+				$wp_smiliessearch .= ')(?=' . $spaces . '|$)';  // End previous "subpattern"
+				$wp_smiliessearch .= '|(?<=' . $spaces . '|^)'; // Begin another "subpattern"
+			}
+			$subchar = $firstchar;
+			$wp_smiliessearch .= preg_quote($firstchar, '/') . '(?:';
+		} else {
+			$wp_smiliessearch .= '|';
+		}
+		$wp_smiliessearch .= preg_quote($rest, '/');
+	}
+
+	$wp_smiliessearch .= ')(?=' . $spaces . '|$)/m';
+
+}
+
+/**
+ * Merge user defined arguments into defaults array.
+ *
+ * This function is used throughout WordPress to allow for both string or array
+ * to be merged into another array.
+ *
+ * @since 2.2.0
+ * @since 2.3.0 `$args` can now also be an object.
+ *
+ * @param string|array|object $args     Value to merge with $defaults.
+ * @param array               $defaults Optional. Array that serves as the defaults. Default empty.
+ * @return array Merged user defined values with defaults.
+ */
+function wp
