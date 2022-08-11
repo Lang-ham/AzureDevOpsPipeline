@@ -3484,4 +3484,359 @@ function smilies_init() {
  * @param array               $defaults Optional. Array that serves as the defaults. Default empty.
  * @return array Merged user defined values with defaults.
  */
-function wp
+function wp_parse_args( $args, $defaults = '' ) {
+	if ( is_object( $args ) )
+		$r = get_object_vars( $args );
+	elseif ( is_array( $args ) )
+		$r =& $args;
+	else
+		wp_parse_str( $args, $r );
+
+	if ( is_array( $defaults ) )
+		return array_merge( $defaults, $r );
+	return $r;
+}
+
+/**
+ * Clean up an array, comma- or space-separated list of IDs.
+ *
+ * @since 3.0.0
+ *
+ * @param array|string $list List of ids.
+ * @return array Sanitized array of IDs.
+ */
+function wp_parse_id_list( $list ) {
+	if ( !is_array($list) )
+		$list = preg_split('/[\s,]+/', $list);
+
+	return array_unique(array_map('absint', $list));
+}
+
+/**
+ * Clean up an array, comma- or space-separated list of slugs.
+ *
+ * @since 4.7.0
+ *
+ * @param  array|string $list List of slugs.
+ * @return array Sanitized array of slugs.
+ */
+function wp_parse_slug_list( $list ) {
+	if ( ! is_array( $list ) ) {
+		$list = preg_split( '/[\s,]+/', $list );
+	}
+
+	foreach ( $list as $key => $value ) {
+		$list[ $key ] = sanitize_title( $value );
+	}
+
+	return array_unique( $list );
+}
+
+/**
+ * Extract a slice of an array, given a list of keys.
+ *
+ * @since 3.1.0
+ *
+ * @param array $array The original array.
+ * @param array $keys  The list of keys.
+ * @return array The array slice.
+ */
+function wp_array_slice_assoc( $array, $keys ) {
+	$slice = array();
+	foreach ( $keys as $key )
+		if ( isset( $array[ $key ] ) )
+			$slice[ $key ] = $array[ $key ];
+
+	return $slice;
+}
+
+/**
+ * Determines if the variable is a numeric-indexed array.
+ *
+ * @since 4.4.0
+ *
+ * @param mixed $data Variable to check.
+ * @return bool Whether the variable is a list.
+ */
+function wp_is_numeric_array( $data ) {
+	if ( ! is_array( $data ) ) {
+		return false;
+	}
+
+	$keys = array_keys( $data );
+	$string_keys = array_filter( $keys, 'is_string' );
+	return count( $string_keys ) === 0;
+}
+
+/**
+ * Filters a list of objects, based on a set of key => value arguments.
+ *
+ * @since 3.0.0
+ * @since 4.7.0 Uses WP_List_Util class.
+ *
+ * @param array       $list     An array of objects to filter
+ * @param array       $args     Optional. An array of key => value arguments to match
+ *                              against each object. Default empty array.
+ * @param string      $operator Optional. The logical operation to perform. 'or' means
+ *                              only one element from the array needs to match; 'and'
+ *                              means all elements must match; 'not' means no elements may
+ *                              match. Default 'and'.
+ * @param bool|string $field    A field from the object to place instead of the entire object.
+ *                              Default false.
+ * @return array A list of objects or object fields.
+ */
+function wp_filter_object_list( $list, $args = array(), $operator = 'and', $field = false ) {
+	if ( ! is_array( $list ) ) {
+		return array();
+	}
+
+	$util = new WP_List_Util( $list );
+
+	$util->filter( $args, $operator );
+
+	if ( $field ) {
+		$util->pluck( $field );
+	}
+
+	return $util->get_output();
+}
+
+/**
+ * Filters a list of objects, based on a set of key => value arguments.
+ *
+ * @since 3.1.0
+ * @since 4.7.0 Uses WP_List_Util class.
+ *
+ * @param array  $list     An array of objects to filter.
+ * @param array  $args     Optional. An array of key => value arguments to match
+ *                         against each object. Default empty array.
+ * @param string $operator Optional. The logical operation to perform. 'AND' means
+ *                         all elements from the array must match. 'OR' means only
+ *                         one element needs to match. 'NOT' means no elements may
+ *                         match. Default 'AND'.
+ * @return array Array of found values.
+ */
+function wp_list_filter( $list, $args = array(), $operator = 'AND' ) {
+	if ( ! is_array( $list ) ) {
+		return array();
+	}
+
+	$util = new WP_List_Util( $list );
+	return $util->filter( $args, $operator );
+}
+
+/**
+ * Pluck a certain field out of each object in a list.
+ *
+ * This has the same functionality and prototype of
+ * array_column() (PHP 5.5) but also supports objects.
+ *
+ * @since 3.1.0
+ * @since 4.0.0 $index_key parameter added.
+ * @since 4.7.0 Uses WP_List_Util class.
+ *
+ * @param array      $list      List of objects or arrays
+ * @param int|string $field     Field from the object to place instead of the entire object
+ * @param int|string $index_key Optional. Field from the object to use as keys for the new array.
+ *                              Default null.
+ * @return array Array of found values. If `$index_key` is set, an array of found values with keys
+ *               corresponding to `$index_key`. If `$index_key` is null, array keys from the original
+ *               `$list` will be preserved in the results.
+ */
+function wp_list_pluck( $list, $field, $index_key = null ) {
+	$util = new WP_List_Util( $list );
+	return $util->pluck( $field, $index_key );
+}
+
+/**
+ * Sorts a list of objects, based on one or more orderby arguments.
+ *
+ * @since 4.7.0
+ *
+ * @param array        $list          An array of objects to filter.
+ * @param string|array $orderby       Optional. Either the field name to order by or an array
+ *                                    of multiple orderby fields as $orderby => $order.
+ * @param string       $order         Optional. Either 'ASC' or 'DESC'. Only used if $orderby
+ *                                    is a string.
+ * @param bool         $preserve_keys Optional. Whether to preserve keys. Default false.
+ * @return array The sorted array.
+ */
+function wp_list_sort( $list, $orderby = array(), $order = 'ASC', $preserve_keys = false ) {
+	if ( ! is_array( $list ) ) {
+		return array();
+	}
+
+	$util = new WP_List_Util( $list );
+	return $util->sort( $orderby, $order, $preserve_keys );
+}
+
+/**
+ * Determines if Widgets library should be loaded.
+ *
+ * Checks to make sure that the widgets library hasn't already been loaded.
+ * If it hasn't, then it will load the widgets library and run an action hook.
+ *
+ * @since 2.2.0
+ */
+function wp_maybe_load_widgets() {
+	/**
+	 * Filters whether to load the Widgets library.
+	 *
+	 * Passing a falsey value to the filter will effectively short-circuit
+	 * the Widgets library from loading.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param bool $wp_maybe_load_widgets Whether to load the Widgets library.
+	 *                                    Default true.
+	 */
+	if ( ! apply_filters( 'load_default_widgets', true ) ) {
+		return;
+	}
+
+	require_once( ABSPATH . WPINC . '/default-widgets.php' );
+
+	add_action( '_admin_menu', 'wp_widgets_add_menu' );
+}
+
+/**
+ * Append the Widgets menu to the themes main menu.
+ *
+ * @since 2.2.0
+ *
+ * @global array $submenu
+ */
+function wp_widgets_add_menu() {
+	global $submenu;
+
+	if ( ! current_theme_supports( 'widgets' ) )
+		return;
+
+	$submenu['themes.php'][7] = array( __( 'Widgets' ), 'edit_theme_options', 'widgets.php' );
+	ksort( $submenu['themes.php'], SORT_NUMERIC );
+}
+
+/**
+ * Flush all output buffers for PHP 5.2.
+ *
+ * Make sure all output buffers are flushed before our singletons are destroyed.
+ *
+ * @since 2.2.0
+ */
+function wp_ob_end_flush_all() {
+	$levels = ob_get_level();
+	for ($i=0; $i<$levels; $i++)
+		ob_end_flush();
+}
+
+/**
+ * Load custom DB error or display WordPress DB error.
+ *
+ * If a file exists in the wp-content directory named db-error.php, then it will
+ * be loaded instead of displaying the WordPress DB error. If it is not found,
+ * then the WordPress DB error will be displayed instead.
+ *
+ * The WordPress DB error sets the HTTP status header to 500 to try to prevent
+ * search engines from caching the message. Custom DB messages should do the
+ * same.
+ *
+ * This function was backported to WordPress 2.3.2, but originally was added
+ * in WordPress 2.5.0.
+ *
+ * @since 2.3.2
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ */
+function dead_db() {
+	global $wpdb;
+
+	wp_load_translations_early();
+
+	// Load custom DB error template, if present.
+	if ( file_exists( WP_CONTENT_DIR . '/db-error.php' ) ) {
+		require_once( WP_CONTENT_DIR . '/db-error.php' );
+		die();
+	}
+
+	// If installing or in the admin, provide the verbose message.
+	if ( wp_installing() || defined( 'WP_ADMIN' ) )
+		wp_die($wpdb->error);
+
+	// Otherwise, be terse.
+	status_header( 500 );
+	nocache_headers();
+	header( 'Content-Type: text/html; charset=utf-8' );
+?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"<?php if ( is_rtl() ) echo ' dir="rtl"'; ?>>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title><?php _e( 'Database Error' ); ?></title>
+
+</head>
+<body>
+	<h1><?php _e( 'Error establishing a database connection' ); ?></h1>
+</body>
+</html>
+<?php
+	die();
+}
+
+/**
+ * Convert a value to non-negative integer.
+ *
+ * @since 2.5.0
+ *
+ * @param mixed $maybeint Data you wish to have converted to a non-negative integer.
+ * @return int A non-negative integer.
+ */
+function absint( $maybeint ) {
+	return abs( intval( $maybeint ) );
+}
+
+/**
+ * Mark a function as deprecated and inform when it has been used.
+ *
+ * There is a {@see 'hook deprecated_function_run'} that will be called that can be used
+ * to get the backtrace up to what file and function called the deprecated
+ * function.
+ *
+ * The current behavior is to trigger a user error if `WP_DEBUG` is true.
+ *
+ * This function is to be used in every function that is deprecated.
+ *
+ * @since 2.5.0
+ * @access private
+ *
+ * @param string $function    The function that was called.
+ * @param string $version     The version of WordPress that deprecated the function.
+ * @param string $replacement Optional. The function that should have been called. Default null.
+ */
+function _deprecated_function( $function, $version, $replacement = null ) {
+
+	/**
+	 * Fires when a deprecated function is called.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param string $function    The function that was called.
+	 * @param string $replacement The function that should have been called.
+	 * @param string $version     The version of WordPress that deprecated the function.
+	 */
+	do_action( 'deprecated_function_run', $function, $replacement, $version );
+
+	/**
+	 * Filters whether to trigger an error for deprecated functions.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param bool $trigger Whether to trigger the error for deprecated functions. Default true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'deprecated_function_trigger_error', true ) ) {
+		if ( function_exists( '__' ) ) {
+			if ( ! is_null( $replacement ) ) {
+				/* translators: 1: PHP function name, 2: version number, 3: alternative function name */
+				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.'), $function, $version, $replacement ) );
+			} else {
+				/* translators: 1: PHP function name, 2: version number */
+				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since ve
