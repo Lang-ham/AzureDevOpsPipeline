@@ -4409,4 +4409,369 @@ function wp_suspend_cache_invalidation( $suspend = true ) {
  * @param int $site_id    Optional. Site ID to test. Defaults to current site.
  * @param int $network_id Optional. Network ID of the network to check for.
  *                        Defaults to current network.
- * @retu
+ * @return bool True if $site_id is the main site of the network, or if not
+ *              running Multisite.
+ */
+function is_main_site( $site_id = null, $network_id = null ) {
+	if ( ! is_multisite() ) {
+		return true;
+	}
+
+	if ( ! $site_id ) {
+		$site_id = get_current_blog_id();
+	}
+
+	$site_id = (int) $site_id;
+
+	return $site_id === get_main_site_id( $network_id );
+}
+
+/**
+ * Gets the main site ID.
+ *
+ * @since 4.9.0
+ *
+ * @param int $network_id Optional. The ID of the network for which to get the main site.
+ *                        Defaults to the current network.
+ * @return int The ID of the main site.
+ */
+function get_main_site_id( $network_id = null ) {
+	if ( ! is_multisite() ) {
+		return get_current_blog_id();
+	}
+
+	$network = get_network( $network_id );
+	if ( ! $network ) {
+		return 0;
+	}
+
+	return $network->site_id;
+}
+
+/**
+ * Determine whether a network is the main network of the Multisite installation.
+ *
+ * @since 3.7.0
+ *
+ * @param int $network_id Optional. Network ID to test. Defaults to current network.
+ * @return bool True if $network_id is the main network, or if not running Multisite.
+ */
+function is_main_network( $network_id = null ) {
+	if ( ! is_multisite() ) {
+		return true;
+	}
+
+	if ( null === $network_id ) {
+		$network_id = get_current_network_id();
+	}
+
+	$network_id = (int) $network_id;
+
+	return ( $network_id === get_main_network_id() );
+}
+
+/**
+ * Get the main network ID.
+ *
+ * @since 4.3.0
+ *
+ * @return int The ID of the main network.
+ */
+function get_main_network_id() {
+	if ( ! is_multisite() ) {
+		return 1;
+	}
+
+	$current_network = get_network();
+
+	if ( defined( 'PRIMARY_NETWORK_ID' ) ) {
+		$main_network_id = PRIMARY_NETWORK_ID;
+	} elseif ( isset( $current_network->id ) && 1 === (int) $current_network->id ) {
+		// If the current network has an ID of 1, assume it is the main network.
+		$main_network_id = 1;
+	} else {
+		$_networks = get_networks( array( 'fields' => 'ids', 'number' => 1 ) );
+		$main_network_id = array_shift( $_networks );
+	}
+
+	/**
+	 * Filters the main network ID.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param int $main_network_id The ID of the main network.
+	 */
+	return (int) apply_filters( 'get_main_network_id', $main_network_id );
+}
+
+/**
+ * Determine whether global terms are enabled.
+ *
+ * @since 3.0.0
+ *
+ * @staticvar bool $global_terms
+ *
+ * @return bool True if multisite and global terms enabled.
+ */
+function global_terms_enabled() {
+	if ( ! is_multisite() )
+		return false;
+
+	static $global_terms = null;
+	if ( is_null( $global_terms ) ) {
+
+		/**
+		 * Filters whether global terms are enabled.
+		 *
+		 * Passing a non-null value to the filter will effectively short-circuit the function,
+		 * returning the value of the 'global_terms_enabled' site option instead.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param null $enabled Whether global terms are enabled.
+		 */
+		$filter = apply_filters( 'global_terms_enabled', null );
+		if ( ! is_null( $filter ) )
+			$global_terms = (bool) $filter;
+		else
+			$global_terms = (bool) get_site_option( 'global_terms_enabled', false );
+	}
+	return $global_terms;
+}
+
+/**
+ * gmt_offset modification for smart timezone handling.
+ *
+ * Overrides the gmt_offset option if we have a timezone_string available.
+ *
+ * @since 2.8.0
+ *
+ * @return float|false Timezone GMT offset, false otherwise.
+ */
+function wp_timezone_override_offset() {
+	if ( !$timezone_string = get_option( 'timezone_string' ) ) {
+		return false;
+	}
+
+	$timezone_object = timezone_open( $timezone_string );
+	$datetime_object = date_create();
+	if ( false === $timezone_object || false === $datetime_object ) {
+		return false;
+	}
+	return round( timezone_offset_get( $timezone_object, $datetime_object ) / HOUR_IN_SECONDS, 2 );
+}
+
+/**
+ * Sort-helper for timezones.
+ *
+ * @since 2.9.0
+ * @access private
+ *
+ * @param array $a
+ * @param array $b
+ * @return int
+ */
+function _wp_timezone_choice_usort_callback( $a, $b ) {
+	// Don't use translated versions of Etc
+	if ( 'Etc' === $a['continent'] && 'Etc' === $b['continent'] ) {
+		// Make the order of these more like the old dropdown
+		if ( 'GMT+' === substr( $a['city'], 0, 4 ) && 'GMT+' === substr( $b['city'], 0, 4 ) ) {
+			return -1 * ( strnatcasecmp( $a['city'], $b['city'] ) );
+		}
+		if ( 'UTC' === $a['city'] ) {
+			if ( 'GMT+' === substr( $b['city'], 0, 4 ) ) {
+				return 1;
+			}
+			return -1;
+		}
+		if ( 'UTC' === $b['city'] ) {
+			if ( 'GMT+' === substr( $a['city'], 0, 4 ) ) {
+				return -1;
+			}
+			return 1;
+		}
+		return strnatcasecmp( $a['city'], $b['city'] );
+	}
+	if ( $a['t_continent'] == $b['t_continent'] ) {
+		if ( $a['t_city'] == $b['t_city'] ) {
+			return strnatcasecmp( $a['t_subcity'], $b['t_subcity'] );
+		}
+		return strnatcasecmp( $a['t_city'], $b['t_city'] );
+	} else {
+		// Force Etc to the bottom of the list
+		if ( 'Etc' === $a['continent'] ) {
+			return 1;
+		}
+		if ( 'Etc' === $b['continent'] ) {
+			return -1;
+		}
+		return strnatcasecmp( $a['t_continent'], $b['t_continent'] );
+	}
+}
+
+/**
+ * Gives a nicely-formatted list of timezone strings.
+ *
+ * @since 2.9.0
+ * @since 4.7.0 Added the `$locale` parameter.
+ *
+ * @staticvar bool $mo_loaded
+ * @staticvar string $locale_loaded
+ *
+ * @param string $selected_zone Selected timezone.
+ * @param string $locale        Optional. Locale to load the timezones in. Default current site locale.
+ * @return string
+ */
+function wp_timezone_choice( $selected_zone, $locale = null ) {
+	static $mo_loaded = false, $locale_loaded = null;
+
+	$continents = array( 'Africa', 'America', 'Antarctica', 'Arctic', 'Asia', 'Atlantic', 'Australia', 'Europe', 'Indian', 'Pacific');
+
+	// Load translations for continents and cities.
+	if ( ! $mo_loaded || $locale !== $locale_loaded ) {
+		$locale_loaded = $locale ? $locale : get_locale();
+		$mofile = WP_LANG_DIR . '/continents-cities-' . $locale_loaded . '.mo';
+		unload_textdomain( 'continents-cities' );
+		load_textdomain( 'continents-cities', $mofile );
+		$mo_loaded = true;
+	}
+
+	$zonen = array();
+	foreach ( timezone_identifiers_list() as $zone ) {
+		$zone = explode( '/', $zone );
+		if ( !in_array( $zone[0], $continents ) ) {
+			continue;
+		}
+
+		// This determines what gets set and translated - we don't translate Etc/* strings here, they are done later
+		$exists = array(
+			0 => ( isset( $zone[0] ) && $zone[0] ),
+			1 => ( isset( $zone[1] ) && $zone[1] ),
+			2 => ( isset( $zone[2] ) && $zone[2] ),
+		);
+		$exists[3] = ( $exists[0] && 'Etc' !== $zone[0] );
+		$exists[4] = ( $exists[1] && $exists[3] );
+		$exists[5] = ( $exists[2] && $exists[3] );
+
+		$zonen[] = array(
+			'continent'   => ( $exists[0] ? $zone[0] : '' ),
+			'city'        => ( $exists[1] ? $zone[1] : '' ),
+			'subcity'     => ( $exists[2] ? $zone[2] : '' ),
+			't_continent' => ( $exists[3] ? translate( str_replace( '_', ' ', $zone[0] ), 'continents-cities' ) : '' ),
+			't_city'      => ( $exists[4] ? translate( str_replace( '_', ' ', $zone[1] ), 'continents-cities' ) : '' ),
+			't_subcity'   => ( $exists[5] ? translate( str_replace( '_', ' ', $zone[2] ), 'continents-cities' ) : '' )
+		);
+	}
+	usort( $zonen, '_wp_timezone_choice_usort_callback' );
+
+	$structure = array();
+
+	if ( empty( $selected_zone ) ) {
+		$structure[] = '<option selected="selected" value="">' . __( 'Select a city' ) . '</option>';
+	}
+
+	foreach ( $zonen as $key => $zone ) {
+		// Build value in an array to join later
+		$value = array( $zone['continent'] );
+
+		if ( empty( $zone['city'] ) ) {
+			// It's at the continent level (generally won't happen)
+			$display = $zone['t_continent'];
+		} else {
+			// It's inside a continent group
+
+			// Continent optgroup
+			if ( !isset( $zonen[$key - 1] ) || $zonen[$key - 1]['continent'] !== $zone['continent'] ) {
+				$label = $zone['t_continent'];
+				$structure[] = '<optgroup label="'. esc_attr( $label ) .'">';
+			}
+
+			// Add the city to the value
+			$value[] = $zone['city'];
+
+			$display = $zone['t_city'];
+			if ( !empty( $zone['subcity'] ) ) {
+				// Add the subcity to the value
+				$value[] = $zone['subcity'];
+				$display .= ' - ' . $zone['t_subcity'];
+			}
+		}
+
+		// Build the value
+		$value = join( '/', $value );
+		$selected = '';
+		if ( $value === $selected_zone ) {
+			$selected = 'selected="selected" ';
+		}
+		$structure[] = '<option ' . $selected . 'value="' . esc_attr( $value ) . '">' . esc_html( $display ) . "</option>";
+
+		// Close continent optgroup
+		if ( !empty( $zone['city'] ) && ( !isset($zonen[$key + 1]) || (isset( $zonen[$key + 1] ) && $zonen[$key + 1]['continent'] !== $zone['continent']) ) ) {
+			$structure[] = '</optgroup>';
+		}
+	}
+
+	// Do UTC
+	$structure[] = '<optgroup label="'. esc_attr__( 'UTC' ) .'">';
+	$selected = '';
+	if ( 'UTC' === $selected_zone )
+		$selected = 'selected="selected" ';
+	$structure[] = '<option ' . $selected . 'value="' . esc_attr( 'UTC' ) . '">' . __('UTC') . '</option>';
+	$structure[] = '</optgroup>';
+
+	// Do manual UTC offsets
+	$structure[] = '<optgroup label="'. esc_attr__( 'Manual Offsets' ) .'">';
+	$offset_range = array (-12, -11.5, -11, -10.5, -10, -9.5, -9, -8.5, -8, -7.5, -7, -6.5, -6, -5.5, -5, -4.5, -4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5,
+		0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 5.75, 6, 6.5, 7, 7.5, 8, 8.5, 8.75, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.75, 13, 13.75, 14);
+	foreach ( $offset_range as $offset ) {
+		if ( 0 <= $offset )
+			$offset_name = '+' . $offset;
+		else
+			$offset_name = (string) $offset;
+
+		$offset_value = $offset_name;
+		$offset_name = str_replace(array('.25','.5','.75'), array(':15',':30',':45'), $offset_name);
+		$offset_name = 'UTC' . $offset_name;
+		$offset_value = 'UTC' . $offset_value;
+		$selected = '';
+		if ( $offset_value === $selected_zone )
+			$selected = 'selected="selected" ';
+		$structure[] = '<option ' . $selected . 'value="' . esc_attr( $offset_value ) . '">' . esc_html( $offset_name ) . "</option>";
+
+	}
+	$structure[] = '</optgroup>';
+
+	return join( "\n", $structure );
+}
+
+/**
+ * Strip close comment and close php tags from file headers used by WP.
+ *
+ * @since 2.8.0
+ * @access private
+ *
+ * @see https://core.trac.wordpress.org/ticket/8497
+ *
+ * @param string $str Header comment to clean up.
+ * @return string
+ */
+function _cleanup_header_comment( $str ) {
+	return trim(preg_replace("/\s*(?:\*\/|\?>).*/", '', $str));
+}
+
+/**
+ * Permanently delete comments or posts of any type that have held a status
+ * of 'trash' for the number of days defined in EMPTY_TRASH_DAYS.
+ *
+ * The default value of `EMPTY_TRASH_DAYS` is 30 (days).
+ *
+ * @since 2.9.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ */
+function wp_scheduled_delete() {
+	global $wpdb;
+
+	$delete_timestamp = time() - ( DAY_IN_SECONDS * EMPTY_TRASH_DAYS );
+
+	$posts_to_delete = $wpdb->get_results($wpdb->prepare("SELECT post_id FROM $wpdb->postmeta WHERE meta_key = '_wp_trash_meta_time' AND meta_value <
