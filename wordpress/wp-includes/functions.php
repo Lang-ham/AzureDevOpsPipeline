@@ -3839,4 +3839,261 @@ function _deprecated_function( $function, $version, $replacement = null ) {
 				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.'), $function, $version, $replacement ) );
 			} else {
 				/* translators: 1: PHP function name, 2: version number */
-				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since ve
+				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since version %2$s with no alternative available.'), $function, $version ) );
+			}
+		} else {
+			if ( ! is_null( $replacement ) ) {
+				trigger_error( sprintf( '%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.', $function, $version, $replacement ) );
+			} else {
+				trigger_error( sprintf( '%1$s is <strong>deprecated</strong> since version %2$s with no alternative available.', $function, $version ) );
+			}
+		}
+	}
+}
+
+/**
+ * Marks a constructor as deprecated and informs when it has been used.
+ *
+ * Similar to _deprecated_function(), but with different strings. Used to
+ * remove PHP4 style constructors.
+ *
+ * The current behavior is to trigger a user error if `WP_DEBUG` is true.
+ *
+ * This function is to be used in every PHP4 style constructor method that is deprecated.
+ *
+ * @since 4.3.0
+ * @since 4.5.0 Added the `$parent_class` parameter.
+ *
+ * @access private
+ *
+ * @param string $class        The class containing the deprecated constructor.
+ * @param string $version      The version of WordPress that deprecated the function.
+ * @param string $parent_class Optional. The parent class calling the deprecated constructor.
+ *                             Default empty string.
+ */
+function _deprecated_constructor( $class, $version, $parent_class = '' ) {
+
+	/**
+	 * Fires when a deprecated constructor is called.
+	 *
+	 * @since 4.3.0
+	 * @since 4.5.0 Added the `$parent_class` parameter.
+	 *
+	 * @param string $class        The class containing the deprecated constructor.
+	 * @param string $version      The version of WordPress that deprecated the function.
+	 * @param string $parent_class The parent class calling the deprecated constructor.
+	 */
+	do_action( 'deprecated_constructor_run', $class, $version, $parent_class );
+
+	/**
+	 * Filters whether to trigger an error for deprecated functions.
+	 *
+	 * `WP_DEBUG` must be true in addition to the filter evaluating to true.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param bool $trigger Whether to trigger the error for deprecated functions. Default true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'deprecated_constructor_trigger_error', true ) ) {
+		if ( function_exists( '__' ) ) {
+			if ( ! empty( $parent_class ) ) {
+				/* translators: 1: PHP class name, 2: PHP parent class name, 3: version number, 4: __construct() method */
+				trigger_error( sprintf( __( 'The called constructor method for %1$s in %2$s is <strong>deprecated</strong> since version %3$s! Use %4$s instead.' ),
+					$class, $parent_class, $version, '<pre>__construct()</pre>' ) );
+			} else {
+				/* translators: 1: PHP class name, 2: version number, 3: __construct() method */
+				trigger_error( sprintf( __( 'The called constructor method for %1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.' ),
+					$class, $version, '<pre>__construct()</pre>' ) );
+			}
+		} else {
+			if ( ! empty( $parent_class ) ) {
+				trigger_error( sprintf( 'The called constructor method for %1$s in %2$s is <strong>deprecated</strong> since version %3$s! Use %4$s instead.',
+					$class, $parent_class, $version, '<pre>__construct()</pre>' ) );
+			} else {
+				trigger_error( sprintf( 'The called constructor method for %1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.',
+					$class, $version, '<pre>__construct()</pre>' ) );
+			}
+		}
+	}
+
+}
+
+/**
+ * Mark a file as deprecated and inform when it has been used.
+ *
+ * There is a hook {@see 'deprecated_file_included'} that will be called that can be used
+ * to get the backtrace up to what file and function included the deprecated
+ * file.
+ *
+ * The current behavior is to trigger a user error if `WP_DEBUG` is true.
+ *
+ * This function is to be used in every file that is deprecated.
+ *
+ * @since 2.5.0
+ * @access private
+ *
+ * @param string $file        The file that was included.
+ * @param string $version     The version of WordPress that deprecated the file.
+ * @param string $replacement Optional. The file that should have been included based on ABSPATH.
+ *                            Default null.
+ * @param string $message     Optional. A message regarding the change. Default empty.
+ */
+function _deprecated_file( $file, $version, $replacement = null, $message = '' ) {
+
+	/**
+	 * Fires when a deprecated file is called.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param string $file        The file that was called.
+	 * @param string $replacement The file that should have been included based on ABSPATH.
+	 * @param string $version     The version of WordPress that deprecated the file.
+	 * @param string $message     A message regarding the change.
+	 */
+	do_action( 'deprecated_file_included', $file, $replacement, $version, $message );
+
+	/**
+	 * Filters whether to trigger an error for deprecated files.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param bool $trigger Whether to trigger the error for deprecated files. Default true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'deprecated_file_trigger_error', true ) ) {
+		$message = empty( $message ) ? '' : ' ' . $message;
+		if ( function_exists( '__' ) ) {
+			if ( ! is_null( $replacement ) ) {
+				/* translators: 1: PHP file name, 2: version number, 3: alternative file name */
+				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.'), $file, $version, $replacement ) . $message );
+			} else {
+				/* translators: 1: PHP file name, 2: version number */
+				trigger_error( sprintf( __('%1$s is <strong>deprecated</strong> since version %2$s with no alternative available.'), $file, $version ) . $message );
+			}
+		} else {
+			if ( ! is_null( $replacement ) ) {
+				trigger_error( sprintf( '%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.', $file, $version, $replacement ) . $message );
+			} else {
+				trigger_error( sprintf( '%1$s is <strong>deprecated</strong> since version %2$s with no alternative available.', $file, $version ) . $message );
+			}
+		}
+	}
+}
+/**
+ * Mark a function argument as deprecated and inform when it has been used.
+ *
+ * This function is to be used whenever a deprecated function argument is used.
+ * Before this function is called, the argument must be checked for whether it was
+ * used by comparing it to its default value or evaluating whether it is empty.
+ * For example:
+ *
+ *     if ( ! empty( $deprecated ) ) {
+ *         _deprecated_argument( __FUNCTION__, '3.0.0' );
+ *     }
+ *
+ *
+ * There is a hook deprecated_argument_run that will be called that can be used
+ * to get the backtrace up to what file and function used the deprecated
+ * argument.
+ *
+ * The current behavior is to trigger a user error if WP_DEBUG is true.
+ *
+ * @since 3.0.0
+ * @access private
+ *
+ * @param string $function The function that was called.
+ * @param string $version  The version of WordPress that deprecated the argument used.
+ * @param string $message  Optional. A message regarding the change. Default null.
+ */
+function _deprecated_argument( $function, $version, $message = null ) {
+
+	/**
+	 * Fires when a deprecated argument is called.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $function The function that was called.
+	 * @param string $message  A message regarding the change.
+	 * @param string $version  The version of WordPress that deprecated the argument used.
+	 */
+	do_action( 'deprecated_argument_run', $function, $message, $version );
+
+	/**
+	 * Filters whether to trigger an error for deprecated arguments.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param bool $trigger Whether to trigger the error for deprecated arguments. Default true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'deprecated_argument_trigger_error', true ) ) {
+		if ( function_exists( '__' ) ) {
+			if ( ! is_null( $message ) ) {
+				/* translators: 1: PHP function name, 2: version number, 3: optional message regarding the change */
+				trigger_error( sprintf( __('%1$s was called with an argument that is <strong>deprecated</strong> since version %2$s! %3$s'), $function, $version, $message ) );
+			} else {
+				/* translators: 1: PHP function name, 2: version number */
+				trigger_error( sprintf( __('%1$s was called with an argument that is <strong>deprecated</strong> since version %2$s with no alternative available.'), $function, $version ) );
+			}
+		} else {
+			if ( ! is_null( $message ) ) {
+				trigger_error( sprintf( '%1$s was called with an argument that is <strong>deprecated</strong> since version %2$s! %3$s', $function, $version, $message ) );
+			} else {
+				trigger_error( sprintf( '%1$s was called with an argument that is <strong>deprecated</strong> since version %2$s with no alternative available.', $function, $version ) );
+			}
+		}
+	}
+}
+
+/**
+ * Marks a deprecated action or filter hook as deprecated and throws a notice.
+ *
+ * Use the {@see 'deprecated_hook_run'} action to get the backtrace describing where
+ * the deprecated hook was called.
+ *
+ * Default behavior is to trigger a user error if `WP_DEBUG` is true.
+ *
+ * This function is called by the do_action_deprecated() and apply_filters_deprecated()
+ * functions, and so generally does not need to be called directly.
+ *
+ * @since 4.6.0
+ * @access private
+ *
+ * @param string $hook        The hook that was used.
+ * @param string $version     The version of WordPress that deprecated the hook.
+ * @param string $replacement Optional. The hook that should have been used.
+ * @param string $message     Optional. A message regarding the change.
+ */
+function _deprecated_hook( $hook, $version, $replacement = null, $message = null ) {
+	/**
+	 * Fires when a deprecated hook is called.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param string $hook        The hook that was called.
+	 * @param string $replacement The hook that should be used as a replacement.
+	 * @param string $version     The version of WordPress that deprecated the argument used.
+	 * @param string $message     A message regarding the change.
+	 */
+	do_action( 'deprecated_hook_run', $hook, $replacement, $version, $message );
+
+	/**
+	 * Filters whether to trigger deprecated hook errors.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param bool $trigger Whether to trigger deprecated hook errors. Requires
+	 *                      `WP_DEBUG` to be defined true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'deprecated_hook_trigger_error', true ) ) {
+		$message = empty( $message ) ? '' : ' ' . $message;
+		if ( ! is_null( $replacement ) ) {
+			/* translators: 1: WordPress hook name, 2: version number, 3: alternative hook name */
+			trigger_error( sprintf( __( '%1$s is <strong>deprecated</strong> since version %2$s! Use %3$s instead.' ), $hook, $version, $replacement ) . $message );
+		} else {
+			/* translators: 1: WordPress hook name, 2: version number */
+			trigger_error( sprintf( __( '%1$s is <strong>deprecated</strong> since version %2$s with no alternative available.' ), $hook, $version ) . $message );
+		}
+	}
+}
+
+/**
+ * Mark somethin
