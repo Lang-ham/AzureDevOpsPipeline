@@ -4096,4 +4096,317 @@ function _deprecated_hook( $hook, $version, $replacement = null, $message = null
 }
 
 /**
- * Mark somethin
+ * Mark something as being incorrectly called.
+ *
+ * There is a hook {@see 'doing_it_wrong_run'} that will be called that can be used
+ * to get the backtrace up to what file and function called the deprecated
+ * function.
+ *
+ * The current behavior is to trigger a user error if `WP_DEBUG` is true.
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param string $function The function that was called.
+ * @param string $message  A message explaining what has been done incorrectly.
+ * @param string $version  The version of WordPress where the message was added.
+ */
+function _doing_it_wrong( $function, $message, $version ) {
+
+	/**
+	 * Fires when the given function is being used incorrectly.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $function The function that was called.
+	 * @param string $message  A message explaining what has been done incorrectly.
+	 * @param string $version  The version of WordPress where the message was added.
+	 */
+	do_action( 'doing_it_wrong_run', $function, $message, $version );
+
+	/**
+	 * Filters whether to trigger an error for _doing_it_wrong() calls.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param bool $trigger Whether to trigger the error for _doing_it_wrong() calls. Default true.
+	 */
+	if ( WP_DEBUG && apply_filters( 'doing_it_wrong_trigger_error', true ) ) {
+		if ( function_exists( '__' ) ) {
+			if ( is_null( $version ) ) {
+				$version = '';
+			} else {
+				/* translators: %s: version number */
+				$version = sprintf( __( '(This message was added in version %s.)' ), $version );
+			}
+			/* translators: %s: Codex URL */
+			$message .= ' ' . sprintf( __( 'Please see <a href="%s">Debugging in WordPress</a> for more information.' ),
+				__( 'https://codex.wordpress.org/Debugging_in_WordPress' )
+			);
+			/* translators: Developer debugging message. 1: PHP function name, 2: Explanatory message, 3: Version information message */
+			trigger_error( sprintf( __( '%1$s was called <strong>incorrectly</strong>. %2$s %3$s' ), $function, $message, $version ) );
+		} else {
+			if ( is_null( $version ) ) {
+				$version = '';
+			} else {
+				$version = sprintf( '(This message was added in version %s.)', $version );
+			}
+			$message .= sprintf( ' Please see <a href="%s">Debugging in WordPress</a> for more information.',
+				'https://codex.wordpress.org/Debugging_in_WordPress'
+			);
+			trigger_error( sprintf( '%1$s was called <strong>incorrectly</strong>. %2$s %3$s', $function, $message, $version ) );
+		}
+	}
+}
+
+/**
+ * Is the server running earlier than 1.5.0 version of lighttpd?
+ *
+ * @since 2.5.0
+ *
+ * @return bool Whether the server is running lighttpd < 1.5.0.
+ */
+function is_lighttpd_before_150() {
+	$server_parts = explode( '/', isset( $_SERVER['SERVER_SOFTWARE'] )? $_SERVER['SERVER_SOFTWARE'] : '' );
+	$server_parts[1] = isset( $server_parts[1] )? $server_parts[1] : '';
+	return  'lighttpd' == $server_parts[0] && -1 == version_compare( $server_parts[1], '1.5.0' );
+}
+
+/**
+ * Does the specified module exist in the Apache config?
+ *
+ * @since 2.5.0
+ *
+ * @global bool $is_apache
+ *
+ * @param string $mod     The module, e.g. mod_rewrite.
+ * @param bool   $default Optional. The default return value if the module is not found. Default false.
+ * @return bool Whether the specified module is loaded.
+ */
+function apache_mod_loaded($mod, $default = false) {
+	global $is_apache;
+
+	if ( !$is_apache )
+		return false;
+
+	if ( function_exists( 'apache_get_modules' ) ) {
+		$mods = apache_get_modules();
+		if ( in_array($mod, $mods) )
+			return true;
+	} elseif ( function_exists( 'phpinfo' ) && false === strpos( ini_get( 'disable_functions' ), 'phpinfo' ) ) {
+			ob_start();
+			phpinfo(8);
+			$phpinfo = ob_get_clean();
+			if ( false !== strpos($phpinfo, $mod) )
+				return true;
+	}
+	return $default;
+}
+
+/**
+ * Check if IIS 7+ supports pretty permalinks.
+ *
+ * @since 2.8.0
+ *
+ * @global bool $is_iis7
+ *
+ * @return bool Whether IIS7 supports permalinks.
+ */
+function iis7_supports_permalinks() {
+	global $is_iis7;
+
+	$supports_permalinks = false;
+	if ( $is_iis7 ) {
+		/* First we check if the DOMDocument class exists. If it does not exist, then we cannot
+		 * easily update the xml configuration file, hence we just bail out and tell user that
+		 * pretty permalinks cannot be used.
+		 *
+		 * Next we check if the URL Rewrite Module 1.1 is loaded and enabled for the web site. When
+		 * URL Rewrite 1.1 is loaded it always sets a server variable called 'IIS_UrlRewriteModule'.
+		 * Lastly we make sure that PHP is running via FastCGI. This is important because if it runs
+		 * via ISAPI then pretty permalinks will not work.
+		 */
+		$supports_permalinks = class_exists( 'DOMDocument', false ) && isset($_SERVER['IIS_UrlRewriteModule']) && ( PHP_SAPI == 'cgi-fcgi' );
+	}
+
+	/**
+	 * Filters whether IIS 7+ supports pretty permalinks.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param bool $supports_permalinks Whether IIS7 supports permalinks. Default false.
+	 */
+	return apply_filters( 'iis7_supports_permalinks', $supports_permalinks );
+}
+
+/**
+ * Validates a file name and path against an allowed set of rules.
+ *
+ * A return value of `1` means the file path contains directory traversal.
+ *
+ * A return value of `2` means the file path contains a Windows drive path.
+ *
+ * A return value of `3` means the file is not in the allowed files list.
+ *
+ * @since 1.2.0
+ *
+ * @param string $file          File path.
+ * @param array  $allowed_files Optional. List of allowed files.
+ * @return int 0 means nothing is wrong, greater than 0 means something was wrong.
+ */
+function validate_file( $file, $allowed_files = array() ) {
+	// `../` on its own is not allowed:
+	if ( '../' === $file ) {
+		return 1;
+	}
+
+	// More than one occurence of `../` is not allowed:
+	if ( preg_match_all( '#\.\./#', $file, $matches, PREG_SET_ORDER ) && ( count( $matches ) > 1 ) ) {
+		return 1;
+	}
+
+	// `../` which does not occur at the end of the path is not allowed:
+	if ( false !== strpos( $file, '../' ) && '../' !== mb_substr( $file, -3, 3 ) ) {
+		return 1;
+	}
+
+	// Files not in the allowed file list are not allowed:
+	if ( ! empty( $allowed_files ) && ! in_array( $file, $allowed_files ) )
+		return 3;
+
+	// Absolute Windows drive paths are not allowed:
+	if (':' == substr( $file, 1, 1 ) )
+		return 2;
+
+	return 0;
+}
+
+/**
+ * Whether to force SSL used for the Administration Screens.
+ *
+ * @since 2.6.0
+ *
+ * @staticvar bool $forced
+ *
+ * @param string|bool $force Optional. Whether to force SSL in admin screens. Default null.
+ * @return bool True if forced, false if not forced.
+ */
+function force_ssl_admin( $force = null ) {
+	static $forced = false;
+
+	if ( !is_null( $force ) ) {
+		$old_forced = $forced;
+		$forced = $force;
+		return $old_forced;
+	}
+
+	return $forced;
+}
+
+/**
+ * Guess the URL for the site.
+ *
+ * Will remove wp-admin links to retrieve only return URLs not in the wp-admin
+ * directory.
+ *
+ * @since 2.6.0
+ *
+ * @return string The guessed URL.
+ */
+function wp_guess_url() {
+	if ( defined('WP_SITEURL') && '' != WP_SITEURL ) {
+		$url = WP_SITEURL;
+	} else {
+		$abspath_fix = str_replace( '\\', '/', ABSPATH );
+		$script_filename_dir = dirname( $_SERVER['SCRIPT_FILENAME'] );
+
+		// The request is for the admin
+		if ( strpos( $_SERVER['REQUEST_URI'], 'wp-admin' ) !== false || strpos( $_SERVER['REQUEST_URI'], 'wp-login.php' ) !== false ) {
+			$path = preg_replace( '#/(wp-admin/.*|wp-login.php)#i', '', $_SERVER['REQUEST_URI'] );
+
+		// The request is for a file in ABSPATH
+		} elseif ( $script_filename_dir . '/' == $abspath_fix ) {
+			// Strip off any file/query params in the path
+			$path = preg_replace( '#/[^/]*$#i', '', $_SERVER['PHP_SELF'] );
+
+		} else {
+			if ( false !== strpos( $_SERVER['SCRIPT_FILENAME'], $abspath_fix ) ) {
+				// Request is hitting a file inside ABSPATH
+				$directory = str_replace( ABSPATH, '', $script_filename_dir );
+				// Strip off the sub directory, and any file/query params
+				$path = preg_replace( '#/' . preg_quote( $directory, '#' ) . '/[^/]*$#i', '' , $_SERVER['REQUEST_URI'] );
+			} elseif ( false !== strpos( $abspath_fix, $script_filename_dir ) ) {
+				// Request is hitting a file above ABSPATH
+				$subdirectory = substr( $abspath_fix, strpos( $abspath_fix, $script_filename_dir ) + strlen( $script_filename_dir ) );
+				// Strip off any file/query params from the path, appending the sub directory to the installation
+				$path = preg_replace( '#/[^/]*$#i', '' , $_SERVER['REQUEST_URI'] ) . $subdirectory;
+			} else {
+				$path = $_SERVER['REQUEST_URI'];
+			}
+		}
+
+		$schema = is_ssl() ? 'https://' : 'http://'; // set_url_scheme() is not defined yet
+		$url = $schema . $_SERVER['HTTP_HOST'] . $path;
+	}
+
+	return rtrim($url, '/');
+}
+
+/**
+ * Temporarily suspend cache additions.
+ *
+ * Stops more data being added to the cache, but still allows cache retrieval.
+ * This is useful for actions, such as imports, when a lot of data would otherwise
+ * be almost uselessly added to the cache.
+ *
+ * Suspension lasts for a single page load at most. Remember to call this
+ * function again if you wish to re-enable cache adds earlier.
+ *
+ * @since 3.3.0
+ *
+ * @staticvar bool $_suspend
+ *
+ * @param bool $suspend Optional. Suspends additions if true, re-enables them if false.
+ * @return bool The current suspend setting
+ */
+function wp_suspend_cache_addition( $suspend = null ) {
+	static $_suspend = false;
+
+	if ( is_bool( $suspend ) )
+		$_suspend = $suspend;
+
+	return $_suspend;
+}
+
+/**
+ * Suspend cache invalidation.
+ *
+ * Turns cache invalidation on and off. Useful during imports where you don't want to do
+ * invalidations every time a post is inserted. Callers must be sure that what they are
+ * doing won't lead to an inconsistent cache when invalidation is suspended.
+ *
+ * @since 2.7.0
+ *
+ * @global bool $_wp_suspend_cache_invalidation
+ *
+ * @param bool $suspend Optional. Whether to suspend or enable cache invalidation. Default true.
+ * @return bool The current suspend setting.
+ */
+function wp_suspend_cache_invalidation( $suspend = true ) {
+	global $_wp_suspend_cache_invalidation;
+
+	$current_suspend = $_wp_suspend_cache_invalidation;
+	$_wp_suspend_cache_invalidation = $suspend;
+	return $current_suspend;
+}
+
+/**
+ * Determine whether a site is the main site of the current network.
+ *
+ * @since 3.0.0
+ * @since 4.9.0 The $network_id parameter has been added.
+ *
+ * @param int $site_id    Optional. Site ID to test. Defaults to current site.
+ * @param int $network_id Optional. Network ID of the network to check for.
+ *                        Defaults to current network.
+ * @retu
