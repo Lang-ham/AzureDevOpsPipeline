@@ -4774,4 +4774,350 @@ function wp_scheduled_delete() {
 
 	$delete_timestamp = time() - ( DAY_IN_SECONDS * EMPTY_TRASH_DAYS );
 
-	$posts_to_delete = $wpdb->get_results($wpdb->prepare("SELECT post_id FROM $wpdb->postmeta WHERE meta_key = '_wp_trash_meta_time' AND meta_value <
+	$posts_to_delete = $wpdb->get_results($wpdb->prepare("SELECT post_id FROM $wpdb->postmeta WHERE meta_key = '_wp_trash_meta_time' AND meta_value < %d", $delete_timestamp), ARRAY_A);
+
+	foreach ( (array) $posts_to_delete as $post ) {
+		$post_id = (int) $post['post_id'];
+		if ( !$post_id )
+			continue;
+
+		$del_post = get_post($post_id);
+
+		if ( !$del_post || 'trash' != $del_post->post_status ) {
+			delete_post_meta($post_id, '_wp_trash_meta_status');
+			delete_post_meta($post_id, '_wp_trash_meta_time');
+		} else {
+			wp_delete_post($post_id);
+		}
+	}
+
+	$comments_to_delete = $wpdb->get_results($wpdb->prepare("SELECT comment_id FROM $wpdb->commentmeta WHERE meta_key = '_wp_trash_meta_time' AND meta_value < %d", $delete_timestamp), ARRAY_A);
+
+	foreach ( (array) $comments_to_delete as $comment ) {
+		$comment_id = (int) $comment['comment_id'];
+		if ( !$comment_id )
+			continue;
+
+		$del_comment = get_comment($comment_id);
+
+		if ( !$del_comment || 'trash' != $del_comment->comment_approved ) {
+			delete_comment_meta($comment_id, '_wp_trash_meta_time');
+			delete_comment_meta($comment_id, '_wp_trash_meta_status');
+		} else {
+			wp_delete_comment( $del_comment );
+		}
+	}
+}
+
+/**
+ * Retrieve metadata from a file.
+ *
+ * Searches for metadata in the first 8kiB of a file, such as a plugin or theme.
+ * Each piece of metadata must be on its own line. Fields can not span multiple
+ * lines, the value will get cut at the end of the first line.
+ *
+ * If the file data is not within that first 8kiB, then the author should correct
+ * their plugin file and move the data headers to the top.
+ *
+ * @link https://codex.wordpress.org/File_Header
+ *
+ * @since 2.9.0
+ *
+ * @param string $file            Path to the file.
+ * @param array  $default_headers List of headers, in the format array('HeaderKey' => 'Header Name').
+ * @param string $context         Optional. If specified adds filter hook {@see 'extra_$context_headers'}.
+ *                                Default empty.
+ * @return array Array of file headers in `HeaderKey => Header Value` format.
+ */
+function get_file_data( $file, $default_headers, $context = '' ) {
+	// We don't need to write to the file, so just open for reading.
+	$fp = fopen( $file, 'r' );
+
+	// Pull only the first 8kiB of the file in.
+	$file_data = fread( $fp, 8192 );
+
+	// PHP will close file handle, but we are good citizens.
+	fclose( $fp );
+
+	// Make sure we catch CR-only line endings.
+	$file_data = str_replace( "\r", "\n", $file_data );
+
+	/**
+	 * Filters extra file headers by context.
+	 *
+	 * The dynamic portion of the hook name, `$context`, refers to
+	 * the context where extra headers might be loaded.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param array $extra_context_headers Empty array by default.
+	 */
+	if ( $context && $extra_headers = apply_filters( "extra_{$context}_headers", array() ) ) {
+		$extra_headers = array_combine( $extra_headers, $extra_headers ); // keys equal values
+		$all_headers = array_merge( $extra_headers, (array) $default_headers );
+	} else {
+		$all_headers = $default_headers;
+	}
+
+	foreach ( $all_headers as $field => $regex ) {
+		if ( preg_match( '/^[ \t\/*#@]*' . preg_quote( $regex, '/' ) . ':(.*)$/mi', $file_data, $match ) && $match[1] )
+			$all_headers[ $field ] = _cleanup_header_comment( $match[1] );
+		else
+			$all_headers[ $field ] = '';
+	}
+
+	return $all_headers;
+}
+
+/**
+ * Returns true.
+ *
+ * Useful for returning true to filters easily.
+ *
+ * @since 3.0.0
+ *
+ * @see __return_false()
+ *
+ * @return true True.
+ */
+function __return_true() {
+	return true;
+}
+
+/**
+ * Returns false.
+ *
+ * Useful for returning false to filters easily.
+ *
+ * @since 3.0.0
+ *
+ * @see __return_true()
+ *
+ * @return false False.
+ */
+function __return_false() {
+	return false;
+}
+
+/**
+ * Returns 0.
+ *
+ * Useful for returning 0 to filters easily.
+ *
+ * @since 3.0.0
+ *
+ * @return int 0.
+ */
+function __return_zero() {
+	return 0;
+}
+
+/**
+ * Returns an empty array.
+ *
+ * Useful for returning an empty array to filters easily.
+ *
+ * @since 3.0.0
+ *
+ * @return array Empty array.
+ */
+function __return_empty_array() {
+	return array();
+}
+
+/**
+ * Returns null.
+ *
+ * Useful for returning null to filters easily.
+ *
+ * @since 3.4.0
+ *
+ * @return null Null value.
+ */
+function __return_null() {
+	return null;
+}
+
+/**
+ * Returns an empty string.
+ *
+ * Useful for returning an empty string to filters easily.
+ *
+ * @since 3.7.0
+ *
+ * @see __return_null()
+ *
+ * @return string Empty string.
+ */
+function __return_empty_string() {
+	return '';
+}
+
+/**
+ * Send a HTTP header to disable content type sniffing in browsers which support it.
+ *
+ * @since 3.0.0
+ *
+ * @see https://blogs.msdn.com/ie/archive/2008/07/02/ie8-security-part-v-comprehensive-protection.aspx
+ * @see https://src.chromium.org/viewvc/chrome?view=rev&revision=6985
+ */
+function send_nosniff_header() {
+	@header( 'X-Content-Type-Options: nosniff' );
+}
+
+/**
+ * Return a MySQL expression for selecting the week number based on the start_of_week option.
+ *
+ * @ignore
+ * @since 3.0.0
+ *
+ * @param string $column Database column.
+ * @return string SQL clause.
+ */
+function _wp_mysql_week( $column ) {
+	switch ( $start_of_week = (int) get_option( 'start_of_week' ) ) {
+	case 1 :
+		return "WEEK( $column, 1 )";
+	case 2 :
+	case 3 :
+	case 4 :
+	case 5 :
+	case 6 :
+		return "WEEK( DATE_SUB( $column, INTERVAL $start_of_week DAY ), 0 )";
+	case 0 :
+	default :
+		return "WEEK( $column, 0 )";
+	}
+}
+
+/**
+ * Find hierarchy loops using a callback function that maps object IDs to parent IDs.
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param callable $callback      Function that accepts ( ID, $callback_args ) and outputs parent_ID.
+ * @param int      $start         The ID to start the loop check at.
+ * @param int      $start_parent  The parent_ID of $start to use instead of calling $callback( $start ).
+ *                                Use null to always use $callback
+ * @param array    $callback_args Optional. Additional arguments to send to $callback.
+ * @return array IDs of all members of loop.
+ */
+function wp_find_hierarchy_loop( $callback, $start, $start_parent, $callback_args = array() ) {
+	$override = is_null( $start_parent ) ? array() : array( $start => $start_parent );
+
+	if ( !$arbitrary_loop_member = wp_find_hierarchy_loop_tortoise_hare( $callback, $start, $override, $callback_args ) )
+		return array();
+
+	return wp_find_hierarchy_loop_tortoise_hare( $callback, $arbitrary_loop_member, $override, $callback_args, true );
+}
+
+/**
+ * Use the "The Tortoise and the Hare" algorithm to detect loops.
+ *
+ * For every step of the algorithm, the hare takes two steps and the tortoise one.
+ * If the hare ever laps the tortoise, there must be a loop.
+ *
+ * @since 3.1.0
+ * @access private
+ *
+ * @param callable $callback      Function that accepts ( ID, callback_arg, ... ) and outputs parent_ID.
+ * @param int      $start         The ID to start the loop check at.
+ * @param array    $override      Optional. An array of ( ID => parent_ID, ... ) to use instead of $callback.
+ *                                Default empty array.
+ * @param array    $callback_args Optional. Additional arguments to send to $callback. Default empty array.
+ * @param bool     $_return_loop  Optional. Return loop members or just detect presence of loop? Only set
+ *                                to true if you already know the given $start is part of a loop (otherwise
+ *                                the returned array might include branches). Default false.
+ * @return mixed Scalar ID of some arbitrary member of the loop, or array of IDs of all members of loop if
+ *               $_return_loop
+ */
+function wp_find_hierarchy_loop_tortoise_hare( $callback, $start, $override = array(), $callback_args = array(), $_return_loop = false ) {
+	$tortoise = $hare = $evanescent_hare = $start;
+	$return = array();
+
+	// Set evanescent_hare to one past hare
+	// Increment hare two steps
+	while (
+		$tortoise
+	&&
+		( $evanescent_hare = isset( $override[$hare] ) ? $override[$hare] : call_user_func_array( $callback, array_merge( array( $hare ), $callback_args ) ) )
+	&&
+		( $hare = isset( $override[$evanescent_hare] ) ? $override[$evanescent_hare] : call_user_func_array( $callback, array_merge( array( $evanescent_hare ), $callback_args ) ) )
+	) {
+		if ( $_return_loop )
+			$return[$tortoise] = $return[$evanescent_hare] = $return[$hare] = true;
+
+		// tortoise got lapped - must be a loop
+		if ( $tortoise == $evanescent_hare || $tortoise == $hare )
+			return $_return_loop ? $return : $tortoise;
+
+		// Increment tortoise by one step
+		$tortoise = isset( $override[$tortoise] ) ? $override[$tortoise] : call_user_func_array( $callback, array_merge( array( $tortoise ), $callback_args ) );
+	}
+
+	return false;
+}
+
+/**
+ * Send a HTTP header to limit rendering of pages to same origin iframes.
+ *
+ * @since 3.1.3
+ *
+ * @see https://developer.mozilla.org/en/the_x-frame-options_response_header
+ */
+function send_frame_options_header() {
+	@header( 'X-Frame-Options: SAMEORIGIN' );
+}
+
+/**
+ * Retrieve a list of protocols to allow in HTML attributes.
+ *
+ * @since 3.3.0
+ * @since 4.3.0 Added 'webcal' to the protocols array.
+ * @since 4.7.0 Added 'urn' to the protocols array.
+ *
+ * @see wp_kses()
+ * @see esc_url()
+ *
+ * @staticvar array $protocols
+ *
+ * @return array Array of allowed protocols. Defaults to an array containing 'http', 'https',
+ *               'ftp', 'ftps', 'mailto', 'news', 'irc', 'gopher', 'nntp', 'feed', 'telnet',
+ *               'mms', 'rtsp', 'svn', 'tel', 'fax', 'xmpp', 'webcal', and 'urn'.
+ */
+function wp_allowed_protocols() {
+	static $protocols = array();
+
+	if ( empty( $protocols ) ) {
+		$protocols = array( 'http', 'https', 'ftp', 'ftps', 'mailto', 'news', 'irc', 'gopher', 'nntp', 'feed', 'telnet', 'mms', 'rtsp', 'svn', 'tel', 'fax', 'xmpp', 'webcal', 'urn' );
+	}
+
+	if ( ! did_action( 'wp_loaded' ) ) {
+		/**
+		 * Filters the list of protocols allowed in HTML attributes.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param array $protocols Array of allowed protocols e.g. 'http', 'ftp', 'tel', and more.
+		 */
+		$protocols = array_unique( (array) apply_filters( 'kses_allowed_protocols', $protocols ) );
+	}
+
+	return $protocols;
+}
+
+/**
+ * Return a comma-separated string of functions that have been called to get
+ * to the current point in code.
+ *
+ * @since 3.4.0
+ *
+ * @see https://core.trac.wordpress.org/ticket/19589
+ *
+ * @param string $ignore_class Optional. A class to ignore all function calls within - useful
+ *                             when you want to just give info about the callee. Default null.
+ * @param int    $skip_frames  Optional. A number of stack frames to skip - useful for unwinding
+ *                             back to the source of the issue. Default 0.
+ * @param bool   $pretty       Optional. Whether or not you want a comma separated string or raw
+ *                             array returned. Defau
