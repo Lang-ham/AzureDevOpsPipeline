@@ -262,3 +262,76 @@ function wp_deregister_script( $handle ) {
  * @param bool             $in_footer Optional. Whether to enqueue the script before </body> instead of in the <head>.
  *                                    Default 'false'.
  */
+function wp_enqueue_script( $handle, $src = '', $deps = array(), $ver = false, $in_footer = false ) {
+	$wp_scripts = wp_scripts();
+
+	_wp_scripts_maybe_doing_it_wrong( __FUNCTION__ );
+
+
+	if ( $src || $in_footer ) {
+		$_handle = explode( '?', $handle );
+
+		if ( $src ) {
+			$wp_scripts->add( $_handle[0], $src, $deps, $ver );
+		}
+
+		if ( $in_footer ) {
+			$wp_scripts->add_data( $_handle[0], 'group', 1 );
+		}
+	}
+
+	$wp_scripts->enqueue( $handle );
+}
+
+/**
+ * Remove a previously enqueued script.
+ *
+ * @see WP_Dependencies::dequeue()
+ *
+ * @since 3.1.0
+ *
+ * @param string $handle Name of the script to be removed.
+ */
+function wp_dequeue_script( $handle ) {
+	_wp_scripts_maybe_doing_it_wrong( __FUNCTION__ );
+
+	wp_scripts()->dequeue( $handle );
+}
+
+/**
+ * Check whether a script has been added to the queue.
+ *
+ * @since 2.8.0
+ * @since 3.5.0 'enqueued' added as an alias of the 'queue' list.
+ *
+ * @param string $handle Name of the script.
+ * @param string $list   Optional. Status of the script to check. Default 'enqueued'.
+ *                       Accepts 'enqueued', 'registered', 'queue', 'to_do', and 'done'.
+ * @return bool Whether the script is queued.
+ */
+function wp_script_is( $handle, $list = 'enqueued' ) {
+	_wp_scripts_maybe_doing_it_wrong( __FUNCTION__ );
+
+	return (bool) wp_scripts()->query( $handle, $list );
+}
+
+/**
+ * Add metadata to a script.
+ *
+ * Works only if the script has already been added.
+ *
+ * Possible values for $key and $value:
+ * 'conditional' string Comments for IE 6, lte IE 7, etc.
+ *
+ * @since 4.2.0
+ *
+ * @see WP_Dependency::add_data()
+ *
+ * @param string $handle Name of the script.
+ * @param string $key    Name of data point for which we're storing a value.
+ * @param mixed  $value  String containing the data to be added.
+ * @return bool True on success, false on failure.
+ */
+function wp_script_add_data( $handle, $key, $value ){
+	return wp_scripts()->add_data( $handle, $key, $value );
+}
