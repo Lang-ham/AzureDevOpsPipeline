@@ -5120,4 +5120,382 @@ function wp_allowed_protocols() {
  * @param int    $skip_frames  Optional. A number of stack frames to skip - useful for unwinding
  *                             back to the source of the issue. Default 0.
  * @param bool   $pretty       Optional. Whether or not you want a comma separated string or raw
- *                             array returned. Defau
+ *                             array returned. Default true.
+ * @return string|array Either a string containing a reversed comma separated trace or an array
+ *                      of individual calls.
+ */
+function wp_debug_backtrace_summary( $ignore_class = null, $skip_frames = 0, $pretty = true ) {
+	if ( version_compare( PHP_VERSION, '5.2.5', '>=' ) )
+		$trace = debug_backtrace( false );
+	else
+		$trace = debug_backtrace();
+
+	$caller = array();
+	$check_class = ! is_null( $ignore_class );
+	$skip_frames++; // skip this function
+
+	foreach ( $trace as $call ) {
+		if ( $skip_frames > 0 ) {
+			$skip_frames--;
+		} elseif ( isset( $call['class'] ) ) {
+			if ( $check_class && $ignore_class == $call['class'] )
+				continue; // Filter out calls
+
+			$caller[] = "{$call['class']}{$call['type']}{$call['function']}";
+		} else {
+			if ( in_array( $call['function'], array( 'do_action', 'apply_filters' ) ) ) {
+				$caller[] = "{$call['function']}('{$call['args'][0]}')";
+			} elseif ( in_array( $call['function'], array( 'include', 'include_once', 'require', 'require_once' ) ) ) {
+				$caller[] = $call['function'] . "('" . str_replace( array( WP_CONTENT_DIR, ABSPATH ) , '', $call['args'][0] ) . "')";
+			} else {
+				$caller[] = $call['function'];
+			}
+		}
+	}
+	if ( $pretty )
+		return join( ', ', array_reverse( $caller ) );
+	else
+		return $caller;
+}
+
+/**
+ * Retrieve ids that are not already present in the cache.
+ *
+ * @since 3.4.0
+ * @access private
+ *
+ * @param array  $object_ids ID list.
+ * @param string $cache_key  The cache bucket to check against.
+ *
+ * @return array List of ids not present in the cache.
+ */
+function _get_non_cached_ids( $object_ids, $cache_key ) {
+	$clean = array();
+	foreach ( $object_ids as $id ) {
+		$id = (int) $id;
+		if ( !wp_cache_get( $id, $cache_key ) ) {
+			$clean[] = $id;
+		}
+	}
+
+	return $clean;
+}
+
+/**
+ * Test if the current device has the capability to upload files.
+ *
+ * @since 3.4.0
+ * @access private
+ *
+ * @return bool Whether the device is able to upload files.
+ */
+function _device_can_upload() {
+	if ( ! wp_is_mobile() )
+		return true;
+
+	$ua = $_SERVER['HTTP_USER_AGENT'];
+
+	if ( strpos($ua, 'iPhone') !== false
+		|| strpos($ua, 'iPad') !== false
+		|| strpos($ua, 'iPod') !== false ) {
+			return preg_match( '#OS ([\d_]+) like Mac OS X#', $ua, $version ) && version_compare( $version[1], '6', '>=' );
+	}
+
+	return true;
+}
+
+/**
+ * Test if a given path is a stream URL
+ *
+ * @since 3.5.0
+ *
+ * @param string $path The resource path or URL.
+ * @return bool True if the path is a stream URL.
+ */
+function wp_is_stream( $path ) {
+	$wrappers = stream_get_wrappers();
+	$wrappers_re = '(' . join('|', $wrappers) . ')';
+
+	return preg_match( "!^$wrappers_re://!", $path ) === 1;
+}
+
+/**
+ * Test if the supplied date is valid for the Gregorian calendar.
+ *
+ * @since 3.5.0
+ *
+ * @see checkdate()
+ *
+ * @param  int    $month       Month number.
+ * @param  int    $day         Day number.
+ * @param  int    $year        Year number.
+ * @param  string $source_date The date to filter.
+ * @return bool True if valid date, false if not valid date.
+ */
+function wp_checkdate( $month, $day, $year, $source_date ) {
+	/**
+	 * Filters whether the given date is valid for the Gregorian calendar.
+	 *
+	 * @since 3.5.0
+	 *
+	 * @param bool   $checkdate   Whether the given date is valid.
+	 * @param string $source_date Date to check.
+	 */
+	return apply_filters( 'wp_checkdate', checkdate( $month, $day, $year ), $source_date );
+}
+
+/**
+ * Load the auth check for monitoring whether the user is still logged in.
+ *
+ * Can be disabled with remove_action( 'admin_enqueue_scripts', 'wp_auth_check_load' );
+ *
+ * This is disabled for certain screens where a login screen could cause an
+ * inconvenient interruption. A filter called {@see 'wp_auth_check_load'} can be used
+ * for fine-grained control.
+ *
+ * @since 3.6.0
+ */
+function wp_auth_check_load() {
+	if ( ! is_admin() && ! is_user_logged_in() )
+		return;
+
+	if ( defined( 'IFRAME_REQUEST' ) )
+		return;
+
+	$screen = get_current_screen();
+	$hidden = array( 'update', 'update-network', 'update-core', 'update-core-network', 'upgrade', 'upgrade-network', 'network' );
+	$show = ! in_array( $screen->id, $hidden );
+
+	/**
+	 * Filters whether to load the authentication check.
+	 *
+	 * Passing a falsey value to the filter will effectively short-circuit
+	 * loading the authentication check.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @param bool      $show   Whether to load the authentication check.
+	 * @param WP_Screen $screen The current screen object.
+	 */
+	if ( apply_filters( 'wp_auth_check_load', $show, $screen ) ) {
+		wp_enqueue_style( 'wp-auth-check' );
+		wp_enqueue_script( 'wp-auth-check' );
+
+		add_action( 'admin_print_footer_scripts', 'wp_auth_check_html', 5 );
+		add_action( 'wp_print_footer_scripts', 'wp_auth_check_html', 5 );
+	}
+}
+
+/**
+ * Output the HTML that shows the wp-login dialog when the user is no longer logged in.
+ *
+ * @since 3.6.0
+ */
+function wp_auth_check_html() {
+	$login_url = wp_login_url();
+	$current_domain = ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'];
+	$same_domain = ( strpos( $login_url, $current_domain ) === 0 );
+
+	/**
+	 * Filters whether the authentication check originated at the same domain.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @param bool $same_domain Whether the authentication check originated at the same domain.
+	 */
+	$same_domain = apply_filters( 'wp_auth_check_same_domain', $same_domain );
+	$wrap_class = $same_domain ? 'hidden' : 'hidden fallback';
+
+	?>
+	<div id="wp-auth-check-wrap" class="<?php echo $wrap_class; ?>">
+	<div id="wp-auth-check-bg"></div>
+	<div id="wp-auth-check">
+	<button type="button" class="wp-auth-check-close button-link"><span class="screen-reader-text"><?php _e( 'Close dialog' ); ?></span></button>
+	<?php
+
+	if ( $same_domain ) {
+		$login_src = add_query_arg( array(
+			'interim-login' => '1',
+			'wp_lang'       => get_user_locale(),
+		), $login_url );
+		?>
+		<div id="wp-auth-check-form" class="loading" data-src="<?php echo esc_url( $login_src ); ?>"></div>
+		<?php
+	}
+
+	?>
+	<div class="wp-auth-fallback">
+		<p><b class="wp-auth-fallback-expired" tabindex="0"><?php _e('Session expired'); ?></b></p>
+		<p><a href="<?php echo esc_url( $login_url ); ?>" target="_blank"><?php _e('Please log in again.'); ?></a>
+		<?php _e('The login page will open in a new window. After logging in you can close it and return to this page.'); ?></p>
+	</div>
+	</div>
+	</div>
+	<?php
+}
+
+/**
+ * Check whether a user is still logged in, for the heartbeat.
+ *
+ * Send a result that shows a log-in box if the user is no longer logged in,
+ * or if their cookie is within the grace period.
+ *
+ * @since 3.6.0
+ *
+ * @global int $login_grace_period
+ *
+ * @param array $response  The Heartbeat response.
+ * @return array $response The Heartbeat response with 'wp-auth-check' value set.
+ */
+function wp_auth_check( $response ) {
+	$response['wp-auth-check'] = is_user_logged_in() && empty( $GLOBALS['login_grace_period'] );
+	return $response;
+}
+
+/**
+ * Return RegEx body to liberally match an opening HTML tag.
+ *
+ * Matches an opening HTML tag that:
+ * 1. Is self-closing or
+ * 2. Has no body but has a closing tag of the same name or
+ * 3. Contains a body and a closing tag of the same name
+ *
+ * Note: this RegEx does not balance inner tags and does not attempt
+ * to produce valid HTML
+ *
+ * @since 3.6.0
+ *
+ * @param string $tag An HTML tag name. Example: 'video'.
+ * @return string Tag RegEx.
+ */
+function get_tag_regex( $tag ) {
+	if ( empty( $tag ) )
+		return;
+	return sprintf( '<%1$s[^<]*(?:>[\s\S]*<\/%1$s>|\s*\/>)', tag_escape( $tag ) );
+}
+
+/**
+ * Retrieve a canonical form of the provided charset appropriate for passing to PHP
+ * functions such as htmlspecialchars() and charset html attributes.
+ *
+ * @since 3.6.0
+ * @access private
+ *
+ * @see https://core.trac.wordpress.org/ticket/23688
+ *
+ * @param string $charset A charset name.
+ * @return string The canonical form of the charset.
+ */
+function _canonical_charset( $charset ) {
+	if ( 'utf-8' === strtolower( $charset ) || 'utf8' === strtolower( $charset) ) {
+
+		return 'UTF-8';
+	}
+
+	if ( 'iso-8859-1' === strtolower( $charset ) || 'iso8859-1' === strtolower( $charset ) ) {
+
+		return 'ISO-8859-1';
+	}
+
+	return $charset;
+}
+
+/**
+ * Set the mbstring internal encoding to a binary safe encoding when func_overload
+ * is enabled.
+ *
+ * When mbstring.func_overload is in use for multi-byte encodings, the results from
+ * strlen() and similar functions respect the utf8 characters, causing binary data
+ * to return incorrect lengths.
+ *
+ * This function overrides the mbstring encoding to a binary-safe encoding, and
+ * resets it to the users expected encoding afterwards through the
+ * `reset_mbstring_encoding` function.
+ *
+ * It is safe to recursively call this function, however each
+ * `mbstring_binary_safe_encoding()` call must be followed up with an equal number
+ * of `reset_mbstring_encoding()` calls.
+ *
+ * @since 3.7.0
+ *
+ * @see reset_mbstring_encoding()
+ *
+ * @staticvar array $encodings
+ * @staticvar bool  $overloaded
+ *
+ * @param bool $reset Optional. Whether to reset the encoding back to a previously-set encoding.
+ *                    Default false.
+ */
+function mbstring_binary_safe_encoding( $reset = false ) {
+	static $encodings = array();
+	static $overloaded = null;
+
+	if ( is_null( $overloaded ) )
+		$overloaded = function_exists( 'mb_internal_encoding' ) && ( ini_get( 'mbstring.func_overload' ) & 2 );
+
+	if ( false === $overloaded )
+		return;
+
+	if ( ! $reset ) {
+		$encoding = mb_internal_encoding();
+		array_push( $encodings, $encoding );
+		mb_internal_encoding( 'ISO-8859-1' );
+	}
+
+	if ( $reset && $encodings ) {
+		$encoding = array_pop( $encodings );
+		mb_internal_encoding( $encoding );
+	}
+}
+
+/**
+ * Reset the mbstring internal encoding to a users previously set encoding.
+ *
+ * @see mbstring_binary_safe_encoding()
+ *
+ * @since 3.7.0
+ */
+function reset_mbstring_encoding() {
+	mbstring_binary_safe_encoding( true );
+}
+
+/**
+ * Filter/validate a variable as a boolean.
+ *
+ * Alternative to `filter_var( $var, FILTER_VALIDATE_BOOLEAN )`.
+ *
+ * @since 4.0.0
+ *
+ * @param mixed $var Boolean value to validate.
+ * @return bool Whether the value is validated.
+ */
+function wp_validate_boolean( $var ) {
+	if ( is_bool( $var ) ) {
+		return $var;
+	}
+
+	if ( is_string( $var ) && 'false' === strtolower( $var ) ) {
+		return false;
+	}
+
+	return (bool) $var;
+}
+
+/**
+ * Delete a file
+ *
+ * @since 4.2.0
+ *
+ * @param string $file The path to the file to delete.
+ */
+function wp_delete_file( $file ) {
+	/**
+	 * Filters the path of the file to delete.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param string $file Path to the file to delete.
+	 */
+	$delete = apply_filters( 'wp_delete_file', $file );
+	if ( ! empty( $delete ) ) {
+		@unlink( $delet
