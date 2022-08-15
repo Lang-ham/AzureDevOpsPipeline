@@ -5498,4 +5498,321 @@ function wp_delete_file( $file ) {
 	 */
 	$delete = apply_filters( 'wp_delete_file', $file );
 	if ( ! empty( $delete ) ) {
-		@unlink( $delet
+		@unlink( $delete );
+	}
+}
+
+/**
+ * Outputs a small JS snippet on preview tabs/windows to remove `window.name` on unload.
+ *
+ * This prevents reusing the same tab for a preview when the user has navigated away.
+ *
+ * @since 4.3.0
+ *
+ * @global WP_Post $post
+ */
+function wp_post_preview_js() {
+	global $post;
+
+	if ( ! is_preview() || empty( $post ) ) {
+		return;
+	}
+
+	// Has to match the window name used in post_submit_meta_box()
+	$name = 'wp-preview-' . (int) $post->ID;
+
+	?>
+	<script>
+	( function() {
+		var query = document.location.search;
+
+		if ( query && query.indexOf( 'preview=true' ) !== -1 ) {
+			window.name = '<?php echo $name; ?>';
+		}
+
+		if ( window.addEventListener ) {
+			window.addEventListener( 'unload', function() { window.name = ''; }, false );
+		}
+	}());
+	</script>
+	<?php
+}
+
+/**
+ * Parses and formats a MySQL datetime (Y-m-d H:i:s) for ISO8601/RFC3339.
+ *
+ * Explicitly strips timezones, as datetimes are not saved with any timezone
+ * information. Including any information on the offset could be misleading.
+ *
+ * @since 4.4.0
+ *
+ * @param string $date_string Date string to parse and format.
+ * @return string Date formatted for ISO8601/RFC3339.
+ */
+function mysql_to_rfc3339( $date_string ) {
+	$formatted = mysql2date( 'c', $date_string, false );
+
+	// Strip timezone information
+	return preg_replace( '/(?:Z|[+-]\d{2}(?::\d{2})?)$/', '', $formatted );
+}
+
+/**
+ * Attempts to raise the PHP memory limit for memory intensive processes.
+ *
+ * Only allows raising the existing limit and prevents lowering it.
+ *
+ * @since 4.6.0
+ *
+ * @param string $context Optional. Context in which the function is called. Accepts either 'admin',
+ *                        'image', or an arbitrary other context. If an arbitrary context is passed,
+ *                        the similarly arbitrary {@see '{$context}_memory_limit'} filter will be
+ *                        invoked. Default 'admin'.
+ * @return bool|int|string The limit that was set or false on failure.
+ */
+function wp_raise_memory_limit( $context = 'admin' ) {
+	// Exit early if the limit cannot be changed.
+	if ( false === wp_is_ini_value_changeable( 'memory_limit' ) ) {
+		return false;
+	}
+
+	$current_limit     = @ini_get( 'memory_limit' );
+	$current_limit_int = wp_convert_hr_to_bytes( $current_limit );
+
+	if ( -1 === $current_limit_int ) {
+		return false;
+	}
+
+	$wp_max_limit     = WP_MAX_MEMORY_LIMIT;
+	$wp_max_limit_int = wp_convert_hr_to_bytes( $wp_max_limit );
+	$filtered_limit   = $wp_max_limit;
+
+	switch ( $context ) {
+		case 'admin':
+			/**
+			 * Filters the maximum memory limit available for administration screens.
+			 *
+			 * This only applies to administrators, who may require more memory for tasks
+			 * like updates. Memory limits when processing images (uploaded or edited by
+			 * users of any role) are handled separately.
+			 *
+			 * The `WP_MAX_MEMORY_LIMIT` constant specifically defines the maximum memory
+			 * limit available when in the administration back end. The default is 256M
+			 * (256 megabytes of memory) or the original `memory_limit` php.ini value if
+			 * this is higher.
+			 *
+			 * @since 3.0.0
+			 * @since 4.6.0 The default now takes the original `memory_limit` into account.
+			 *
+			 * @param int|string $filtered_limit The maximum WordPress memory limit. Accepts an integer
+			 *                                   (bytes), or a shorthand string notation, such as '256M'.
+			 */
+			$filtered_limit = apply_filters( 'admin_memory_limit', $filtered_limit );
+			break;
+
+		case 'image':
+			/**
+			 * Filters the memory limit allocated for image manipulation.
+			 *
+			 * @since 3.5.0
+			 * @since 4.6.0 The default now takes the original `memory_limit` into account.
+			 *
+			 * @param int|string $filtered_limit Maximum memory limit to allocate for images.
+			 *                                   Default `WP_MAX_MEMORY_LIMIT` or the original
+			 *                                   php.ini `memory_limit`, whichever is higher.
+			 *                                   Accepts an integer (bytes), or a shorthand string
+			 *                                   notation, such as '256M'.
+			 */
+			$filtered_limit = apply_filters( 'image_memory_limit', $filtered_limit );
+			break;
+
+		default:
+			/**
+			 * Filters the memory limit allocated for arbitrary contexts.
+			 *
+			 * The dynamic portion of the hook name, `$context`, refers to an arbitrary
+			 * context passed on calling the function. This allows for plugins to define
+			 * their own contexts for raising the memory limit.
+			 *
+			 * @since 4.6.0
+			 *
+			 * @param int|string $filtered_limit Maximum memory limit to allocate for images.
+			 *                                   Default '256M' or the original php.ini `memory_limit`,
+			 *                                   whichever is higher. Accepts an integer (bytes), or a
+			 *                                   shorthand string notation, such as '256M'.
+			 */
+			$filtered_limit = apply_filters( "{$context}_memory_limit", $filtered_limit );
+			break;
+	}
+
+	$filtered_limit_int = wp_convert_hr_to_bytes( $filtered_limit );
+
+	if ( -1 === $filtered_limit_int || ( $filtered_limit_int > $wp_max_limit_int && $filtered_limit_int > $current_limit_int ) ) {
+		if ( false !== @ini_set( 'memory_limit', $filtered_limit ) ) {
+			return $filtered_limit;
+		} else {
+			return false;
+		}
+	} elseif ( -1 === $wp_max_limit_int || $wp_max_limit_int > $current_limit_int ) {
+		if ( false !== @ini_set( 'memory_limit', $wp_max_limit ) ) {
+			return $wp_max_limit;
+		} else {
+			return false;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Generate a random UUID (version 4).
+ *
+ * @since 4.7.0
+ *
+ * @return string UUID.
+ */
+function wp_generate_uuid4() {
+	return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+		mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
+		mt_rand( 0, 0xffff ),
+		mt_rand( 0, 0x0fff ) | 0x4000,
+		mt_rand( 0, 0x3fff ) | 0x8000,
+		mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
+	);
+}
+
+/**
+ * Validates that a UUID is valid.
+ *
+ * @since 4.9.0
+ *
+ * @param mixed $uuid    UUID to check.
+ * @param int   $version Specify which version of UUID to check against. Default is none, to accept any UUID version. Otherwise, only version allowed is `4`.
+ * @return bool The string is a valid UUID or false on failure.
+ */
+function wp_is_uuid( $uuid, $version = null ) {
+
+	if ( ! is_string( $uuid ) ) {
+		return false;
+	}
+
+	if ( is_numeric( $version ) ) {
+		if ( 4 !== (int) $version ) {
+			_doing_it_wrong( __FUNCTION__, __( 'Only UUID V4 is supported at this time.' ), '4.9.0' );
+			return false;
+		}
+		$regex = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/';
+	} else {
+		$regex = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+	}
+
+	return (bool) preg_match( $regex, $uuid );
+}
+
+/**
+ * Get last changed date for the specified cache group.
+ *
+ * @since 4.7.0
+ *
+ * @param string $group Where the cache contents are grouped.
+ *
+ * @return string $last_changed UNIX timestamp with microseconds representing when the group was last changed.
+ */
+function wp_cache_get_last_changed( $group ) {
+	$last_changed = wp_cache_get( 'last_changed', $group );
+
+	if ( ! $last_changed ) {
+		$last_changed = microtime();
+		wp_cache_set( 'last_changed', $last_changed, $group );
+	}
+
+	return $last_changed;
+}
+
+/**
+ * Send an email to the old site admin email address when the site admin email address changes.
+ *
+ * @since 4.9.0
+ *
+ * @param string $old_email   The old site admin email address.
+ * @param string $new_email   The new site admin email address.
+ * @param string $option_name The relevant database option name.
+ */
+function wp_site_admin_email_change_notification( $old_email, $new_email, $option_name ) {
+	$send = true;
+
+	// Don't send the notification to the default 'admin_email' value.
+	if ( 'you@example.com' === $old_email ) {
+		$send = false;
+	}
+
+	/**
+	 * Filters whether to send the site admin email change notification email.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param bool   $send      Whether to send the email notification.
+	 * @param string $old_email The old site admin email address.
+	 * @param string $new_email The new site admin email address.
+	 */
+	$send = apply_filters( 'send_site_admin_email_change_email', $send, $old_email, $new_email );
+
+	if ( ! $send ) {
+		return;
+	}
+
+	/* translators: Do not translate OLD_EMAIL, NEW_EMAIL, SITENAME, SITEURL: those are placeholders. */
+	$email_change_text = __( 'Hi,
+
+This notice confirms that the admin email address was changed on ###SITENAME###.
+
+The new admin email address is ###NEW_EMAIL###.
+
+This email has been sent to ###OLD_EMAIL###
+
+Regards,
+All at ###SITENAME###
+###SITEURL###' );
+
+	$email_change_email = array(
+		'to'      => $old_email,
+		/* translators: Site admin email change notification email subject. %s: Site title */
+		'subject' => __( '[%s] Notice of Admin Email Change' ),
+		'message' => $email_change_text,
+		'headers' => '',
+	);
+	// get site name
+	$site_name = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+
+	/**
+	 * Filters the contents of the email notification sent when the site admin email address is changed.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array $email_change_email {
+	 *            Used to build wp_mail().
+	 *
+	 *            @type string $to      The intended recipient.
+	 *            @type string $subject The subject of the email.
+	 *            @type string $message The content of the email.
+	 *                The following strings have a special meaning and will get replaced dynamically:
+	 *                - ###OLD_EMAIL### The old site admin email address.
+	 *                - ###NEW_EMAIL### The new site admin email address.
+	 *                - ###SITENAME###  The name of the site.
+	 *                - ###SITEURL###   The URL to the site.
+	 *            @type string $headers Headers.
+	 *        }
+	 * @param string $old_email The old site admin email address.
+	 * @param string $new_email The new site admin email address.
+	 */
+	$email_change_email = apply_filters( 'site_admin_email_change_email', $email_change_email, $old_email, $new_email );
+
+	$email_change_email['message'] = str_replace( '###OLD_EMAIL###', $old_email, $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###NEW_EMAIL###', $new_email, $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###SITENAME###',  $site_name, $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###SITEURL###',   home_url(), $email_change_email['message'] );
+
+	wp_mail( $email_change_email['to'], sprintf(
+		$email_change_email['subject'],
+		$site_name
+	), $email_change_email['message'], $email_change_email['headers'] );
+}
