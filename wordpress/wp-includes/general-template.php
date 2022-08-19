@@ -359,4 +359,281 @@ function wp_registration_url() {
 /**
  * Provides a simple login form for use anywhere within WordPress.
  *
- * The login format HTML is echoed by default. Pass a false
+ * The login format HTML is echoed by default. Pass a false value for `$echo` to return it instead.
+ *
+ * @since 3.0.0
+ *
+ * @param array $args {
+ *     Optional. Array of options to control the form output. Default empty array.
+ *
+ *     @type bool   $echo           Whether to display the login form or return the form HTML code.
+ *                                  Default true (echo).
+ *     @type string $redirect       URL to redirect to. Must be absolute, as in "https://example.com/mypage/".
+ *                                  Default is to redirect back to the request URI.
+ *     @type string $form_id        ID attribute value for the form. Default 'loginform'.
+ *     @type string $label_username Label for the username or email address field. Default 'Username or Email Address'.
+ *     @type string $label_password Label for the password field. Default 'Password'.
+ *     @type string $label_remember Label for the remember field. Default 'Remember Me'.
+ *     @type string $label_log_in   Label for the submit button. Default 'Log In'.
+ *     @type string $id_username    ID attribute value for the username field. Default 'user_login'.
+ *     @type string $id_password    ID attribute value for the password field. Default 'user_pass'.
+ *     @type string $id_remember    ID attribute value for the remember field. Default 'rememberme'.
+ *     @type string $id_submit      ID attribute value for the submit button. Default 'wp-submit'.
+ *     @type bool   $remember       Whether to display the "rememberme" checkbox in the form.
+ *     @type string $value_username Default value for the username field. Default empty.
+ *     @type bool   $value_remember Whether the "Remember Me" checkbox should be checked by default.
+ *                                  Default false (unchecked).
+ *
+ * }
+ * @return string|void String when retrieving.
+ */
+function wp_login_form( $args = array() ) {
+	$defaults = array(
+		'echo' => true,
+		// Default 'redirect' value takes the user back to the request URI.
+		'redirect' => ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'],
+		'form_id' => 'loginform',
+		'label_username' => __( 'Username or Email Address' ),
+		'label_password' => __( 'Password' ),
+		'label_remember' => __( 'Remember Me' ),
+		'label_log_in' => __( 'Log In' ),
+		'id_username' => 'user_login',
+		'id_password' => 'user_pass',
+		'id_remember' => 'rememberme',
+		'id_submit' => 'wp-submit',
+		'remember' => true,
+		'value_username' => '',
+		// Set 'value_remember' to true to default the "Remember me" checkbox to checked.
+		'value_remember' => false,
+	);
+
+	/**
+	 * Filters the default login form output arguments.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @see wp_login_form()
+	 *
+	 * @param array $defaults An array of default login form arguments.
+	 */
+	$args = wp_parse_args( $args, apply_filters( 'login_form_defaults', $defaults ) );
+
+	/**
+	 * Filters content to display at the top of the login form.
+	 *
+	 * The filter evaluates just following the opening form tag element.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $content Content to display. Default empty.
+	 * @param array  $args    Array of login form arguments.
+	 */
+	$login_form_top = apply_filters( 'login_form_top', '', $args );
+
+	/**
+	 * Filters content to display in the middle of the login form.
+	 *
+	 * The filter evaluates just following the location where the 'login-password'
+	 * field is displayed.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $content Content to display. Default empty.
+	 * @param array  $args    Array of login form arguments.
+	 */
+	$login_form_middle = apply_filters( 'login_form_middle', '', $args );
+
+	/**
+	 * Filters content to display at the bottom of the login form.
+	 *
+	 * The filter evaluates just preceding the closing form tag element.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $content Content to display. Default empty.
+	 * @param array  $args    Array of login form arguments.
+	 */
+	$login_form_bottom = apply_filters( 'login_form_bottom', '', $args );
+
+	$form = '
+		<form name="' . $args['form_id'] . '" id="' . $args['form_id'] . '" action="' . esc_url( site_url( 'wp-login.php', 'login_post' ) ) . '" method="post">
+			' . $login_form_top . '
+			<p class="login-username">
+				<label for="' . esc_attr( $args['id_username'] ) . '">' . esc_html( $args['label_username'] ) . '</label>
+				<input type="text" name="log" id="' . esc_attr( $args['id_username'] ) . '" class="input" value="' . esc_attr( $args['value_username'] ) . '" size="20" />
+			</p>
+			<p class="login-password">
+				<label for="' . esc_attr( $args['id_password'] ) . '">' . esc_html( $args['label_password'] ) . '</label>
+				<input type="password" name="pwd" id="' . esc_attr( $args['id_password'] ) . '" class="input" value="" size="20" />
+			</p>
+			' . $login_form_middle . '
+			' . ( $args['remember'] ? '<p class="login-remember"><label><input name="rememberme" type="checkbox" id="' . esc_attr( $args['id_remember'] ) . '" value="forever"' . ( $args['value_remember'] ? ' checked="checked"' : '' ) . ' /> ' . esc_html( $args['label_remember'] ) . '</label></p>' : '' ) . '
+			<p class="login-submit">
+				<input type="submit" name="wp-submit" id="' . esc_attr( $args['id_submit'] ) . '" class="button button-primary" value="' . esc_attr( $args['label_log_in'] ) . '" />
+				<input type="hidden" name="redirect_to" value="' . esc_url( $args['redirect'] ) . '" />
+			</p>
+			' . $login_form_bottom . '
+		</form>';
+
+	if ( $args['echo'] )
+		echo $form;
+	else
+		return $form;
+}
+
+/**
+ * Returns the URL that allows the user to retrieve the lost password
+ *
+ * @since 2.8.0
+ *
+ * @param string $redirect Path to redirect to on login.
+ * @return string Lost password URL.
+ */
+function wp_lostpassword_url( $redirect = '' ) {
+	$args = array( 'action' => 'lostpassword' );
+	if ( !empty($redirect) ) {
+		$args['redirect_to'] = urlencode( $redirect );
+	}
+
+	$lostpassword_url = add_query_arg( $args, network_site_url('wp-login.php', 'login') );
+
+	/**
+	 * Filters the Lost Password URL.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $lostpassword_url The lost password page URL.
+	 * @param string $redirect         The path to redirect to on login.
+	 */
+	return apply_filters( 'lostpassword_url', $lostpassword_url, $redirect );
+}
+
+/**
+ * Display the Registration or Admin link.
+ *
+ * Display a link which allows the user to navigate to the registration page if
+ * not logged in and registration is enabled or to the dashboard if logged in.
+ *
+ * @since 1.5.0
+ *
+ * @param string $before Text to output before the link. Default `<li>`.
+ * @param string $after  Text to output after the link. Default `</li>`.
+ * @param bool   $echo   Default to echo and not return the link.
+ * @return string|void String when retrieving.
+ */
+function wp_register( $before = '<li>', $after = '</li>', $echo = true ) {
+	if ( ! is_user_logged_in() ) {
+		if ( get_option('users_can_register') )
+			$link = $before . '<a href="' . esc_url( wp_registration_url() ) . '">' . __('Register') . '</a>' . $after;
+		else
+			$link = '';
+	} elseif ( current_user_can( 'read' ) ) {
+		$link = $before . '<a href="' . admin_url() . '">' . __('Site Admin') . '</a>' . $after;
+	} else {
+		$link = '';
+	}
+
+	/**
+	 * Filters the HTML link to the Registration or Admin page.
+	 *
+	 * Users are sent to the admin page if logged-in, or the registration page
+	 * if enabled and logged-out.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $link The HTML code for the link to the Registration or Admin page.
+	 */
+	$link = apply_filters( 'register', $link );
+
+	if ( $echo ) {
+		echo $link;
+	} else {
+		return $link;
+	}
+}
+
+/**
+ * Theme container function for the 'wp_meta' action.
+ *
+ * The {@see 'wp_meta'} action can have several purposes, depending on how you use it,
+ * but one purpose might have been to allow for theme switching.
+ *
+ * @since 1.5.0
+ *
+ * @link https://core.trac.wordpress.org/ticket/1458 Explanation of 'wp_meta' action.
+ */
+function wp_meta() {
+	/**
+	 * Fires before displaying echoed content in the sidebar.
+	 *
+	 * @since 1.5.0
+	 */
+	do_action( 'wp_meta' );
+}
+
+/**
+ * Displays information about the current site.
+ *
+ * @since 0.71
+ *
+ * @see get_bloginfo() For possible `$show` values
+ *
+ * @param string $show Optional. Site information to display. Default empty.
+ */
+function bloginfo( $show = '' ) {
+	echo get_bloginfo( $show, 'display' );
+}
+
+/**
+ * Retrieves information about the current site.
+ *
+ * Possible values for `$show` include:
+ *
+ * - 'name' - Site title (set in Settings > General)
+ * - 'description' - Site tagline (set in Settings > General)
+ * - 'wpurl' - The WordPress address (URL) (set in Settings > General)
+ * - 'url' - The Site address (URL) (set in Settings > General)
+ * - 'admin_email' - Admin email (set in Settings > General)
+ * - 'charset' - The "Encoding for pages and feeds"  (set in Settings > Reading)
+ * - 'version' - The current WordPress version
+ * - 'html_type' - The content-type (default: "text/html"). Themes and plugins
+ *   can override the default value using the {@see 'pre_option_html_type'} filter
+ * - 'text_direction' - The text direction determined by the site's language. is_rtl()
+ *   should be used instead
+ * - 'language' - Language code for the current site
+ * - 'stylesheet_url' - URL to the stylesheet for the active theme. An active child theme
+ *   will take precedence over this value
+ * - 'stylesheet_directory' - Directory path for the active theme.  An active child theme
+ *   will take precedence over this value
+ * - 'template_url' / 'template_directory' - URL of the active theme's directory. An active
+ *   child theme will NOT take precedence over this value
+ * - 'pingback_url' - The pingback XML-RPC file URL (xmlrpc.php)
+ * - 'atom_url' - The Atom feed URL (/feed/atom)
+ * - 'rdf_url' - The RDF/RSS 1.0 feed URL (/feed/rfd)
+ * - 'rss_url' - The RSS 0.92 feed URL (/feed/rss)
+ * - 'rss2_url' - The RSS 2.0 feed URL (/feed)
+ * - 'comments_atom_url' - The comments Atom feed URL (/comments/feed)
+ * - 'comments_rss2_url' - The comments RSS 2.0 feed URL (/comments/feed)
+ *
+ * Some `$show` values are deprecated and will be removed in future versions.
+ * These options will trigger the _deprecated_argument() function.
+ *
+ * Deprecated arguments include:
+ *
+ * - 'siteurl' - Use 'url' instead
+ * - 'home' - Use 'url' instead
+ *
+ * @since 0.71
+ *
+ * @global string $wp_version
+ *
+ * @param string $show   Optional. Site info to retrieve. Default empty (site name).
+ * @param string $filter Optional. How to filter what is retrieved. Default 'raw'.
+ * @return string Mostly string values, might be empty.
+ */
+function get_bloginfo( $show = '', $filter = 'raw' ) {
+	switch( $show ) {
+		case 'home' : // DEPRECATED
+		case 'siteurl' : // DEPRECATED
+			_deprecated_argument( __FUNCTION__, '2.2.0', sprintf(
+				/* trans
