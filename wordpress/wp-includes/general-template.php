@@ -636,4 +636,384 @@ function get_bloginfo( $show = '', $filter = 'raw' ) {
 		case 'home' : // DEPRECATED
 		case 'siteurl' : // DEPRECATED
 			_deprecated_argument( __FUNCTION__, '2.2.0', sprintf(
-				/* trans
+				/* translators: 1: 'siteurl'/'home' argument, 2: bloginfo() function name, 3: 'url' argument */
+				__( 'The %1$s option is deprecated for the family of %2$s functions. Use the %3$s option instead.' ),
+				'<code>' . $show . '</code>',
+				'<code>bloginfo()</code>',
+				'<code>url</code>'
+			) );
+		case 'url' :
+			$output = home_url();
+			break;
+		case 'wpurl' :
+			$output = site_url();
+			break;
+		case 'description':
+			$output = get_option('blogdescription');
+			break;
+		case 'rdf_url':
+			$output = get_feed_link('rdf');
+			break;
+		case 'rss_url':
+			$output = get_feed_link('rss');
+			break;
+		case 'rss2_url':
+			$output = get_feed_link('rss2');
+			break;
+		case 'atom_url':
+			$output = get_feed_link('atom');
+			break;
+		case 'comments_atom_url':
+			$output = get_feed_link('comments_atom');
+			break;
+		case 'comments_rss2_url':
+			$output = get_feed_link('comments_rss2');
+			break;
+		case 'pingback_url':
+			$output = site_url( 'xmlrpc.php' );
+			break;
+		case 'stylesheet_url':
+			$output = get_stylesheet_uri();
+			break;
+		case 'stylesheet_directory':
+			$output = get_stylesheet_directory_uri();
+			break;
+		case 'template_directory':
+		case 'template_url':
+			$output = get_template_directory_uri();
+			break;
+		case 'admin_email':
+			$output = get_option('admin_email');
+			break;
+		case 'charset':
+			$output = get_option('blog_charset');
+			if ('' == $output) $output = 'UTF-8';
+			break;
+		case 'html_type' :
+			$output = get_option('html_type');
+			break;
+		case 'version':
+			global $wp_version;
+			$output = $wp_version;
+			break;
+		case 'language':
+			/* translators: Translate this to the correct language tag for your locale,
+			 * see https://www.w3.org/International/articles/language-tags/ for reference.
+			 * Do not translate into your own language.
+			 */
+			$output = __( 'html_lang_attribute' );
+			if ( 'html_lang_attribute' === $output || preg_match( '/[^a-zA-Z0-9-]/', $output ) ) {
+				$output = is_admin() ? get_user_locale() : get_locale();
+				$output = str_replace( '_', '-', $output );
+			}
+			break;
+		case 'text_direction':
+			_deprecated_argument( __FUNCTION__, '2.2.0', sprintf(
+				/* translators: 1: 'text_direction' argument, 2: bloginfo() function name, 3: is_rtl() function name */
+				__( 'The %1$s option is deprecated for the family of %2$s functions. Use the %3$s function instead.' ),
+				'<code>' . $show . '</code>',
+				'<code>bloginfo()</code>',
+				'<code>is_rtl()</code>'
+			) );
+			if ( function_exists( 'is_rtl' ) ) {
+				$output = is_rtl() ? 'rtl' : 'ltr';
+			} else {
+				$output = 'ltr';
+			}
+			break;
+		case 'name':
+		default:
+			$output = get_option('blogname');
+			break;
+	}
+
+	$url = true;
+	if (strpos($show, 'url') === false &&
+		strpos($show, 'directory') === false &&
+		strpos($show, 'home') === false)
+		$url = false;
+
+	if ( 'display' == $filter ) {
+		if ( $url ) {
+			/**
+			 * Filters the URL returned by get_bloginfo().
+			 *
+			 * @since 2.0.5
+			 *
+			 * @param mixed $output The URL returned by bloginfo().
+			 * @param mixed $show   Type of information requested.
+			 */
+			$output = apply_filters( 'bloginfo_url', $output, $show );
+		} else {
+			/**
+			 * Filters the site information returned by get_bloginfo().
+			 *
+			 * @since 0.71
+			 *
+			 * @param mixed $output The requested non-URL site information.
+			 * @param mixed $show   Type of information requested.
+			 */
+			$output = apply_filters( 'bloginfo', $output, $show );
+		}
+	}
+
+	return $output;
+}
+
+/**
+ * Returns the Site Icon URL.
+ *
+ * @since 4.3.0
+ *
+ * @param int    $size    Optional. Size of the site icon. Default 512 (pixels).
+ * @param string $url     Optional. Fallback url if no site icon is found. Default empty.
+ * @param int    $blog_id Optional. ID of the blog to get the site icon for. Default current blog.
+ * @return string Site Icon URL.
+ */
+function get_site_icon_url( $size = 512, $url = '', $blog_id = 0 ) {
+	$switched_blog = false;
+
+	if ( is_multisite() && ! empty( $blog_id ) && (int) $blog_id !== get_current_blog_id() ) {
+		switch_to_blog( $blog_id );
+		$switched_blog = true;
+	}
+
+	$site_icon_id = get_option( 'site_icon' );
+
+	if ( $site_icon_id ) {
+		if ( $size >= 512 ) {
+			$size_data = 'full';
+		} else {
+			$size_data = array( $size, $size );
+		}
+		$url = wp_get_attachment_image_url( $site_icon_id, $size_data );
+	}
+
+	if ( $switched_blog ) {
+		restore_current_blog();
+	}
+
+	/**
+	 * Filters the site icon URL.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param string $url     Site icon URL.
+	 * @param int    $size    Size of the site icon.
+	 * @param int    $blog_id ID of the blog to get the site icon for.
+	 */
+	return apply_filters( 'get_site_icon_url', $url, $size, $blog_id );
+}
+
+/**
+ * Displays the Site Icon URL.
+ *
+ * @since 4.3.0
+ *
+ * @param int    $size    Optional. Size of the site icon. Default 512 (pixels).
+ * @param string $url     Optional. Fallback url if no site icon is found. Default empty.
+ * @param int    $blog_id Optional. ID of the blog to get the site icon for. Default current blog.
+ */
+function site_icon_url( $size = 512, $url = '', $blog_id = 0 ) {
+	echo esc_url( get_site_icon_url( $size, $url, $blog_id ) );
+}
+
+/**
+ * Whether the site has a Site Icon.
+ *
+ * @since 4.3.0
+ *
+ * @param int $blog_id Optional. ID of the blog in question. Default current blog.
+ * @return bool Whether the site has a site icon or not.
+ */
+function has_site_icon( $blog_id = 0 ) {
+	return (bool) get_site_icon_url( 512, '', $blog_id );
+}
+
+/**
+ * Determines whether the site has a custom logo.
+ *
+ * @since 4.5.0
+ *
+ * @param int $blog_id Optional. ID of the blog in question. Default is the ID of the current blog.
+ * @return bool Whether the site has a custom logo or not.
+ */
+function has_custom_logo( $blog_id = 0 ) {
+	$switched_blog = false;
+
+	if ( is_multisite() && ! empty( $blog_id ) && (int) $blog_id !== get_current_blog_id() ) {
+		switch_to_blog( $blog_id );
+		$switched_blog = true;
+	}
+
+	$custom_logo_id = get_theme_mod( 'custom_logo' );
+
+	if ( $switched_blog ) {
+		restore_current_blog();
+	}
+
+	return (bool) $custom_logo_id;
+}
+
+/**
+ * Returns a custom logo, linked to home.
+ *
+ * @since 4.5.0
+ *
+ * @param int $blog_id Optional. ID of the blog in question. Default is the ID of the current blog.
+ * @return string Custom logo markup.
+ */
+function get_custom_logo( $blog_id = 0 ) {
+	$html = '';
+	$switched_blog = false;
+
+	if ( is_multisite() && ! empty( $blog_id ) && (int) $blog_id !== get_current_blog_id() ) {
+		switch_to_blog( $blog_id );
+		$switched_blog = true;
+	}
+
+	$custom_logo_id = get_theme_mod( 'custom_logo' );
+
+	// We have a logo. Logo is go.
+	if ( $custom_logo_id ) {
+		$custom_logo_attr = array(
+			'class'    => 'custom-logo',
+			'itemprop' => 'logo',
+		);
+
+		/*
+		 * If the logo alt attribute is empty, get the site title and explicitly
+		 * pass it to the attributes used by wp_get_attachment_image().
+		 */
+		$image_alt = get_post_meta( $custom_logo_id, '_wp_attachment_image_alt', true );
+		if ( empty( $image_alt ) ) {
+			$custom_logo_attr['alt'] = get_bloginfo( 'name', 'display' );
+		}
+
+		/*
+		 * If the alt attribute is not empty, there's no need to explicitly pass
+		 * it because wp_get_attachment_image() already adds the alt attribute.
+		 */
+		$html = sprintf( '<a href="%1$s" class="custom-logo-link" rel="home" itemprop="url">%2$s</a>',
+			esc_url( home_url( '/' ) ),
+			wp_get_attachment_image( $custom_logo_id, 'full', false, $custom_logo_attr )
+		);
+	}
+
+	// If no logo is set but we're in the Customizer, leave a placeholder (needed for the live preview).
+	elseif ( is_customize_preview() ) {
+		$html = sprintf( '<a href="%1$s" class="custom-logo-link" style="display:none;"><img class="custom-logo"/></a>',
+			esc_url( home_url( '/' ) )
+		);
+	}
+
+	if ( $switched_blog ) {
+		restore_current_blog();
+	}
+
+	/**
+	 * Filters the custom logo output.
+	 *
+	 * @since 4.5.0
+	 * @since 4.6.0 Added the `$blog_id` parameter.
+	 *
+	 * @param string $html    Custom logo HTML output.
+	 * @param int    $blog_id ID of the blog to get the custom logo for.
+	 */
+	return apply_filters( 'get_custom_logo', $html, $blog_id );
+}
+
+/**
+ * Displays a custom logo, linked to home.
+ *
+ * @since 4.5.0
+ *
+ * @param int $blog_id Optional. ID of the blog in question. Default is the ID of the current blog.
+ */
+function the_custom_logo( $blog_id = 0 ) {
+	echo get_custom_logo( $blog_id );
+}
+
+/**
+ * Returns document title for the current page.
+ *
+ * @since 4.4.0
+ *
+ * @global int $page  Page number of a single post.
+ * @global int $paged Page number of a list of posts.
+ *
+ * @return string Tag with the document title.
+ */
+function wp_get_document_title() {
+
+	/**
+	 * Filters the document title before it is generated.
+	 *
+	 * Passing a non-empty value will short-circuit wp_get_document_title(),
+	 * returning that value instead.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param string $title The document title. Default empty string.
+	 */
+	$title = apply_filters( 'pre_get_document_title', '' );
+	if ( ! empty( $title ) ) {
+		return $title;
+	}
+
+	global $page, $paged;
+
+	$title = array(
+		'title' => '',
+	);
+
+	// If it's a 404 page, use a "Page not found" title.
+	if ( is_404() ) {
+		$title['title'] = __( 'Page not found' );
+
+	// If it's a search, use a dynamic search results title.
+	} elseif ( is_search() ) {
+		/* translators: %s: search phrase */
+		$title['title'] = sprintf( __( 'Search Results for &#8220;%s&#8221;' ), get_search_query() );
+
+	// If on the front page, use the site title.
+	} elseif ( is_front_page() ) {
+		$title['title'] = get_bloginfo( 'name', 'display' );
+
+	// If on a post type archive, use the post type archive title.
+	} elseif ( is_post_type_archive() ) {
+		$title['title'] = post_type_archive_title( '', false );
+
+	// If on a taxonomy archive, use the term title.
+	} elseif ( is_tax() ) {
+		$title['title'] = single_term_title( '', false );
+
+	/*
+	 * If we're on the blog page that is not the homepage or
+	 * a single post of any post type, use the post title.
+	 */
+	} elseif ( is_home() || is_singular() ) {
+		$title['title'] = single_post_title( '', false );
+
+	// If on a category or tag archive, use the term title.
+	} elseif ( is_category() || is_tag() ) {
+		$title['title'] = single_term_title( '', false );
+
+	// If on an author archive, use the author's display name.
+	} elseif ( is_author() && $author = get_queried_object() ) {
+		$title['title'] = $author->display_name;
+
+	// If it's a date archive, use the date as the title.
+	} elseif ( is_year() ) {
+		$title['title'] = get_the_date( _x( 'Y', 'yearly archives date format' ) );
+
+	} elseif ( is_month() ) {
+		$title['title'] = get_the_date( _x( 'F Y', 'monthly archives date format' ) );
+
+	} elseif ( is_day() ) {
+		$title['title'] = get_the_date();
+	}
+
+	// Add a page number if necessary.
+	if ( ( $paged >= 2 || $page >= 2 ) && ! is_404() ) {
+		$title['page'] = sprintf( __( 'Page %s' ), max( $
