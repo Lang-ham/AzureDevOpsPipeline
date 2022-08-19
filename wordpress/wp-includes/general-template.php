@@ -1016,4 +1016,362 @@ function wp_get_document_title() {
 
 	// Add a page number if necessary.
 	if ( ( $paged >= 2 || $page >= 2 ) && ! is_404() ) {
-		$title['page'] = sprintf( __( 'Page %s' ), max( $
+		$title['page'] = sprintf( __( 'Page %s' ), max( $paged, $page ) );
+	}
+
+	// Append the description or site title to give context.
+	if ( is_front_page() ) {
+		$title['tagline'] = get_bloginfo( 'description', 'display' );
+	} else {
+		$title['site'] = get_bloginfo( 'name', 'display' );
+	}
+
+	/**
+	 * Filters the separator for the document title.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param string $sep Document title separator. Default '-'.
+	 */
+	$sep = apply_filters( 'document_title_separator', '-' );
+
+	/**
+	 * Filters the parts of the document title.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param array $title {
+	 *     The document title parts.
+	 *
+	 *     @type string $title   Title of the viewed page.
+	 *     @type string $page    Optional. Page number if paginated.
+	 *     @type string $tagline Optional. Site description when on home page.
+	 *     @type string $site    Optional. Site title when not on home page.
+	 * }
+	 */
+	$title = apply_filters( 'document_title_parts', $title );
+
+	$title = implode( " $sep ", array_filter( $title ) );
+	$title = wptexturize( $title );
+	$title = convert_chars( $title );
+	$title = esc_html( $title );
+	$title = capital_P_dangit( $title );
+
+	return $title;
+}
+
+/**
+ * Displays title tag with content.
+ *
+ * @ignore
+ * @since 4.1.0
+ * @since 4.4.0 Improved title output replaced `wp_title()`.
+ * @access private
+ */
+function _wp_render_title_tag() {
+	if ( ! current_theme_supports( 'title-tag' ) ) {
+		return;
+	}
+
+	echo '<title>' . wp_get_document_title() . '</title>' . "\n";
+}
+
+/**
+ * Display or retrieve page title for all areas of blog.
+ *
+ * By default, the page title will display the separator before the page title,
+ * so that the blog title will be before the page title. This is not good for
+ * title display, since the blog title shows up on most tabs and not what is
+ * important, which is the page that the user is looking at.
+ *
+ * There are also SEO benefits to having the blog title after or to the 'right'
+ * of the page title. However, it is mostly common sense to have the blog title
+ * to the right with most browsers supporting tabs. You can achieve this by
+ * using the seplocation parameter and setting the value to 'right'. This change
+ * was introduced around 2.5.0, in case backward compatibility of themes is
+ * important.
+ *
+ * @since 1.0.0
+ *
+ * @global WP_Locale $wp_locale
+ *
+ * @param string $sep         Optional, default is '&raquo;'. How to separate the various items
+ *                            within the page title.
+ * @param bool   $display     Optional, default is true. Whether to display or retrieve title.
+ * @param string $seplocation Optional. Direction to display title, 'right'.
+ * @return string|null String on retrieve, null when displaying.
+ */
+function wp_title( $sep = '&raquo;', $display = true, $seplocation = '' ) {
+	global $wp_locale;
+
+	$m        = get_query_var( 'm' );
+	$year     = get_query_var( 'year' );
+	$monthnum = get_query_var( 'monthnum' );
+	$day      = get_query_var( 'day' );
+	$search   = get_query_var( 's' );
+	$title    = '';
+
+	$t_sep = '%WP_TITLE_SEP%'; // Temporary separator, for accurate flipping, if necessary
+
+	// If there is a post
+	if ( is_single() || ( is_home() && ! is_front_page() ) || ( is_page() && ! is_front_page() ) ) {
+		$title = single_post_title( '', false );
+	}
+
+	// If there's a post type archive
+	if ( is_post_type_archive() ) {
+		$post_type = get_query_var( 'post_type' );
+		if ( is_array( $post_type ) ) {
+			$post_type = reset( $post_type );
+		}
+		$post_type_object = get_post_type_object( $post_type );
+		if ( ! $post_type_object->has_archive ) {
+			$title = post_type_archive_title( '', false );
+		}
+	}
+
+	// If there's a category or tag
+	if ( is_category() || is_tag() ) {
+		$title = single_term_title( '', false );
+	}
+
+	// If there's a taxonomy
+	if ( is_tax() ) {
+		$term = get_queried_object();
+		if ( $term ) {
+			$tax   = get_taxonomy( $term->taxonomy );
+			$title = single_term_title( $tax->labels->name . $t_sep, false );
+		}
+	}
+
+	// If there's an author
+	if ( is_author() && ! is_post_type_archive() ) {
+		$author = get_queried_object();
+		if ( $author ) {
+			$title = $author->display_name;
+		}
+	}
+
+	// Post type archives with has_archive should override terms.
+	if ( is_post_type_archive() && $post_type_object->has_archive ) {
+		$title = post_type_archive_title( '', false );
+	}
+
+	// If there's a month
+	if ( is_archive() && ! empty( $m ) ) {
+		$my_year  = substr( $m, 0, 4 );
+		$my_month = $wp_locale->get_month( substr( $m, 4, 2 ) );
+		$my_day   = intval( substr( $m, 6, 2 ) );
+		$title    = $my_year . ( $my_month ? $t_sep . $my_month : '' ) . ( $my_day ? $t_sep . $my_day : '' );
+	}
+
+	// If there's a year
+	if ( is_archive() && ! empty( $year ) ) {
+		$title = $year;
+		if ( ! empty( $monthnum ) ) {
+			$title .= $t_sep . $wp_locale->get_month( $monthnum );
+		}
+		if ( ! empty( $day ) ) {
+			$title .= $t_sep . zeroise( $day, 2 );
+		}
+	}
+
+	// If it's a search
+	if ( is_search() ) {
+		/* translators: 1: separator, 2: search phrase */
+		$title = sprintf( __( 'Search Results %1$s %2$s' ), $t_sep, strip_tags( $search ) );
+	}
+
+	// If it's a 404 page
+	if ( is_404() ) {
+		$title = __( 'Page not found' );
+	}
+
+	$prefix = '';
+	if ( ! empty( $title ) ) {
+		$prefix = " $sep ";
+	}
+
+	/**
+	 * Filters the parts of the page title.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param array $title_array Parts of the page title.
+	 */
+	$title_array = apply_filters( 'wp_title_parts', explode( $t_sep, $title ) );
+
+	// Determines position of the separator and direction of the breadcrumb
+	if ( 'right' == $seplocation ) { // sep on right, so reverse the order
+		$title_array = array_reverse( $title_array );
+		$title       = implode( " $sep ", $title_array ) . $prefix;
+	} else {
+		$title = $prefix . implode( " $sep ", $title_array );
+	}
+
+	/**
+	 * Filters the text of the page title.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param string $title Page title.
+	 * @param string $sep Title separator.
+	 * @param string $seplocation Location of the separator (left or right).
+	 */
+	$title = apply_filters( 'wp_title', $title, $sep, $seplocation );
+
+	// Send it out
+	if ( $display ) {
+		echo $title;
+	} else {
+		return $title;
+	}
+}
+
+/**
+ * Display or retrieve page title for post.
+ *
+ * This is optimized for single.php template file for displaying the post title.
+ *
+ * It does not support placing the separator after the title, but by leaving the
+ * prefix parameter empty, you can set the title separator manually. The prefix
+ * does not automatically place a space between the prefix, so if there should
+ * be a space, the parameter value will need to have it at the end.
+ *
+ * @since 0.71
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving.
+ */
+function single_post_title( $prefix = '', $display = true ) {
+	$_post = get_queried_object();
+
+	if ( !isset($_post->post_title) )
+		return;
+
+	/**
+	 * Filters the page title for a single post.
+	 *
+	 * @since 0.71
+	 *
+	 * @param string $_post_title The single post page title.
+	 * @param object $_post       The current queried object as returned by get_queried_object().
+	 */
+	$title = apply_filters( 'single_post_title', $_post->post_title, $_post );
+	if ( $display )
+		echo $prefix . $title;
+	else
+		return $prefix . $title;
+}
+
+/**
+ * Display or retrieve title for a post type archive.
+ *
+ * This is optimized for archive.php and archive-{$post_type}.php template files
+ * for displaying the title of the post type.
+ *
+ * @since 3.1.0
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving, null when displaying or failure.
+ */
+function post_type_archive_title( $prefix = '', $display = true ) {
+	if ( ! is_post_type_archive() )
+		return;
+
+	$post_type = get_query_var( 'post_type' );
+	if ( is_array( $post_type ) )
+		$post_type = reset( $post_type );
+
+	$post_type_obj = get_post_type_object( $post_type );
+
+	/**
+	 * Filters the post type archive title.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $post_type_name Post type 'name' label.
+	 * @param string $post_type      Post type.
+	 */
+	$title = apply_filters( 'post_type_archive_title', $post_type_obj->labels->name, $post_type );
+
+	if ( $display )
+		echo $prefix . $title;
+	else
+		return $prefix . $title;
+}
+
+/**
+ * Display or retrieve page title for category archive.
+ *
+ * Useful for category template files for displaying the category page title.
+ * The prefix does not automatically place a space between the prefix, so if
+ * there should be a space, the parameter value will need to have it at the end.
+ *
+ * @since 0.71
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving.
+ */
+function single_cat_title( $prefix = '', $display = true ) {
+	return single_term_title( $prefix, $display );
+}
+
+/**
+ * Display or retrieve page title for tag post archive.
+ *
+ * Useful for tag template files for displaying the tag page title. The prefix
+ * does not automatically place a space between the prefix, so if there should
+ * be a space, the parameter value will need to have it at the end.
+ *
+ * @since 2.3.0
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving.
+ */
+function single_tag_title( $prefix = '', $display = true ) {
+	return single_term_title( $prefix, $display );
+}
+
+/**
+ * Display or retrieve page title for taxonomy term archive.
+ *
+ * Useful for taxonomy term template files for displaying the taxonomy term page title.
+ * The prefix does not automatically place a space between the prefix, so if there should
+ * be a space, the parameter value will need to have it at the end.
+ *
+ * @since 3.1.0
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving.
+ */
+function single_term_title( $prefix = '', $display = true ) {
+	$term = get_queried_object();
+
+	if ( !$term )
+		return;
+
+	if ( is_category() ) {
+		/**
+		 * Filters the category archive page title.
+		 *
+		 * @since 2.0.10
+		 *
+		 * @param string $term_name Category name for archive being displayed.
+		 */
+		$term_name = apply_filters( 'single_cat_title', $term->name );
+	} elseif ( is_tag() ) {
+		/**
+		 * Filters the tag archive page title.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param string $term_name Tag name for archive being displayed.
+		 */
+		$term_name = apply_filters( 'single_tag_title', $term->name );
+	} elseif ( is
