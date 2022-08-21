@@ -1374,4 +1374,314 @@ function single_term_title( $prefix = '', $display = true ) {
 		 * @param string $term_name Tag name for archive being displayed.
 		 */
 		$term_name = apply_filters( 'single_tag_title', $term->name );
-	} elseif ( is
+	} elseif ( is_tax() ) {
+		/**
+		 * Filters the custom taxonomy archive page title.
+		 *
+		 * @since 3.1.0
+		 *
+		 * @param string $term_name Term name for archive being displayed.
+		 */
+		$term_name = apply_filters( 'single_term_title', $term->name );
+	} else {
+		return;
+	}
+
+	if ( empty( $term_name ) )
+		return;
+
+	if ( $display )
+		echo $prefix . $term_name;
+	else
+		return $prefix . $term_name;
+}
+
+/**
+ * Display or retrieve page title for post archive based on date.
+ *
+ * Useful for when the template only needs to display the month and year,
+ * if either are available. The prefix does not automatically place a space
+ * between the prefix, so if there should be a space, the parameter value
+ * will need to have it at the end.
+ *
+ * @since 0.71
+ *
+ * @global WP_Locale $wp_locale
+ *
+ * @param string $prefix  Optional. What to display before the title.
+ * @param bool   $display Optional, default is true. Whether to display or retrieve title.
+ * @return string|void Title when retrieving.
+ */
+function single_month_title($prefix = '', $display = true ) {
+	global $wp_locale;
+
+	$m = get_query_var('m');
+	$year = get_query_var('year');
+	$monthnum = get_query_var('monthnum');
+
+	if ( !empty($monthnum) && !empty($year) ) {
+		$my_year = $year;
+		$my_month = $wp_locale->get_month($monthnum);
+	} elseif ( !empty($m) ) {
+		$my_year = substr($m, 0, 4);
+		$my_month = $wp_locale->get_month(substr($m, 4, 2));
+	}
+
+	if ( empty($my_month) )
+		return false;
+
+	$result = $prefix . $my_month . $prefix . $my_year;
+
+	if ( !$display )
+		return $result;
+	echo $result;
+}
+
+/**
+ * Display the archive title based on the queried object.
+ *
+ * @since 4.1.0
+ *
+ * @see get_the_archive_title()
+ *
+ * @param string $before Optional. Content to prepend to the title. Default empty.
+ * @param string $after  Optional. Content to append to the title. Default empty.
+ */
+function the_archive_title( $before = '', $after = '' ) {
+	$title = get_the_archive_title();
+
+	if ( ! empty( $title ) ) {
+		echo $before . $title . $after;
+	}
+}
+
+/**
+ * Retrieve the archive title based on the queried object.
+ *
+ * @since 4.1.0
+ *
+ * @return string Archive title.
+ */
+function get_the_archive_title() {
+	if ( is_category() ) {
+		/* translators: Category archive title. 1: Category name */
+		$title = sprintf( __( 'Category: %s' ), single_cat_title( '', false ) );
+	} elseif ( is_tag() ) {
+		/* translators: Tag archive title. 1: Tag name */
+		$title = sprintf( __( 'Tag: %s' ), single_tag_title( '', false ) );
+	} elseif ( is_author() ) {
+		/* translators: Author archive title. 1: Author name */
+		$title = sprintf( __( 'Author: %s' ), '<span class="vcard">' . get_the_author() . '</span>' );
+	} elseif ( is_year() ) {
+		/* translators: Yearly archive title. 1: Year */
+		$title = sprintf( __( 'Year: %s' ), get_the_date( _x( 'Y', 'yearly archives date format' ) ) );
+	} elseif ( is_month() ) {
+		/* translators: Monthly archive title. 1: Month name and year */
+		$title = sprintf( __( 'Month: %s' ), get_the_date( _x( 'F Y', 'monthly archives date format' ) ) );
+	} elseif ( is_day() ) {
+		/* translators: Daily archive title. 1: Date */
+		$title = sprintf( __( 'Day: %s' ), get_the_date( _x( 'F j, Y', 'daily archives date format' ) ) );
+	} elseif ( is_tax( 'post_format' ) ) {
+		if ( is_tax( 'post_format', 'post-format-aside' ) ) {
+			$title = _x( 'Asides', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-gallery' ) ) {
+			$title = _x( 'Galleries', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-image' ) ) {
+			$title = _x( 'Images', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-video' ) ) {
+			$title = _x( 'Videos', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-quote' ) ) {
+			$title = _x( 'Quotes', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-link' ) ) {
+			$title = _x( 'Links', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-status' ) ) {
+			$title = _x( 'Statuses', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-audio' ) ) {
+			$title = _x( 'Audio', 'post format archive title' );
+		} elseif ( is_tax( 'post_format', 'post-format-chat' ) ) {
+			$title = _x( 'Chats', 'post format archive title' );
+		}
+	} elseif ( is_post_type_archive() ) {
+		/* translators: Post type archive title. 1: Post type name */
+		$title = sprintf( __( 'Archives: %s' ), post_type_archive_title( '', false ) );
+	} elseif ( is_tax() ) {
+		$tax = get_taxonomy( get_queried_object()->taxonomy );
+		/* translators: Taxonomy term archive title. 1: Taxonomy singular name, 2: Current taxonomy term */
+		$title = sprintf( __( '%1$s: %2$s' ), $tax->labels->singular_name, single_term_title( '', false ) );
+	} else {
+		$title = __( 'Archives' );
+	}
+
+	/**
+	 * Filters the archive title.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param string $title Archive title to be displayed.
+	 */
+	return apply_filters( 'get_the_archive_title', $title );
+}
+
+/**
+ * Display category, tag, term, or author description.
+ *
+ * @since 4.1.0
+ *
+ * @see get_the_archive_description()
+ *
+ * @param string $before Optional. Content to prepend to the description. Default empty.
+ * @param string $after  Optional. Content to append to the description. Default empty.
+ */
+function the_archive_description( $before = '', $after = '' ) {
+	$description = get_the_archive_description();
+	if ( $description ) {
+		echo $before . $description . $after;
+	}
+}
+
+/**
+ * Retrieves the description for an author, post type, or term archive.
+ *
+ * @since 4.1.0
+ * @since 4.7.0 Added support for author archives.
+ * @since 4.9.0 Added support for post type archives.
+ *
+ * @see term_description()
+ *
+ * @return string Archive description.
+ */
+function get_the_archive_description() {
+	if ( is_author() ) {
+		$description = get_the_author_meta( 'description' );
+	} elseif ( is_post_type_archive() ) {
+		$description = get_the_post_type_description();
+	} else {
+		$description = term_description();
+	}
+
+	/**
+	 * Filters the archive description.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param string $description Archive description to be displayed.
+	 */
+	return apply_filters( 'get_the_archive_description', $description );
+}
+
+/**
+ * Retrieves the description for a post type archive.
+ *
+ * @since 4.9.0
+ *
+ * @return string The post type description.
+ */
+function get_the_post_type_description() {
+	$post_type = get_query_var( 'post_type' );
+
+	if ( is_array( $post_type ) ) {
+		$post_type = reset( $post_type );
+	}
+
+	$post_type_obj = get_post_type_object( $post_type );
+
+	// Check if a description is set.
+	if ( isset( $post_type_obj->description ) ) {
+		$description = $post_type_obj->description;
+	} else {
+		$description = '';
+	}
+
+	/**
+	 * Filters the description for a post type archive.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param string       $description   The post type description.
+	 * @param WP_Post_Type $post_type_obj The post type object.
+	 */
+	return apply_filters( 'get_the_post_type_description', $description, $post_type_obj );
+}
+
+/**
+ * Retrieve archive link content based on predefined or custom code.
+ *
+ * The format can be one of four styles. The 'link' for head element, 'option'
+ * for use in the select element, 'html' for use in list (either ol or ul HTML
+ * elements). Custom content is also supported using the before and after
+ * parameters.
+ *
+ * The 'link' format uses the `<link>` HTML element with the **archives**
+ * relationship. The before and after parameters are not used. The text
+ * parameter is used to describe the link.
+ *
+ * The 'option' format uses the option HTML element for use in select element.
+ * The value is the url parameter and the before and after parameters are used
+ * between the text description.
+ *
+ * The 'html' format, which is the default, uses the li HTML element for use in
+ * the list HTML elements. The before parameter is before the link and the after
+ * parameter is after the closing link.
+ *
+ * The custom format uses the before parameter before the link ('a' HTML
+ * element) and the after parameter after the closing link tag. If the above
+ * three values for the format are not used, then custom format is assumed.
+ *
+ * @since 1.0.0
+ *
+ * @param string $url    URL to archive.
+ * @param string $text   Archive text description.
+ * @param string $format Optional, default is 'html'. Can be 'link', 'option', 'html', or custom.
+ * @param string $before Optional. Content to prepend to the description. Default empty.
+ * @param string $after  Optional. Content to append to the description. Default empty.
+ * @return string HTML link content for archive.
+ */
+function get_archives_link($url, $text, $format = 'html', $before = '', $after = '') {
+	$text = wptexturize($text);
+	$url = esc_url($url);
+
+	if ('link' == $format)
+		$link_html = "\t<link rel='archives' title='" . esc_attr( $text ) . "' href='$url' />\n";
+	elseif ('option' == $format)
+		$link_html = "\t<option value='$url'>$before $text $after</option>\n";
+	elseif ('html' == $format)
+		$link_html = "\t<li>$before<a href='$url'>$text</a>$after</li>\n";
+	else // custom
+		$link_html = "\t$before<a href='$url'>$text</a>$after\n";
+
+	/**
+	 * Filters the archive link content.
+	 *
+	 * @since 2.6.0
+	 * @since 4.5.0 Added the `$url`, `$text`, `$format`, `$before`, and `$after` parameters.
+	 *
+	 * @param string $link_html The archive HTML link content.
+	 * @param string $url       URL to archive.
+	 * @param string $text      Archive text description.
+	 * @param string $format    Link format. Can be 'link', 'option', 'html', or custom.
+	 * @param string $before    Content to prepend to the description.
+	 * @param string $after     Content to append to the description.
+	 */
+	return apply_filters( 'get_archives_link', $link_html, $url, $text, $format, $before, $after );
+}
+
+/**
+ * Display archive links based on type and format.
+ *
+ * @since 1.2.0
+ * @since 4.4.0 $post_type arg was added.
+ *
+ * @see get_archives_link()
+ *
+ * @global wpdb      $wpdb
+ * @global WP_Locale $wp_locale
+ *
+ * @param string|array $args {
+ *     Default archive links arguments. Optional.
+ *
+ *     @type string     $type            Type of archive to retrieve. Accepts 'daily', 'weekly', 'monthly',
+ *                                       'yearly', 'postbypost', or 'alpha'. Both 'postbypost' and 'alpha'
+ *                                       display the same archive link list as well as post titles instead
+ *                                       of displaying dates. The difference between the two is that 'alpha'
+ *                                       will order by post title and 'postbypost' will order by post date.
+ *                    
