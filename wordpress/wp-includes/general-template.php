@@ -1968,4 +1968,353 @@ function get_calendar( $initial = true, $echo = true ) {
 	// Let's figure out when we are
 	if ( ! empty( $monthnum ) && ! empty( $year ) ) {
 		$thismonth = zeroise( intval( $monthnum ), 2 );
-		$thisyea
+		$thisyear = (int) $year;
+	} elseif ( ! empty( $w ) ) {
+		// We need to get the month from MySQL
+		$thisyear = (int) substr( $m, 0, 4 );
+		//it seems MySQL's weeks disagree with PHP's
+		$d = ( ( $w - 1 ) * 7 ) + 6;
+		$thismonth = $wpdb->get_var("SELECT DATE_FORMAT((DATE_ADD('{$thisyear}0101', INTERVAL $d DAY) ), '%m')");
+	} elseif ( ! empty( $m ) ) {
+		$thisyear = (int) substr( $m, 0, 4 );
+		if ( strlen( $m ) < 6 ) {
+			$thismonth = '01';
+		} else {
+			$thismonth = zeroise( (int) substr( $m, 4, 2 ), 2 );
+		}
+	} else {
+		$thisyear = gmdate( 'Y', $ts );
+		$thismonth = gmdate( 'm', $ts );
+	}
+
+	$unixmonth = mktime( 0, 0 , 0, $thismonth, 1, $thisyear );
+	$last_day = date( 't', $unixmonth );
+
+	// Get the next and previous month and year with at least one post
+	$previous = $wpdb->get_row("SELECT MONTH(post_date) AS month, YEAR(post_date) AS year
+		FROM $wpdb->posts
+		WHERE post_date < '$thisyear-$thismonth-01'
+		AND post_type = 'post' AND post_status = 'publish'
+			ORDER BY post_date DESC
+			LIMIT 1");
+	$next = $wpdb->get_row("SELECT MONTH(post_date) AS month, YEAR(post_date) AS year
+		FROM $wpdb->posts
+		WHERE post_date > '$thisyear-$thismonth-{$last_day} 23:59:59'
+		AND post_type = 'post' AND post_status = 'publish'
+			ORDER BY post_date ASC
+			LIMIT 1");
+
+	/* translators: Calendar caption: 1: month name, 2: 4-digit year */
+	$calendar_caption = _x('%1$s %2$s', 'calendar caption');
+	$calendar_output = '<table id="wp-calendar">
+	<caption>' . sprintf(
+		$calendar_caption,
+		$wp_locale->get_month( $thismonth ),
+		date( 'Y', $unixmonth )
+	) . '</caption>
+	<thead>
+	<tr>';
+
+	$myweek = array();
+
+	for ( $wdcount = 0; $wdcount <= 6; $wdcount++ ) {
+		$myweek[] = $wp_locale->get_weekday( ( $wdcount + $week_begins ) % 7 );
+	}
+
+	foreach ( $myweek as $wd ) {
+		$day_name = $initial ? $wp_locale->get_weekday_initial( $wd ) : $wp_locale->get_weekday_abbrev( $wd );
+		$wd = esc_attr( $wd );
+		$calendar_output .= "\n\t\t<th scope=\"col\" title=\"$wd\">$day_name</th>";
+	}
+
+	$calendar_output .= '
+	</tr>
+	</thead>
+
+	<tfoot>
+	<tr>';
+
+	if ( $previous ) {
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="prev"><a href="' . get_month_link( $previous->year, $previous->month ) . '">&laquo; ' .
+			$wp_locale->get_month_abbrev( $wp_locale->get_month( $previous->month ) ) .
+		'</a></td>';
+	} else {
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="prev" class="pad">&nbsp;</td>';
+	}
+
+	$calendar_output .= "\n\t\t".'<td class="pad">&nbsp;</td>';
+
+	if ( $next ) {
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="next"><a href="' . get_month_link( $next->year, $next->month ) . '">' .
+			$wp_locale->get_month_abbrev( $wp_locale->get_month( $next->month ) ) .
+		' &raquo;</a></td>';
+	} else {
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="next" class="pad">&nbsp;</td>';
+	}
+
+	$calendar_output .= '
+	</tr>
+	</tfoot>
+
+	<tbody>
+	<tr>';
+
+	$daywithpost = array();
+
+	// Get days with posts
+	$dayswithposts = $wpdb->get_results("SELECT DISTINCT DAYOFMONTH(post_date)
+		FROM $wpdb->posts WHERE post_date >= '{$thisyear}-{$thismonth}-01 00:00:00'
+		AND post_type = 'post' AND post_status = 'publish'
+		AND post_date <= '{$thisyear}-{$thismonth}-{$last_day} 23:59:59'", ARRAY_N);
+	if ( $dayswithposts ) {
+		foreach ( (array) $dayswithposts as $daywith ) {
+			$daywithpost[] = $daywith[0];
+		}
+	}
+
+	// See how much we should pad in the beginning
+	$pad = calendar_week_mod( date( 'w', $unixmonth ) - $week_begins );
+	if ( 0 != $pad ) {
+		$calendar_output .= "\n\t\t".'<td colspan="'. esc_attr( $pad ) .'" class="pad">&nbsp;</td>';
+	}
+
+	$newrow = false;
+	$daysinmonth = (int) date( 't', $unixmonth );
+
+	for ( $day = 1; $day <= $daysinmonth; ++$day ) {
+		if ( isset($newrow) && $newrow ) {
+			$calendar_output .= "\n\t</tr>\n\t<tr>\n\t\t";
+		}
+		$newrow = false;
+
+		if ( $day == gmdate( 'j', $ts ) &&
+			$thismonth == gmdate( 'm', $ts ) &&
+			$thisyear == gmdate( 'Y', $ts ) ) {
+			$calendar_output .= '<td id="today">';
+		} else {
+			$calendar_output .= '<td>';
+		}
+
+		if ( in_array( $day, $daywithpost ) ) {
+			// any posts today?
+			$date_format = date( _x( 'F j, Y', 'daily archives date format' ), strtotime( "{$thisyear}-{$thismonth}-{$day}" ) );
+			/* translators: Post calendar label. 1: Date */
+			$label = sprintf( __( 'Posts published on %s' ), $date_format );
+			$calendar_output .= sprintf(
+				'<a href="%s" aria-label="%s">%s</a>',
+				get_day_link( $thisyear, $thismonth, $day ),
+				esc_attr( $label ),
+				$day
+			);
+		} else {
+			$calendar_output .= $day;
+		}
+		$calendar_output .= '</td>';
+
+		if ( 6 == calendar_week_mod( date( 'w', mktime(0, 0 , 0, $thismonth, $day, $thisyear ) ) - $week_begins ) ) {
+			$newrow = true;
+		}
+	}
+
+	$pad = 7 - calendar_week_mod( date( 'w', mktime( 0, 0 , 0, $thismonth, $day, $thisyear ) ) - $week_begins );
+	if ( $pad != 0 && $pad != 7 ) {
+		$calendar_output .= "\n\t\t".'<td class="pad" colspan="'. esc_attr( $pad ) .'">&nbsp;</td>';
+	}
+	$calendar_output .= "\n\t</tr>\n\t</tbody>\n\t</table>";
+
+	$cache[ $key ] = $calendar_output;
+	wp_cache_set( 'get_calendar', $cache, 'calendar' );
+
+	if ( $echo ) {
+		/**
+		 * Filters the HTML calendar output.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param string $calendar_output HTML output of the calendar.
+		 */
+		echo apply_filters( 'get_calendar', $calendar_output );
+		return;
+	}
+	/** This filter is documented in wp-includes/general-template.php */
+	return apply_filters( 'get_calendar', $calendar_output );
+}
+
+/**
+ * Purge the cached results of get_calendar.
+ *
+ * @see get_calendar
+ * @since 2.1.0
+ */
+function delete_get_calendar_cache() {
+	wp_cache_delete( 'get_calendar', 'calendar' );
+}
+
+/**
+ * Display all of the allowed tags in HTML format with attributes.
+ *
+ * This is useful for displaying in the comment area, which elements and
+ * attributes are supported. As well as any plugins which want to display it.
+ *
+ * @since 1.0.1
+ *
+ * @global array $allowedtags
+ *
+ * @return string HTML allowed tags entity encoded.
+ */
+function allowed_tags() {
+	global $allowedtags;
+	$allowed = '';
+	foreach ( (array) $allowedtags as $tag => $attributes ) {
+		$allowed .= '<'.$tag;
+		if ( 0 < count($attributes) ) {
+			foreach ( $attributes as $attribute => $limits ) {
+				$allowed .= ' '.$attribute.'=""';
+			}
+		}
+		$allowed .= '> ';
+	}
+	return htmlentities( $allowed );
+}
+
+/***** Date/Time tags *****/
+
+/**
+ * Outputs the date in iso8601 format for xml files.
+ *
+ * @since 1.0.0
+ */
+function the_date_xml() {
+	echo mysql2date( 'Y-m-d', get_post()->post_date, false );
+}
+
+/**
+ * Display or Retrieve the date the current post was written (once per date)
+ *
+ * Will only output the date if the current post's date is different from the
+ * previous one output.
+ *
+ * i.e. Only one date listing will show per day worth of posts shown in the loop, even if the
+ * function is called several times for each post.
+ *
+ * HTML output can be filtered with 'the_date'.
+ * Date string output can be filtered with 'get_the_date'.
+ *
+ * @since 0.71
+ *
+ * @global string|int|bool $currentday
+ * @global string|int|bool $previousday
+ *
+ * @param string $d      Optional. PHP date format defaults to the date_format option if not specified.
+ * @param string $before Optional. Output before the date.
+ * @param string $after  Optional. Output after the date.
+ * @param bool   $echo   Optional, default is display. Whether to echo the date or return it.
+ * @return string|void String if retrieving.
+ */
+function the_date( $d = '', $before = '', $after = '', $echo = true ) {
+	global $currentday, $previousday;
+
+	if ( is_new_day() ) {
+		$the_date = $before . get_the_date( $d ) . $after;
+		$previousday = $currentday;
+
+		/**
+		 * Filters the date a post was published for display.
+		 *
+		 * @since 0.71
+		 *
+		 * @param string $the_date The formatted date string.
+		 * @param string $d        PHP date format. Defaults to 'date_format' option
+		 *                         if not specified.
+		 * @param string $before   HTML output before the date.
+		 * @param string $after    HTML output after the date.
+		 */
+		$the_date = apply_filters( 'the_date', $the_date, $d, $before, $after );
+
+		if ( $echo )
+			echo $the_date;
+		else
+			return $the_date;
+	}
+}
+
+/**
+ * Retrieve the date on which the post was written.
+ *
+ * Unlike the_date() this function will always return the date.
+ * Modify output with the {@see 'get_the_date'} filter.
+ *
+ * @since 3.0.0
+ *
+ * @param  string      $d    Optional. PHP date format defaults to the date_format option if not specified.
+ * @param  int|WP_Post $post Optional. Post ID or WP_Post object. Default current post.
+ * @return false|string Date the current post was written. False on failure.
+ */
+function get_the_date( $d = '', $post = null ) {
+	$post = get_post( $post );
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	if ( '' == $d ) {
+		$the_date = mysql2date( get_option( 'date_format' ), $post->post_date );
+	} else {
+		$the_date = mysql2date( $d, $post->post_date );
+	}
+
+	/**
+	 * Filters the date a post was published.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string      $the_date The formatted date.
+	 * @param string      $d        PHP date format. Defaults to 'date_format' option
+	 *                              if not specified.
+	 * @param int|WP_Post $post     The post object or ID.
+	 */
+	return apply_filters( 'get_the_date', $the_date, $d, $post );
+}
+
+/**
+ * Display the date on which the post was last modified.
+ *
+ * @since 2.1.0
+ *
+ * @param string $d      Optional. PHP date format defaults to the date_format option if not specified.
+ * @param string $before Optional. Output before the date.
+ * @param string $after  Optional. Output after the date.
+ * @param bool   $echo   Optional, default is display. Whether to echo the date or return it.
+ * @return string|void String if retrieving.
+ */
+function the_modified_date( $d = '', $before = '', $after = '', $echo = true ) {
+	$the_modified_date = $before . get_the_modified_date($d) . $after;
+
+	/**
+	 * Filters the date a post was last modified for display.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param string $the_modified_date The last modified date.
+	 * @param string $d                 PHP date format. Defaults to 'date_format' option
+	 *                                  if not specified.
+	 * @param string $before            HTML output before the date.
+	 * @param string $after             HTML output after the date.
+	 */
+	$the_modified_date = apply_filters( 'the_modified_date', $the_modified_date, $d, $before, $after );
+
+	if ( $echo )
+		echo $the_modified_date;
+	else
+		return $the_modified_date;
+
+}
+
+/**
+ * Retrieve the date on which the post was last modified.
+ *
+ * @since 2.1.0
+ * @since 4.6.0 Added the `$post` parameter.
+ *
+ * @param string      $d    Optional. PHP date format defaults to the date_format option if not specified.
+ * @param int|WP_Post $post Optional. Post ID or WP_Post object. De
