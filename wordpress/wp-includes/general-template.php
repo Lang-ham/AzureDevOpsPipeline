@@ -2660,4 +2660,336 @@ function feed_links( $args = array() ) {
 	 * @param bool $show Whether to display the posts feed link. Default true.
 	 */
 	if ( apply_filters( 'feed_links_show_posts_feed', true ) ) {
-		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['feedtitle'], get_bloginfo( 'na
+		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['feedtitle'], get_bloginfo( 'name' ), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link() ) . "\" />\n";
+	}
+
+	/**
+	 * Filters whether to display the comments feed link.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param bool $show Whether to display the comments feed link. Default true.
+	 */
+	if ( apply_filters( 'feed_links_show_comments_feed', true ) ) {
+		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['comstitle'], get_bloginfo( 'name' ), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link( 'comments_' . get_default_feed() ) ) . "\" />\n";
+	}
+}
+
+/**
+ * Display the links to the extra feeds such as category feeds.
+ *
+ * @since 2.8.0
+ *
+ * @param array $args Optional arguments.
+ */
+function feed_links_extra( $args = array() ) {
+	$defaults = array(
+		/* translators: Separator between blog name and feed type in feed links */
+		'separator'   => _x('&raquo;', 'feed link'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: post title */
+		'singletitle' => __('%1$s %2$s %3$s Comments Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: category name */
+		'cattitle'    => __('%1$s %2$s %3$s Category Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: tag name */
+		'tagtitle'    => __('%1$s %2$s %3$s Tag Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: term name, 4: taxonomy singular name */
+		'taxtitle'    => __('%1$s %2$s %3$s %4$s Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: author name  */
+		'authortitle' => __('%1$s %2$s Posts by %3$s Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: search phrase */
+		'searchtitle' => __('%1$s %2$s Search Results for &#8220;%3$s&#8221; Feed'),
+		/* translators: 1: blog name, 2: separator(raquo), 3: post type name */
+		'posttypetitle' => __('%1$s %2$s %3$s Feed'),
+	);
+
+	$args = wp_parse_args( $args, $defaults );
+
+	if ( is_singular() ) {
+		$id = 0;
+		$post = get_post( $id );
+
+		if ( comments_open() || pings_open() || $post->comment_count > 0 ) {
+			$title = sprintf( $args['singletitle'], get_bloginfo('name'), $args['separator'], the_title_attribute( array( 'echo' => false ) ) );
+			$href = get_post_comments_feed_link( $post->ID );
+		}
+	} elseif ( is_post_type_archive() ) {
+		$post_type = get_query_var( 'post_type' );
+		if ( is_array( $post_type ) )
+			$post_type = reset( $post_type );
+
+		$post_type_obj = get_post_type_object( $post_type );
+		$title = sprintf( $args['posttypetitle'], get_bloginfo( 'name' ), $args['separator'], $post_type_obj->labels->name );
+		$href = get_post_type_archive_feed_link( $post_type_obj->name );
+	} elseif ( is_category() ) {
+		$term = get_queried_object();
+
+		if ( $term ) {
+			$title = sprintf( $args['cattitle'], get_bloginfo('name'), $args['separator'], $term->name );
+			$href = get_category_feed_link( $term->term_id );
+		}
+	} elseif ( is_tag() ) {
+		$term = get_queried_object();
+
+		if ( $term ) {
+			$title = sprintf( $args['tagtitle'], get_bloginfo('name'), $args['separator'], $term->name );
+			$href = get_tag_feed_link( $term->term_id );
+		}
+	} elseif ( is_tax() ) {
+ 		$term = get_queried_object();
+ 		$tax = get_taxonomy( $term->taxonomy );
+ 		$title = sprintf( $args['taxtitle'], get_bloginfo('name'), $args['separator'], $term->name, $tax->labels->singular_name );
+ 		$href = get_term_feed_link( $term->term_id, $term->taxonomy );
+	} elseif ( is_author() ) {
+		$author_id = intval( get_query_var('author') );
+
+		$title = sprintf( $args['authortitle'], get_bloginfo('name'), $args['separator'], get_the_author_meta( 'display_name', $author_id ) );
+		$href = get_author_feed_link( $author_id );
+	} elseif ( is_search() ) {
+		$title = sprintf( $args['searchtitle'], get_bloginfo('name'), $args['separator'], get_search_query( false ) );
+		$href = get_search_feed_link();
+	} elseif ( is_post_type_archive() ) {
+		$title = sprintf( $args['posttypetitle'], get_bloginfo('name'), $args['separator'], post_type_archive_title( '', false ) );
+		$post_type_obj = get_queried_object();
+		if ( $post_type_obj )
+			$href = get_post_type_archive_feed_link( $post_type_obj->name );
+	}
+
+	if ( isset($title) && isset($href) )
+		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( $title ) . '" href="' . esc_url( $href ) . '" />' . "\n";
+}
+
+/**
+ * Display the link to the Really Simple Discovery service endpoint.
+ *
+ * @link http://archipelago.phrasewise.com/rsd
+ * @since 2.0.0
+ */
+function rsd_link() {
+	echo '<link rel="EditURI" type="application/rsd+xml" title="RSD" href="' . esc_url( site_url( 'xmlrpc.php?rsd', 'rpc' ) ) . '" />' . "\n";
+}
+
+/**
+ * Display the link to the Windows Live Writer manifest file.
+ *
+ * @link https://msdn.microsoft.com/en-us/library/bb463265.aspx
+ * @since 2.3.1
+ */
+function wlwmanifest_link() {
+	echo '<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="',
+		includes_url( 'wlwmanifest.xml' ), '" /> ', "\n";
+}
+
+/**
+ * Displays a noindex meta tag if required by the blog configuration.
+ *
+ * If a blog is marked as not being public then the noindex meta tag will be
+ * output to tell web robots not to index the page content. Add this to the
+ * {@see 'wp_head'} action.
+ *
+ * Typical usage is as a {@see 'wp_head'} callback:
+ *
+ *     add_action( 'wp_head', 'noindex' );
+ *
+ * @see wp_no_robots
+ *
+ * @since 2.1.0
+ */
+function noindex() {
+	// If the blog is not public, tell robots to go away.
+	if ( '0' == get_option('blog_public') )
+		wp_no_robots();
+}
+
+/**
+ * Display a noindex meta tag.
+ *
+ * Outputs a noindex meta tag that tells web robots not to index the page content.
+ * Typical usage is as a wp_head callback. add_action( 'wp_head', 'wp_no_robots' );
+ *
+ * @since 3.3.0
+ */
+function wp_no_robots() {
+	echo "<meta name='robots' content='noindex,follow' />\n";
+}
+
+/**
+ * Display site icon meta tags.
+ *
+ * @since 4.3.0
+ *
+ * @link https://www.whatwg.org/specs/web-apps/current-work/multipage/links.html#rel-icon HTML5 specification link icon.
+ */
+function wp_site_icon() {
+	if ( ! has_site_icon() && ! is_customize_preview() ) {
+		return;
+	}
+
+	$meta_tags = array();
+	$icon_32 = get_site_icon_url( 32 );
+	if ( empty( $icon_32 ) && is_customize_preview() ) {
+		$icon_32 = '/favicon.ico'; // Serve default favicon URL in customizer so element can be updated for preview.
+	}
+	if ( $icon_32 ) {
+		$meta_tags[] = sprintf( '<link rel="icon" href="%s" sizes="32x32" />', esc_url( $icon_32 ) );
+	}
+	$icon_192 = get_site_icon_url( 192 );
+	if ( $icon_192 ) {
+		$meta_tags[] = sprintf( '<link rel="icon" href="%s" sizes="192x192" />', esc_url( $icon_192 ) );
+	}
+	$icon_180 = get_site_icon_url( 180 );
+	if ( $icon_180 ) {
+		$meta_tags[] = sprintf( '<link rel="apple-touch-icon-precomposed" href="%s" />', esc_url( $icon_180 ) );
+	}
+	$icon_270 = get_site_icon_url( 270 );
+	if ( $icon_270 ) {
+		$meta_tags[] = sprintf( '<meta name="msapplication-TileImage" content="%s" />', esc_url( $icon_270 ) );
+	}
+
+	/**
+	 * Filters the site icon meta tags, so Plugins can add their own.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param array $meta_tags Site Icon meta elements.
+	 */
+	$meta_tags = apply_filters( 'site_icon_meta_tags', $meta_tags );
+	$meta_tags = array_filter( $meta_tags );
+
+	foreach ( $meta_tags as $meta_tag ) {
+		echo "$meta_tag\n";
+	}
+}
+
+/**
+ * Prints resource hints to browsers for pre-fetching, pre-rendering
+ * and pre-connecting to web sites.
+ *
+ * Gives hints to browsers to prefetch specific pages or render them
+ * in the background, to perform DNS lookups or to begin the connection
+ * handshake (DNS, TCP, TLS) in the background.
+ *
+ * These performance improving indicators work by using `<link rel"…">`.
+ *
+ * @since 4.6.0
+ */
+function wp_resource_hints() {
+	$hints = array(
+		'dns-prefetch' => wp_dependencies_unique_hosts(),
+		'preconnect'   => array(),
+		'prefetch'     => array(),
+		'prerender'    => array(),
+	);
+
+	/*
+	 * Add DNS prefetch for the Emoji CDN.
+	 * The path is removed in the foreach loop below.
+	 */
+	/** This filter is documented in wp-includes/formatting.php */
+	$hints['dns-prefetch'][] = apply_filters( 'emoji_svg_url', 'https://s.w.org/images/core/emoji/2.4/svg/' );
+
+	foreach ( $hints as $relation_type => $urls ) {
+		$unique_urls = array();
+
+		/**
+		 * Filters domains and URLs for resource hints of relation type.
+		 *
+		 * @since 4.6.0
+		 *
+		 * @param array  $urls          URLs to print for resource hints.
+		 * @param string $relation_type The relation type the URLs are printed for, e.g. 'preconnect' or 'prerender'.
+		 */
+		$urls = apply_filters( 'wp_resource_hints', $urls, $relation_type );
+
+		foreach ( $urls as $key => $url ) {
+			$atts = array();
+
+			if ( is_array( $url ) ) {
+				if ( isset( $url['href'] ) ) {
+					$atts = $url;
+					$url  = $url['href'];
+				} else {
+					continue;
+				}
+			}
+
+			$url = esc_url( $url, array( 'http', 'https' ) );
+
+			if ( ! $url ) {
+				continue;
+			}
+
+			if ( isset( $unique_urls[ $url ] ) ) {
+				continue;
+			}
+
+			if ( in_array( $relation_type, array( 'preconnect', 'dns-prefetch' ) ) ) {
+				$parsed = wp_parse_url( $url );
+
+				if ( empty( $parsed['host'] ) ) {
+					continue;
+				}
+
+				if ( 'preconnect' === $relation_type && ! empty( $parsed['scheme'] ) ) {
+					$url = $parsed['scheme'] . '://' . $parsed['host'];
+				} else {
+					// Use protocol-relative URLs for dns-prefetch or if scheme is missing.
+					$url = '//' . $parsed['host'];
+				}
+			}
+
+			$atts['rel'] = $relation_type;
+			$atts['href'] = $url;
+
+			$unique_urls[ $url ] = $atts;
+		}
+
+		foreach ( $unique_urls as $atts ) {
+			$html = '';
+
+			foreach ( $atts as $attr => $value ) {
+				if ( ! is_scalar( $value ) ||
+				     ( ! in_array( $attr, array( 'as', 'crossorigin', 'href', 'pr', 'rel', 'type' ), true ) && ! is_numeric( $attr ))
+				) {
+					continue;
+				}
+
+				$value = ( 'href' === $attr ) ? esc_url( $value ) : esc_attr( $value );
+
+				if ( ! is_string( $attr ) ) {
+					$html .= " $value";
+				} else {
+					$html .= " $attr='$value'";
+				}
+			}
+
+			$html = trim( $html );
+
+			echo "<link $html />\n";
+		}
+	}
+}
+
+/**
+ * Retrieves a list of unique hosts of all enqueued scripts and styles.
+ *
+ * @since 4.6.0
+ *
+ * @return array A list of unique hosts of enqueued scripts and styles.
+ */
+function wp_dependencies_unique_hosts() {
+	global $wp_scripts, $wp_styles;
+
+	$unique_hosts = array();
+
+	foreach ( array( $wp_scripts, $wp_styles ) as $dependencies ) {
+		if ( $dependencies instanceof WP_Dependencies && ! empty( $dependencies->queue ) ) {
+			foreach ( $dependencies->queue as $handle ) {
+				if ( ! isset( $dependencies->registered[ $handle ] ) ) {
+					continue;
+				}
+
+				/* @var _WP_Dependency $dependency */
+				$dependency = $dependencies->registered[ $handle ];
+				$parsed     = wp_parse_url( $dependency->src );
+
+				if ( ! empty( $parsed['host'] ) && ! in_array( $parsed['host'], $unique_hosts ) && $parsed['h
