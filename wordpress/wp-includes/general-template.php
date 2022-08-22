@@ -2317,4 +2317,347 @@ function the_modified_date( $d = '', $before = '', $after = '', $echo = true ) {
  * @since 4.6.0 Added the `$post` parameter.
  *
  * @param string      $d    Optional. PHP date format defaults to the date_format option if not specified.
- * @param int|WP_Post $post Optional. Post ID or WP_Post object. De
+ * @param int|WP_Post $post Optional. Post ID or WP_Post object. Default current post.
+ * @return false|string Date the current post was modified. False on failure.
+ */
+function get_the_modified_date( $d = '', $post = null ) {
+	$post = get_post( $post );
+
+	if ( ! $post ) {
+		// For backward compatibility, failures go through the filter below.
+		$the_time = false;
+	} elseif ( empty( $d ) ) {
+		$the_time = get_post_modified_time( get_option( 'date_format' ), false, $post, true );
+	} else {
+		$the_time = get_post_modified_time( $d, false, $post, true );
+	}
+
+	/**
+	 * Filters the date a post was last modified.
+	 *
+	 * @since 2.1.0
+	 * @since 4.6.0 Added the `$post` parameter.
+	 *
+	 * @param string|bool  $the_time The formatted date or false if no post is found.
+	 * @param string       $d        PHP date format. Defaults to value specified in
+	 *                               'date_format' option.
+	 * @param WP_Post|null $post     WP_Post object or null if no post is found.
+	 */
+	return apply_filters( 'get_the_modified_date', $the_time, $d, $post );
+}
+
+/**
+ * Display the time at which the post was written.
+ *
+ * @since 0.71
+ *
+ * @param string $d Either 'G', 'U', or php date format.
+ */
+function the_time( $d = '' ) {
+	/**
+	 * Filters the time a post was written for display.
+	 *
+	 * @since 0.71
+	 *
+	 * @param string $get_the_time The formatted time.
+	 * @param string $d            The time format. Accepts 'G', 'U',
+	 *                             or php date format.
+	 */
+	echo apply_filters( 'the_time', get_the_time( $d ), $d );
+}
+
+/**
+ * Retrieve the time at which the post was written.
+ *
+ * @since 1.5.0
+ *
+ * @param string      $d    Optional. Format to use for retrieving the time the post
+ *                          was written. Either 'G', 'U', or php date format defaults
+ *                          to the value specified in the time_format option. Default empty.
+ * @param int|WP_Post $post WP_Post object or ID. Default is global $post object.
+ * @return string|int|false Formatted date string or Unix timestamp if `$id` is 'U' or 'G'. False on failure.
+ */
+function get_the_time( $d = '', $post = null ) {
+	$post = get_post($post);
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	if ( '' == $d )
+		$the_time = get_post_time(get_option('time_format'), false, $post, true);
+	else
+		$the_time = get_post_time($d, false, $post, true);
+
+	/**
+	 * Filters the time a post was written.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string      $the_time The formatted time.
+	 * @param string      $d        Format to use for retrieving the time the post was written.
+	 *                              Accepts 'G', 'U', or php date format value specified
+	 *                              in 'time_format' option. Default empty.
+	 * @param int|WP_Post $post     WP_Post object or ID.
+	 */
+	return apply_filters( 'get_the_time', $the_time, $d, $post );
+}
+
+/**
+ * Retrieve the time at which the post was written.
+ *
+ * @since 2.0.0
+ *
+ * @param string      $d         Optional. Format to use for retrieving the time the post
+ *                               was written. Either 'G', 'U', or php date format. Default 'U'.
+ * @param bool        $gmt       Optional. Whether to retrieve the GMT time. Default false.
+ * @param int|WP_Post $post      WP_Post object or ID. Default is global $post object.
+ * @param bool        $translate Whether to translate the time string. Default false.
+ * @return string|int|false Formatted date string or Unix timestamp if `$id` is 'U' or 'G'. False on failure.
+ */
+function get_post_time( $d = 'U', $gmt = false, $post = null, $translate = false ) {
+	$post = get_post($post);
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	if ( $gmt )
+		$time = $post->post_date_gmt;
+	else
+		$time = $post->post_date;
+
+	$time = mysql2date($d, $time, $translate);
+
+	/**
+	 * Filters the localized time a post was written.
+	 *
+	 * @since 2.6.0
+	 *
+	 * @param string $time The formatted time.
+	 * @param string $d    Format to use for retrieving the time the post was written.
+	 *                     Accepts 'G', 'U', or php date format. Default 'U'.
+	 * @param bool   $gmt  Whether to retrieve the GMT time. Default false.
+	 */
+	return apply_filters( 'get_post_time', $time, $d, $gmt );
+}
+
+/**
+ * Display the time at which the post was last modified.
+ *
+ * @since 2.0.0
+ *
+ * @param string $d Optional Either 'G', 'U', or php date format defaults to the value specified in the time_format option.
+ */
+function the_modified_time($d = '') {
+	/**
+	 * Filters the localized time a post was last modified, for display.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param string $get_the_modified_time The formatted time.
+	 * @param string $d                     The time format. Accepts 'G', 'U',
+	 *                                      or php date format. Defaults to value
+	 *                                      specified in 'time_format' option.
+	 */
+	echo apply_filters( 'the_modified_time', get_the_modified_time($d), $d );
+}
+
+/**
+ * Retrieve the time at which the post was last modified.
+ *
+ * @since 2.0.0
+ * @since 4.6.0 Added the `$post` parameter.
+ *
+ * @param string      $d     Optional. Format to use for retrieving the time the post
+ *                           was modified. Either 'G', 'U', or php date format defaults
+ *                           to the value specified in the time_format option. Default empty.
+ * @param int|WP_Post $post  Optional. Post ID or WP_Post object. Default current post.
+ * @return false|string Formatted date string or Unix timestamp. False on failure.
+ */
+function get_the_modified_time( $d = '', $post = null ) {
+	$post = get_post( $post );
+
+	if ( ! $post ) {
+		// For backward compatibility, failures go through the filter below.
+		$the_time = false;
+	} elseif ( empty( $d ) ) {
+		$the_time = get_post_modified_time( get_option( 'time_format' ), false, $post, true );
+	} else {
+		$the_time = get_post_modified_time( $d, false, $post, true );
+	}
+
+	/**
+	 * Filters the localized time a post was last modified.
+	 *
+	 * @since 2.0.0
+	 * @since 4.6.0 Added the `$post` parameter.
+	 *
+	 * @param string|bool  $the_time The formatted time or false if no post is found.
+	 * @param string       $d        Format to use for retrieving the time the post was
+	 *                               written. Accepts 'G', 'U', or php date format. Defaults
+	 *                               to value specified in 'time_format' option.
+	 * @param WP_Post|null $post     WP_Post object or null if no post is found.
+	 */
+	return apply_filters( 'get_the_modified_time', $the_time, $d, $post );
+}
+
+/**
+ * Retrieve the time at which the post was last modified.
+ *
+ * @since 2.0.0
+ *
+ * @param string      $d         Optional. Format to use for retrieving the time the post
+ *                               was modified. Either 'G', 'U', or php date format. Default 'U'.
+ * @param bool        $gmt       Optional. Whether to retrieve the GMT time. Default false.
+ * @param int|WP_Post $post      WP_Post object or ID. Default is global $post object.
+ * @param bool        $translate Whether to translate the time string. Default false.
+ * @return string|int|false Formatted date string or Unix timestamp if `$id` is 'U' or 'G'. False on failure.
+ */
+function get_post_modified_time( $d = 'U', $gmt = false, $post = null, $translate = false ) {
+	$post = get_post($post);
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	if ( $gmt )
+		$time = $post->post_modified_gmt;
+	else
+		$time = $post->post_modified;
+	$time = mysql2date($d, $time, $translate);
+
+	/**
+	 * Filters the localized time a post was last modified.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $time The formatted time.
+	 * @param string $d    The date format. Accepts 'G', 'U', or php date format. Default 'U'.
+	 * @param bool   $gmt  Whether to return the GMT time. Default false.
+	 */
+	return apply_filters( 'get_post_modified_time', $time, $d, $gmt );
+}
+
+/**
+ * Display the weekday on which the post was written.
+ *
+ * @since 0.71
+ *
+ * @global WP_Locale $wp_locale
+ */
+function the_weekday() {
+	global $wp_locale;
+	$the_weekday = $wp_locale->get_weekday( mysql2date( 'w', get_post()->post_date, false ) );
+
+	/**
+	 * Filters the weekday on which the post was written, for display.
+	 *
+	 * @since 0.71
+	 *
+	 * @param string $the_weekday
+	 */
+	echo apply_filters( 'the_weekday', $the_weekday );
+}
+
+/**
+ * Display the weekday on which the post was written.
+ *
+ * Will only output the weekday if the current post's weekday is different from
+ * the previous one output.
+ *
+ * @since 0.71
+ *
+ * @global WP_Locale       $wp_locale
+ * @global string|int|bool $currentday
+ * @global string|int|bool $previousweekday
+ *
+ * @param string $before Optional Output before the date.
+ * @param string $after Optional Output after the date.
+ */
+function the_weekday_date($before='',$after='') {
+	global $wp_locale, $currentday, $previousweekday;
+	$the_weekday_date = '';
+	if ( $currentday != $previousweekday ) {
+		$the_weekday_date .= $before;
+		$the_weekday_date .= $wp_locale->get_weekday( mysql2date( 'w', get_post()->post_date, false ) );
+		$the_weekday_date .= $after;
+		$previousweekday = $currentday;
+	}
+
+	/**
+	 * Filters the localized date on which the post was written, for display.
+	 *
+	 * @since 0.71
+	 *
+	 * @param string $the_weekday_date
+	 * @param string $before           The HTML to output before the date.
+	 * @param string $after            The HTML to output after the date.
+	 */
+	$the_weekday_date = apply_filters( 'the_weekday_date', $the_weekday_date, $before, $after );
+	echo $the_weekday_date;
+}
+
+/**
+ * Fire the wp_head action.
+ *
+ * See {@see 'wp_head'}.
+ *
+ * @since 1.2.0
+ */
+function wp_head() {
+	/**
+	 * Prints scripts or data in the head tag on the front end.
+	 *
+	 * @since 1.5.0
+	 */
+	do_action( 'wp_head' );
+}
+
+/**
+ * Fire the wp_footer action.
+ *
+ * See {@see 'wp_footer'}.
+ *
+ * @since 1.5.1
+ */
+function wp_footer() {
+	/**
+	 * Prints scripts or data before the closing body tag on the front end.
+	 *
+	 * @since 1.5.1
+	 */
+	do_action( 'wp_footer' );
+}
+
+/**
+ * Display the links to the general feeds.
+ *
+ * @since 2.8.0
+ *
+ * @param array $args Optional arguments.
+ */
+function feed_links( $args = array() ) {
+	if ( !current_theme_supports('automatic-feed-links') )
+		return;
+
+	$defaults = array(
+		/* translators: Separator between blog name and feed type in feed links */
+		'separator'	=> _x('&raquo;', 'feed link'),
+		/* translators: 1: blog title, 2: separator (raquo) */
+		'feedtitle'	=> __('%1$s %2$s Feed'),
+		/* translators: 1: blog title, 2: separator (raquo) */
+		'comstitle'	=> __('%1$s %2$s Comments Feed'),
+	);
+
+	$args = wp_parse_args( $args, $defaults );
+
+	/**
+	 * Filters whether to display the posts feed link.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @param bool $show Whether to display the posts feed link. Default true.
+	 */
+	if ( apply_filters( 'feed_links_show_posts_feed', true ) ) {
+		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['feedtitle'], get_bloginfo( 'na
