@@ -2992,4 +2992,360 @@ function wp_dependencies_unique_hosts() {
 				$dependency = $dependencies->registered[ $handle ];
 				$parsed     = wp_parse_url( $dependency->src );
 
-				if ( ! empty( $parsed['host'] ) && ! in_array( $parsed['host'], $unique_hosts ) && $parsed['h
+				if ( ! empty( $parsed['host'] ) && ! in_array( $parsed['host'], $unique_hosts ) && $parsed['host'] !== $_SERVER['SERVER_NAME'] ) {
+					$unique_hosts[] = $parsed['host'];
+				}
+			}
+		}
+	}
+
+	return $unique_hosts;
+}
+
+/**
+ * Whether the user can access the visual editor.
+ *
+ * Checks if the user can access the visual editor and that it's supported by the user's browser.
+ *
+ * @since 2.0.0
+ *
+ * @global bool $wp_rich_edit Whether the user can access the visual editor.
+ * @global bool $is_gecko     Whether the browser is Gecko-based.
+ * @global bool $is_opera     Whether the browser is Opera.
+ * @global bool $is_safari    Whether the browser is Safari.
+ * @global bool $is_chrome    Whether the browser is Chrome.
+ * @global bool $is_IE        Whether the browser is Internet Explorer.
+ * @global bool $is_edge      Whether the browser is Microsoft Edge.
+ *
+ * @return bool True if the user can access the visual editor, false otherwise.
+ */
+function user_can_richedit() {
+	global $wp_rich_edit, $is_gecko, $is_opera, $is_safari, $is_chrome, $is_IE, $is_edge;
+
+	if ( !isset($wp_rich_edit) ) {
+		$wp_rich_edit = false;
+
+		if ( get_user_option( 'rich_editing' ) == 'true' || ! is_user_logged_in() ) { // default to 'true' for logged out users
+			if ( $is_safari ) {
+				$wp_rich_edit = ! wp_is_mobile() || ( preg_match( '!AppleWebKit/(\d+)!', $_SERVER['HTTP_USER_AGENT'], $match ) && intval( $match[1] ) >= 534 );
+			} elseif ( $is_IE ) {
+				$wp_rich_edit = ( strpos( $_SERVER['HTTP_USER_AGENT'], 'Trident/7.0;' ) !== false );
+			} elseif ( $is_gecko || $is_chrome || $is_edge || ( $is_opera && !wp_is_mobile() ) ) {
+				$wp_rich_edit = true;
+			}
+		}
+	}
+
+	/**
+	 * Filters whether the user can access the visual editor.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param bool $wp_rich_edit Whether the user can access the visual editor.
+	 */
+	return apply_filters( 'user_can_richedit', $wp_rich_edit );
+}
+
+/**
+ * Find out which editor should be displayed by default.
+ *
+ * Works out which of the two editors to display as the current editor for a
+ * user. The 'html' setting is for the "Text" editor tab.
+ *
+ * @since 2.5.0
+ *
+ * @return string Either 'tinymce', or 'html', or 'test'
+ */
+function wp_default_editor() {
+	$r = user_can_richedit() ? 'tinymce' : 'html'; // defaults
+	if ( wp_get_current_user() ) { // look for cookie
+		$ed = get_user_setting('editor', 'tinymce');
+		$r = ( in_array($ed, array('tinymce', 'html', 'test') ) ) ? $ed : $r;
+	}
+
+	/**
+	 * Filters which editor should be displayed by default.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param string $r Which editor should be displayed by default. Either 'tinymce', 'html', or 'test'.
+	 */
+	return apply_filters( 'wp_default_editor', $r );
+}
+
+/**
+ * Renders an editor.
+ *
+ * Using this function is the proper way to output all needed components for both TinyMCE and Quicktags.
+ * _WP_Editors should not be used directly. See https://core.trac.wordpress.org/ticket/17144.
+ *
+ * NOTE: Once initialized the TinyMCE editor cannot be safely moved in the DOM. For that reason
+ * running wp_editor() inside of a meta box is not a good idea unless only Quicktags is used.
+ * On the post edit screen several actions can be used to include additional editors
+ * containing TinyMCE: 'edit_page_form', 'edit_form_advanced' and 'dbx_post_sidebar'.
+ * See https://core.trac.wordpress.org/ticket/19173 for more information.
+ *
+ * @see _WP_Editors::editor()
+ * @since 3.3.0
+ *
+ * @param string $content   Initial content for the editor.
+ * @param string $editor_id HTML ID attribute value for the textarea and TinyMCE. Can only be /[a-z]+/.
+ * @param array  $settings  See _WP_Editors::editor().
+ */
+function wp_editor( $content, $editor_id, $settings = array() ) {
+	if ( ! class_exists( '_WP_Editors', false ) )
+		require( ABSPATH . WPINC . '/class-wp-editor.php' );
+	_WP_Editors::editor($content, $editor_id, $settings);
+}
+
+/**
+ * Outputs the editor scripts, stylesheets, and default settings.
+ *
+ * The editor can be initialized when needed after page load.
+ * See wp.editor.initialize() in wp-admin/js/editor.js for initialization options.
+ *
+ * @uses _WP_Editors
+ * @since 4.8.0
+ */
+function wp_enqueue_editor() {
+	if ( ! class_exists( '_WP_Editors', false ) ) {
+		require( ABSPATH . WPINC . '/class-wp-editor.php' );
+	}
+
+	_WP_Editors::enqueue_default_editor();
+}
+
+/**
+ * Enqueue assets needed by the code editor for the given settings.
+ *
+ * @since 4.9.0
+ *
+ * @see wp_enqueue_editor()
+ * @see _WP_Editors::parse_settings()
+ * @param array $args {
+ *     Args.
+ *
+ *     @type string   $type       The MIME type of the file to be edited.
+ *     @type string   $file       Filename to be edited. Extension is used to sniff the type. Can be supplied as alternative to `$type` param.
+ *     @type WP_Theme $theme      Theme being edited when on theme editor.
+ *     @type string   $plugin     Plugin being edited when on plugin editor.
+ *     @type array    $codemirror Additional CodeMirror setting overrides.
+ *     @type array    $csslint    CSSLint rule overrides.
+ *     @type array    $jshint     JSHint rule overrides.
+ *     @type array    $htmlhint   JSHint rule overrides.
+ * }
+ * @returns array|false Settings for the enqueued code editor, or false if the editor was not enqueued .
+ */
+function wp_enqueue_code_editor( $args ) {
+	if ( is_user_logged_in() && 'false' === wp_get_current_user()->syntax_highlighting ) {
+		return false;
+	}
+
+	$settings = array(
+		'codemirror' => array(
+			'indentUnit' => 4,
+			'indentWithTabs' => true,
+			'inputStyle' => 'contenteditable',
+			'lineNumbers' => true,
+			'lineWrapping' => true,
+			'styleActiveLine' => true,
+			'continueComments' => true,
+			'extraKeys' => array(
+				'Ctrl-Space' => 'autocomplete',
+				'Ctrl-/' => 'toggleComment',
+				'Cmd-/' => 'toggleComment',
+				'Alt-F' => 'findPersistent',
+				'Ctrl-F'     => 'findPersistent',
+				'Cmd-F'      => 'findPersistent',
+			),
+			'direction' => 'ltr', // Code is shown in LTR even in RTL languages.
+			'gutters' => array(),
+		),
+		'csslint' => array(
+			'errors' => true, // Parsing errors.
+			'box-model' => true,
+			'display-property-grouping' => true,
+			'duplicate-properties' => true,
+			'known-properties' => true,
+			'outline-none' => true,
+		),
+		'jshint' => array(
+			// The following are copied from <https://github.com/WordPress/wordpress-develop/blob/4.8.1/.jshintrc>.
+			'boss' => true,
+			'curly' => true,
+			'eqeqeq' => true,
+			'eqnull' => true,
+			'es3' => true,
+			'expr' => true,
+			'immed' => true,
+			'noarg' => true,
+			'nonbsp' => true,
+			'onevar' => true,
+			'quotmark' => 'single',
+			'trailing' => true,
+			'undef' => true,
+			'unused' => true,
+
+			'browser' => true,
+
+			'globals' => array(
+				'_' => false,
+				'Backbone' => false,
+				'jQuery' => false,
+				'JSON' => false,
+				'wp' => false,
+			),
+		),
+		'htmlhint' => array(
+			'tagname-lowercase' => true,
+			'attr-lowercase' => true,
+			'attr-value-double-quotes' => false,
+			'doctype-first' => false,
+			'tag-pair' => true,
+			'spec-char-escape' => true,
+			'id-unique' => true,
+			'src-not-empty' => true,
+			'attr-no-duplication' => true,
+			'alt-require' => true,
+			'space-tab-mixed-disabled' => 'tab',
+			'attr-unsafe-chars' => true,
+		),
+	);
+
+	$type = '';
+	if ( isset( $args['type'] ) ) {
+		$type = $args['type'];
+
+		// Remap MIME types to ones that CodeMirror modes will recognize.
+		if ( 'application/x-patch' === $type || 'text/x-patch' === $type ) {
+			$type = 'text/x-diff';
+		}
+	} elseif ( isset( $args['file'] ) && false !== strpos( basename( $args['file'] ), '.' ) ) {
+		$extension = strtolower( pathinfo( $args['file'], PATHINFO_EXTENSION ) );
+		foreach ( wp_get_mime_types() as $exts => $mime ) {
+			if ( preg_match( '!^(' . $exts . ')$!i', $extension ) ) {
+				$type = $mime;
+				break;
+			}
+		}
+
+		// Supply any types that are not matched by wp_get_mime_types().
+		if ( empty( $type ) ) {
+			switch ( $extension ) {
+				case 'conf':
+					$type = 'text/nginx';
+					break;
+				case 'css':
+					$type = 'text/css';
+					break;
+				case 'diff':
+				case 'patch':
+					$type = 'text/x-diff';
+					break;
+				case 'html':
+				case 'htm':
+					$type = 'text/html';
+					break;
+				case 'http':
+					$type = 'message/http';
+					break;
+				case 'js':
+					$type = 'text/javascript';
+					break;
+				case 'json':
+					$type = 'application/json';
+					break;
+				case 'jsx':
+					$type = 'text/jsx';
+					break;
+				case 'less':
+					$type = 'text/x-less';
+					break;
+				case 'md':
+					$type = 'text/x-gfm';
+					break;
+				case 'php':
+				case 'phtml':
+				case 'php3':
+				case 'php4':
+				case 'php5':
+				case 'php7':
+				case 'phps':
+					$type = 'application/x-httpd-php';
+					break;
+				case 'scss':
+					$type = 'text/x-scss';
+					break;
+				case 'sass':
+					$type = 'text/x-sass';
+					break;
+				case 'sh':
+				case 'bash':
+					$type = 'text/x-sh';
+					break;
+				case 'sql':
+					$type = 'text/x-sql';
+					break;
+				case 'svg':
+					$type = 'application/svg+xml';
+					break;
+				case 'xml':
+					$type = 'text/xml';
+					break;
+				case 'yml':
+				case 'yaml':
+					$type = 'text/x-yaml';
+					break;
+				case 'txt':
+				default:
+					$type = 'text/plain';
+					break;
+			}
+		}
+	}
+
+	if ( 'text/css' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'css',
+			'lint' => true,
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+	} elseif ( 'text/x-scss' === $type || 'text/x-less' === $type || 'text/x-sass' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => $type,
+			'lint' => false,
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+	} elseif ( 'text/x-diff' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'diff',
+		) );
+	} elseif ( 'text/html' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'htmlmixed',
+			'lint' => true,
+			'autoCloseBrackets' => true,
+			'autoCloseTags' => true,
+			'matchTags' => array(
+				'bothTags' => true,
+			),
+		) );
+
+		if ( ! current_user_can( 'unfiltered_html' ) ) {
+			$settings['htmlhint']['kses'] = wp_kses_allowed_html( 'post' );
+		}
+	} elseif ( 'text/x-gfm' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'gfm',
+			'highlightFormatting' => true,
+		) );
+	} elseif ( 'application/javascript' === $type || 'text/javascript' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'javascript',
+			'lint' => true,
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+	} elseif ( false !== strpos( $type
