@@ -3666,4 +3666,268 @@ function language_attributes( $doctype = 'html' ) {
  *
  *     @type string $base               Base of the paginated url. Default empty.
  *     @type string $format             Format for the pagination structure. Default empty.
- *     @type int    $total              The total amount of pages. Default is the value WP_Quer
+ *     @type int    $total              The total amount of pages. Default is the value WP_Query's
+ *                                      `max_num_pages` or 1.
+ *     @type int    $current            The current page number. Default is 'paged' query var or 1.
+ *     @type string $aria_current       The value for the aria-current attribute. Possible values are 'page',
+ *                                      'step', 'location', 'date', 'time', 'true', 'false'. Default is 'page'.
+ *     @type bool   $show_all           Whether to show all pages. Default false.
+ *     @type int    $end_size           How many numbers on either the start and the end list edges.
+ *                                      Default 1.
+ *     @type int    $mid_size           How many numbers to either side of the current pages. Default 2.
+ *     @type bool   $prev_next          Whether to include the previous and next links in the list. Default true.
+ *     @type bool   $prev_text          The previous page text. Default '&laquo; Previous'.
+ *     @type bool   $next_text          The next page text. Default 'Next &raquo;'.
+ *     @type string $type               Controls format of the returned value. Possible values are 'plain',
+ *                                      'array' and 'list'. Default is 'plain'.
+ *     @type array  $add_args           An array of query args to add. Default false.
+ *     @type string $add_fragment       A string to append to each link. Default empty.
+ *     @type string $before_page_number A string to appear before the page number. Default empty.
+ *     @type string $after_page_number  A string to append after the page number. Default empty.
+ * }
+ * @return array|string|void String of page links or array of page links.
+ */
+function paginate_links( $args = '' ) {
+	global $wp_query, $wp_rewrite;
+
+	// Setting up default values based on the current URL.
+	$pagenum_link = html_entity_decode( get_pagenum_link() );
+	$url_parts    = explode( '?', $pagenum_link );
+
+	// Get max pages and current page out of the current query, if available.
+	$total   = isset( $wp_query->max_num_pages ) ? $wp_query->max_num_pages : 1;
+	$current = get_query_var( 'paged' ) ? intval( get_query_var( 'paged' ) ) : 1;
+
+	// Append the format placeholder to the base URL.
+	$pagenum_link = trailingslashit( $url_parts[0] ) . '%_%';
+
+	// URL base depends on permalink settings.
+	$format  = $wp_rewrite->using_index_permalinks() && ! strpos( $pagenum_link, 'index.php' ) ? 'index.php/' : '';
+	$format .= $wp_rewrite->using_permalinks() ? user_trailingslashit( $wp_rewrite->pagination_base . '/%#%', 'paged' ) : '?paged=%#%';
+
+	$defaults = array(
+		'base'               => $pagenum_link, // http://example.com/all_posts.php%_% : %_% is replaced by format (below)
+		'format'             => $format, // ?page=%#% : %#% is replaced by the page number
+		'total'              => $total,
+		'current'            => $current,
+		'aria_current'       => 'page',
+		'show_all'           => false,
+		'prev_next'          => true,
+		'prev_text'          => __( '&laquo; Previous' ),
+		'next_text'          => __( 'Next &raquo;' ),
+		'end_size'           => 1,
+		'mid_size'           => 2,
+		'type'               => 'plain',
+		'add_args'           => array(), // array of query args to add
+		'add_fragment'       => '',
+		'before_page_number' => '',
+		'after_page_number'  => '',
+	);
+
+	$args = wp_parse_args( $args, $defaults );
+
+	if ( ! is_array( $args['add_args'] ) ) {
+		$args['add_args'] = array();
+	}
+
+	// Merge additional query vars found in the original URL into 'add_args' array.
+	if ( isset( $url_parts[1] ) ) {
+		// Find the format argument.
+		$format = explode( '?', str_replace( '%_%', $args['format'], $args['base'] ) );
+		$format_query = isset( $format[1] ) ? $format[1] : '';
+		wp_parse_str( $format_query, $format_args );
+
+		// Find the query args of the requested URL.
+		wp_parse_str( $url_parts[1], $url_query_args );
+
+		// Remove the format argument from the array of query arguments, to avoid overwriting custom format.
+		foreach ( $format_args as $format_arg => $format_arg_value ) {
+			unset( $url_query_args[ $format_arg ] );
+		}
+
+		$args['add_args'] = array_merge( $args['add_args'], urlencode_deep( $url_query_args ) );
+	}
+
+	// Who knows what else people pass in $args
+	$total = (int) $args['total'];
+	if ( $total < 2 ) {
+		return;
+	}
+	$current  = (int) $args['current'];
+	$end_size = (int) $args['end_size']; // Out of bounds?  Make it the default.
+	if ( $end_size < 1 ) {
+		$end_size = 1;
+	}
+	$mid_size = (int) $args['mid_size'];
+	if ( $mid_size < 0 ) {
+		$mid_size = 2;
+	}
+	$add_args = $args['add_args'];
+	$r = '';
+	$page_links = array();
+	$dots = false;
+
+	if ( $args['prev_next'] && $current && 1 < $current ) :
+		$link = str_replace( '%_%', 2 == $current ? '' : $args['format'], $args['base'] );
+		$link = str_replace( '%#%', $current - 1, $link );
+		if ( $add_args )
+			$link = add_query_arg( $add_args, $link );
+		$link .= $args['add_fragment'];
+
+		/**
+		 * Filters the paginated links for the given archive pages.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param string $link The paginated link URL.
+		 */
+		$page_links[] = '<a class="prev page-numbers" href="' . esc_url( apply_filters( 'paginate_links', $link ) ) . '">' . $args['prev_text'] . '</a>';
+	endif;
+	for ( $n = 1; $n <= $total; $n++ ) :
+		if ( $n == $current ) :
+			$page_links[] = "<span aria-current='" . esc_attr( $args['aria_current'] ) . "' class='page-numbers current'>" . $args['before_page_number'] . number_format_i18n( $n ) . $args['after_page_number'] . "</span>";
+			$dots = true;
+		else :
+			if ( $args['show_all'] || ( $n <= $end_size || ( $current && $n >= $current - $mid_size && $n <= $current + $mid_size ) || $n > $total - $end_size ) ) :
+				$link = str_replace( '%_%', 1 == $n ? '' : $args['format'], $args['base'] );
+				$link = str_replace( '%#%', $n, $link );
+				if ( $add_args )
+					$link = add_query_arg( $add_args, $link );
+				$link .= $args['add_fragment'];
+
+				/** This filter is documented in wp-includes/general-template.php */
+				$page_links[] = "<a class='page-numbers' href='" . esc_url( apply_filters( 'paginate_links', $link ) ) . "'>" . $args['before_page_number'] . number_format_i18n( $n ) . $args['after_page_number'] . "</a>";
+				$dots = true;
+			elseif ( $dots && ! $args['show_all'] ) :
+				$page_links[] = '<span class="page-numbers dots">' . __( '&hellip;' ) . '</span>';
+				$dots = false;
+			endif;
+		endif;
+	endfor;
+	if ( $args['prev_next'] && $current && $current < $total ) :
+		$link = str_replace( '%_%', $args['format'], $args['base'] );
+		$link = str_replace( '%#%', $current + 1, $link );
+		if ( $add_args )
+			$link = add_query_arg( $add_args, $link );
+		$link .= $args['add_fragment'];
+
+		/** This filter is documented in wp-includes/general-template.php */
+		$page_links[] = '<a class="next page-numbers" href="' . esc_url( apply_filters( 'paginate_links', $link ) ) . '">' . $args['next_text'] . '</a>';
+	endif;
+	switch ( $args['type'] ) {
+		case 'array' :
+			return $page_links;
+
+		case 'list' :
+			$r .= "<ul class='page-numbers'>\n\t<li>";
+			$r .= join("</li>\n\t<li>", $page_links);
+			$r .= "</li>\n</ul>\n";
+			break;
+
+		default :
+			$r = join("\n", $page_links);
+			break;
+	}
+	return $r;
+}
+
+/**
+ * Registers an admin colour scheme css file.
+ *
+ * Allows a plugin to register a new admin colour scheme. For example:
+ *
+ *     wp_admin_css_color( 'classic', __( 'Classic' ), admin_url( "css/colors-classic.css" ), array(
+ *         '#07273E', '#14568A', '#D54E21', '#2683AE'
+ *     ) );
+ *
+ * @since 2.5.0
+ *
+ * @global array $_wp_admin_css_colors
+ *
+ * @param string $key    The unique key for this theme.
+ * @param string $name   The name of the theme.
+ * @param string $url    The URL of the CSS file containing the color scheme.
+ * @param array  $colors Optional. An array of CSS color definition strings which are used
+ *                       to give the user a feel for the theme.
+ * @param array  $icons {
+ *     Optional. CSS color definitions used to color any SVG icons.
+ *
+ *     @type string $base    SVG icon base color.
+ *     @type string $focus   SVG icon color on focus.
+ *     @type string $current SVG icon color of current admin menu link.
+ * }
+ */
+function wp_admin_css_color( $key, $name, $url, $colors = array(), $icons = array() ) {
+	global $_wp_admin_css_colors;
+
+	if ( !isset($_wp_admin_css_colors) )
+		$_wp_admin_css_colors = array();
+
+	$_wp_admin_css_colors[$key] = (object) array(
+		'name' => $name,
+		'url' => $url,
+		'colors' => $colors,
+		'icon_colors' => $icons,
+	);
+}
+
+/**
+ * Registers the default Admin color schemes
+ *
+ * @since 3.0.0
+ */
+function register_admin_color_schemes() {
+	$suffix = is_rtl() ? '-rtl' : '';
+	$suffix .= SCRIPT_DEBUG ? '' : '.min';
+
+	wp_admin_css_color( 'fresh', _x( 'Default', 'admin color scheme' ),
+		false,
+		array( '#222', '#333', '#0073aa', '#00a0d2' ),
+		array( 'base' => '#82878c', 'focus' => '#00a0d2', 'current' => '#fff' )
+	);
+
+	// Other color schemes are not available when running out of src
+	if ( false !== strpos( get_bloginfo( 'version' ), '-src' ) ) {
+		return;
+	}
+
+	wp_admin_css_color( 'light', _x( 'Light', 'admin color scheme' ),
+		admin_url( "css/colors/light/colors$suffix.css" ),
+		array( '#e5e5e5', '#999', '#d64e07', '#04a4cc' ),
+		array( 'base' => '#999', 'focus' => '#ccc', 'current' => '#ccc' )
+	);
+
+	wp_admin_css_color( 'blue', _x( 'Blue', 'admin color scheme' ),
+		admin_url( "css/colors/blue/colors$suffix.css" ),
+		array( '#096484', '#4796b3', '#52accc', '#74B6CE' ),
+		array( 'base' => '#e5f8ff', 'focus' => '#fff', 'current' => '#fff' )
+	);
+
+	wp_admin_css_color( 'midnight', _x( 'Midnight', 'admin color scheme' ),
+		admin_url( "css/colors/midnight/colors$suffix.css" ),
+		array( '#25282b', '#363b3f', '#69a8bb', '#e14d43' ),
+		array( 'base' => '#f1f2f3', 'focus' => '#fff', 'current' => '#fff' )
+	);
+
+	wp_admin_css_color( 'sunrise', _x( 'Sunrise', 'admin color scheme' ),
+		admin_url( "css/colors/sunrise/colors$suffix.css" ),
+		array( '#b43c38', '#cf4944', '#dd823b', '#ccaf0b' ),
+		array( 'base' => '#f3f1f1', 'focus' => '#fff', 'current' => '#fff' )
+	);
+
+	wp_admin_css_color( 'ectoplasm', _x( 'Ectoplasm', 'admin color scheme' ),
+		admin_url( "css/colors/ectoplasm/colors$suffix.css" ),
+		array( '#413256', '#523f6d', '#a3b745', '#d46f15' ),
+		array( 'base' => '#ece6f6', 'focus' => '#fff', 'current' => '#fff' )
+	);
+
+	wp_admin_css_color( 'ocean', _x( 'Ocean', 'admin color scheme' ),
+		admin_url( "css/colors/ocean/colors$suffix.css" ),
+		array( '#627c83', '#738e96', '#9ebaa0', '#aa9d88' ),
+		array( 'base' => '#f2fcff', 'focus' => '#fff', 'current' => '#fff' )
+	);
+
+	wp_admin_css_color( 'coffee', _x( 'Coffee', 'admin color scheme' ),
+		admin_url( "css/colors/coffee/colors$suffix.css" ),
+		array( '#46403c', '#59524c', '#c7a589', '#9ea476' ),
+		array( 
