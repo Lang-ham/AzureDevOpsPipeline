@@ -1,0 +1,11 @@
+/*! This file is auto-generated from CodeMirror - github:codemirror/CodeMirror#ee20357d279bf9edfed0047d3bf2a75b5f0a040f
+
+CodeMirror, copyright (c) by Marijn Haverbeke and others
+Distributed under an MIT license: http://codemirror.net/LICENSE
+
+This is CodeMirror (http://codemirror.net), a code editor
+implemented in JavaScript on top of the browser's DOM.
+
+You can find some technical background for some of the code below
+at http://marijnhaverbeke.nl/blog/#cm-internals .
+*/.CodeMirror-Tern-tooltip,.CodeMirror-hints{-webkit-box-shadow:2px 3px 5px rgba(0,0,0,.2)}.CodeMirror{font-family:monospace;height:300px;color:#000;direction:ltr}.CodeMirror-lines{padding:4px 0}.CodeMirror pre{padding:0 4px}.CodeMirror-gutter-filler,.CodeMirror-scrollbar-filler{background-color:#fff}.CodeMirror-gutters{border-right:1px solid #ddd;background-color:#f7f7f7;white-space:nowrap}.CodeMirror-linenumber{padding:0 3px 0 5px;min-width:20px;text-align:right;color:#999;white-space:nowrap}.CodeMirror-guttermarker{color:#000}.CodeMirror-guttermarker-subtle{color:#999}.CodeMirror-cursor{border-left:1px solid #000;border-right:none;width:0}.CodeMirror div.CodeMirror-secondarycursor{border-left:1px solid silver}.cm-fat-cursor .CodeMirror-cursor{width:a
