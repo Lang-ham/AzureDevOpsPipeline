@@ -3348,4 +3348,322 @@ function wp_enqueue_code_editor( $args ) {
 			'autoCloseBrackets' => true,
 			'matchBrackets' => true,
 		) );
-	} elseif ( false !== strpos( $type
+	} elseif ( false !== strpos( $type, 'json' ) ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => array(
+				'name' => 'javascript',
+			),
+			'lint' => true,
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+		if ( 'application/ld+json' === $type ) {
+			$settings['codemirror']['mode']['jsonld'] = true;
+		} else {
+			$settings['codemirror']['mode']['json'] = true;
+		}
+	} elseif ( false !== strpos( $type, 'jsx' ) ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'jsx',
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+	} elseif ( 'text/x-markdown' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'markdown',
+			'highlightFormatting' => true,
+		) );
+	} elseif ( 'text/nginx' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'nginx',
+		) );
+	} elseif ( 'application/x-httpd-php' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'php',
+			'autoCloseBrackets' => true,
+			'autoCloseTags' => true,
+			'matchBrackets' => true,
+			'matchTags' => array(
+				'bothTags' => true,
+			),
+		) );
+	} elseif ( 'text/x-sql' === $type || 'text/x-mysql' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'sql',
+			'autoCloseBrackets' => true,
+			'matchBrackets' => true,
+		) );
+	} elseif ( false !== strpos( $type, 'xml' ) ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'xml',
+			'autoCloseBrackets' => true,
+			'autoCloseTags' => true,
+			'matchTags' => array(
+				'bothTags' => true,
+			),
+		) );
+	} elseif ( 'text/x-yaml' === $type ) {
+		$settings['codemirror'] = array_merge( $settings['codemirror'], array(
+			'mode' => 'yaml',
+		) );
+	} else {
+		$settings['codemirror']['mode'] = $type;
+	}
+
+	if ( ! empty( $settings['codemirror']['lint'] ) ) {
+		$settings['codemirror']['gutters'][] = 'CodeMirror-lint-markers';
+	}
+
+	// Let settings supplied via args override any defaults.
+	foreach ( wp_array_slice_assoc( $args, array( 'codemirror', 'csslint', 'jshint', 'htmlhint' ) ) as $key => $value ) {
+		$settings[ $key ] = array_merge(
+			$settings[ $key ],
+			$value
+		);
+	}
+
+	/**
+	 * Filters settings that are passed into the code editor.
+	 *
+	 * Returning a falsey value will disable the syntax-highlighting code editor.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array $settings The array of settings passed to the code editor. A falsey value disables the editor.
+	 * @param array $args {
+	 *     Args passed when calling `wp_enqueue_code_editor()`.
+	 *
+	 *     @type string   $type       The MIME type of the file to be edited.
+	 *     @type string   $file       Filename being edited.
+	 *     @type WP_Theme $theme      Theme being edited when on theme editor.
+	 *     @type string   $plugin     Plugin being edited when on plugin editor.
+	 *     @type array    $codemirror Additional CodeMirror setting overrides.
+	 *     @type array    $csslint    CSSLint rule overrides.
+	 *     @type array    $jshint     JSHint rule overrides.
+	 *     @type array    $htmlhint   JSHint rule overrides.
+	 * }
+	 */
+	$settings = apply_filters( 'wp_code_editor_settings', $settings, $args );
+
+	if ( empty( $settings ) || empty( $settings['codemirror'] ) ) {
+		return false;
+	}
+
+	wp_enqueue_script( 'code-editor' );
+	wp_enqueue_style( 'code-editor' );
+
+	if ( isset( $settings['codemirror']['mode'] ) ) {
+		$mode = $settings['codemirror']['mode'];
+		if ( is_string( $mode ) ) {
+			$mode = array(
+				'name' => $mode,
+			);
+		}
+
+		if ( ! empty( $settings['codemirror']['lint'] ) ) {
+			switch ( $mode['name'] ) {
+				case 'css':
+				case 'text/css':
+				case 'text/x-scss':
+				case 'text/x-less':
+					wp_enqueue_script( 'csslint' );
+					break;
+				case 'htmlmixed':
+				case 'text/html':
+				case 'php':
+				case 'application/x-httpd-php':
+				case 'text/x-php':
+					wp_enqueue_script( 'htmlhint' );
+					wp_enqueue_script( 'csslint' );
+					wp_enqueue_script( 'jshint' );
+					if ( ! current_user_can( 'unfiltered_html' ) ) {
+						wp_enqueue_script( 'htmlhint-kses' );
+					}
+					break;
+				case 'javascript':
+				case 'application/ecmascript':
+				case 'application/json':
+				case 'application/javascript':
+				case 'application/ld+json':
+				case 'text/typescript':
+				case 'application/typescript':
+					wp_enqueue_script( 'jshint' );
+					wp_enqueue_script( 'jsonlint' );
+					break;
+			}
+		}
+	}
+
+	wp_add_inline_script( 'code-editor', sprintf( 'jQuery.extend( wp.codeEditor.defaultSettings, %s );', wp_json_encode( $settings ) ) );
+
+	/**
+	 * Fires when scripts and styles are enqueued for the code editor.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array $settings Settings for the enqueued code editor.
+	 */
+	do_action( 'wp_enqueue_code_editor', $settings );
+
+	return $settings;
+}
+
+/**
+ * Retrieves the contents of the search WordPress query variable.
+ *
+ * The search query string is passed through esc_attr() to ensure that it is safe
+ * for placing in an html attribute.
+ *
+ * @since 2.3.0
+ *
+ * @param bool $escaped Whether the result is escaped. Default true.
+ * 	                    Only use when you are later escaping it. Do not use unescaped.
+ * @return string
+ */
+function get_search_query( $escaped = true ) {
+	/**
+	 * Filters the contents of the search query variable.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param mixed $search Contents of the search query variable.
+	 */
+	$query = apply_filters( 'get_search_query', get_query_var( 's' ) );
+
+	if ( $escaped )
+		$query = esc_attr( $query );
+	return $query;
+}
+
+/**
+ * Displays the contents of the search query variable.
+ *
+ * The search query string is passed through esc_attr() to ensure that it is safe
+ * for placing in an html attribute.
+ *
+ * @since 2.1.0
+ */
+function the_search_query() {
+	/**
+	 * Filters the contents of the search query variable for display.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param mixed $search Contents of the search query variable.
+	 */
+	echo esc_attr( apply_filters( 'the_search_query', get_search_query( false ) ) );
+}
+
+/**
+ * Gets the language attributes for the html tag.
+ *
+ * Builds up a set of html attributes containing the text direction and language
+ * information for the page.
+ *
+ * @since 4.3.0
+ *
+ * @param string $doctype Optional. The type of html document. Accepts 'xhtml' or 'html'. Default 'html'.
+ */
+function get_language_attributes( $doctype = 'html' ) {
+	$attributes = array();
+
+	if ( function_exists( 'is_rtl' ) && is_rtl() )
+		$attributes[] = 'dir="rtl"';
+
+	if ( $lang = get_bloginfo( 'language' ) ) {
+		if ( get_option( 'html_type' ) == 'text/html' || $doctype == 'html' ) {
+			$attributes[] = 'lang="' . esc_attr( $lang ) . '"';
+		}
+
+		if ( get_option( 'html_type' ) != 'text/html' || $doctype == 'xhtml' ) {
+			$attributes[] = 'xml:lang="' . esc_attr( $lang ) . '"';
+		}
+	}
+
+	$output = implode(' ', $attributes);
+
+	/**
+	 * Filters the language attributes for display in the html tag.
+	 *
+	 * @since 2.5.0
+	 * @since 4.3.0 Added the `$doctype` parameter.
+	 *
+	 * @param string $output A space-separated list of language attributes.
+	 * @param string $doctype The type of html document (xhtml|html).
+	 */
+	return apply_filters( 'language_attributes', $output, $doctype );
+}
+
+/**
+ * Displays the language attributes for the html tag.
+ *
+ * Builds up a set of html attributes containing the text direction and language
+ * information for the page.
+ *
+ * @since 2.1.0
+ * @since 4.3.0 Converted into a wrapper for get_language_attributes().
+ *
+ * @param string $doctype Optional. The type of html document. Accepts 'xhtml' or 'html'. Default 'html'.
+ */
+function language_attributes( $doctype = 'html' ) {
+	echo get_language_attributes( $doctype );
+}
+
+/**
+ * Retrieve paginated link for archive post pages.
+ *
+ * Technically, the function can be used to create paginated link list for any
+ * area. The 'base' argument is used to reference the url, which will be used to
+ * create the paginated links. The 'format' argument is then used for replacing
+ * the page number. It is however, most likely and by default, to be used on the
+ * archive post pages.
+ *
+ * The 'type' argument controls format of the returned value. The default is
+ * 'plain', which is just a string with the links separated by a newline
+ * character. The other possible values are either 'array' or 'list'. The
+ * 'array' value will return an array of the paginated link list to offer full
+ * control of display. The 'list' value will place all of the paginated links in
+ * an unordered HTML list.
+ *
+ * The 'total' argument is the total amount of pages and is an integer. The
+ * 'current' argument is the current page number and is also an integer.
+ *
+ * An example of the 'base' argument is "http://example.com/all_posts.php%_%"
+ * and the '%_%' is required. The '%_%' will be replaced by the contents of in
+ * the 'format' argument. An example for the 'format' argument is "?page=%#%"
+ * and the '%#%' is also required. The '%#%' will be replaced with the page
+ * number.
+ *
+ * You can include the previous and next links in the list by setting the
+ * 'prev_next' argument to true, which it is by default. You can set the
+ * previous text, by using the 'prev_text' argument. You can set the next text
+ * by setting the 'next_text' argument.
+ *
+ * If the 'show_all' argument is set to true, then it will show all of the pages
+ * instead of a short list of the pages near the current page. By default, the
+ * 'show_all' is set to false and controlled by the 'end_size' and 'mid_size'
+ * arguments. The 'end_size' argument is how many numbers on either the start
+ * and the end list edges, by default is 1. The 'mid_size' argument is how many
+ * numbers to either side of current page, but not including current page.
+ *
+ * It is possible to add query vars to the link by using the 'add_args' argument
+ * and see add_query_arg() for more information.
+ *
+ * The 'before_page_number' and 'after_page_number' arguments allow users to
+ * augment the links themselves. Typically this might be to add context to the
+ * numbered links so that screen reader users understand what the links are for.
+ * The text strings are added before and after the page number - within the
+ * anchor tag.
+ *
+ * @since 2.1.0
+ * @since 4.9.0 Added the `aria_current` argument.
+ *
+ * @global WP_Query   $wp_query
+ * @global WP_Rewrite $wp_rewrite
+ *
+ * @param string|array $args {
+ *     Optional. Array or string of arguments for generating paginated links for archives.
+ *
+ *     @type string $base               Base of the paginated url. Default empty.
+ *     @type string $format             Format for the pagination structure. Default empty.
+ *     @type int    $total              The total amount of pages. Default is the value WP_Quer
