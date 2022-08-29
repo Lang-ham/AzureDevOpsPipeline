@@ -210,4 +210,77 @@ window.wp = window.wp || {};
 		close: function() {
 			var self = this, onConfirmClose;
 			if ( ! self.active ) {
-	
+				return;
+			}
+
+			onConfirmClose = function( confirmed ) {
+				if ( confirmed ) {
+					self.active = false;
+					self.trigger( 'close' );
+
+					// Restore document title prior to opening the Live Preview
+					if ( self.originalDocumentTitle ) {
+						document.title = self.originalDocumentTitle;
+					}
+				} else {
+
+					// Go forward since Customizer is exited by history.back()
+					history.forward();
+				}
+				self.messenger.unbind( 'confirmed-close', onConfirmClose );
+			};
+			self.messenger.bind( 'confirmed-close', onConfirmClose );
+
+			Loader.messenger.send( 'confirm-close' );
+		},
+
+		/**
+		 * Callback after the Customizer has been closed.
+		 */
+		closed: function() {
+			Loader.iframe.remove();
+			Loader.messenger.destroy();
+			Loader.iframe    = null;
+			Loader.messenger = null;
+			Loader.saved     = null;
+			Loader.body.removeClass( 'customize-active full-overlay-active' ).removeClass( 'customize-loading' );
+			$( window ).off( 'beforeunload', Loader.beforeunload );
+			/*
+			 * Return focus to the link that opened the Customizer overlay after
+			 * the body element visibility is restored.
+			 */
+			if ( Loader.link ) {
+				Loader.link.focus();
+			}
+		},
+
+		/**
+		 * Callback for the `load` event on the Customizer iframe.
+		 */
+		loaded: function() {
+			Loader.body.removeClass( 'customize-loading' ).attr( 'aria-busy', 'false' );
+		},
+
+		/**
+		 * Overlay hide/show utility methods.
+		 */
+		overlay: {
+			show: function() {
+				this.element.fadeIn( 200, Loader.opened );
+			},
+
+			hide: function() {
+				this.element.fadeOut( 200, Loader.closed );
+			}
+		}
+	});
+
+	// Bootstrap the Loader on document#ready.
+	$( function() {
+		Loader.settings = _wpCustomizeLoaderSettings;
+		Loader.initialize();
+	});
+
+	// Expose the API publicly on window.wp.customize.Loader
+	api.Loader = Loader;
+})( wp, jQuery );
