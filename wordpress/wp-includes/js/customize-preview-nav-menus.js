@@ -333,3 +333,110 @@ wp.customize.navMenusPreview = wp.customize.MenusCustomizerPreview = ( function(
 			setting.unbind( this.onChangeNavMenuItemSetting );
 			setting.unbind( this.onChangeNavMenuLocationsSetting );
 		};
+
+		/**
+		 * Handle change for nav_menu[] setting for nav menu instances lacking partials.
+		 *
+		 * @since 4.5.0
+		 *
+		 * @this {wp.customize.Value}
+		 */
+		self.onChangeNavMenuSetting = function() {
+			var setting = this;
+
+			self.handleUnplacedNavMenuInstances( {
+				menu: setting._navMenuId
+			} );
+
+			// Ensure all nav menu instances with a theme_location assigned to this menu are handled.
+			api.each( function( otherSetting ) {
+				if ( ! otherSetting._navMenuThemeLocation ) {
+					return;
+				}
+				if ( setting._navMenuId === otherSetting() ) {
+					self.handleUnplacedNavMenuInstances( {
+						theme_location: otherSetting._navMenuThemeLocation
+					} );
+				}
+			} );
+		};
+
+		/**
+		 * Handle change for nav_menu_item[] setting for nav menu instances lacking partials.
+		 *
+		 * @since 4.5.0
+		 *
+		 * @param {object} newItem New value for nav_menu_item[] setting.
+		 * @param {object} oldItem Old value for nav_menu_item[] setting.
+		 * @this {wp.customize.Value}
+		 */
+		self.onChangeNavMenuItemSetting = function( newItem, oldItem ) {
+			var item = newItem || oldItem, navMenuSetting;
+			navMenuSetting = api( 'nav_menu[' + String( item.nav_menu_term_id ) + ']' );
+			if ( navMenuSetting ) {
+				self.onChangeNavMenuSetting.call( navMenuSetting );
+			}
+		};
+
+		/**
+		 * Handle change for nav_menu_locations[] setting for nav menu instances lacking partials.
+		 *
+		 * @since 4.5.0
+		 *
+		 * @this {wp.customize.Value}
+		 */
+		self.onChangeNavMenuLocationsSetting = function() {
+			var setting = this, hasNavMenuInstance;
+			self.handleUnplacedNavMenuInstances( {
+				theme_location: setting._navMenuThemeLocation
+			} );
+
+			// If there are no wp_nav_menu() instances that refer to the theme location, do full refresh.
+			hasNavMenuInstance = !! _.findWhere( _.values( self.data.navMenuInstanceArgs ), {
+				theme_location: setting._navMenuThemeLocation
+			} );
+			if ( ! hasNavMenuInstance ) {
+				api.selectiveRefresh.requestFullRefresh();
+			}
+		};
+	}
+
+	/**
+	 * Connect nav menu items with their corresponding controls in the pane.
+	 *
+	 * Setup shift-click on nav menu items which are more granular than the nav menu partial itself.
+	 * Also this applies even if a nav menu is not partial-refreshable.
+	 *
+	 * @since 4.5.0
+	 */
+	self.highlightControls = function() {
+		var selector = '.menu-item';
+
+		// Skip adding highlights if not in the customizer preview iframe.
+		if ( ! api.settings.channel ) {
+			return;
+		}
+
+		// Focus on the menu item control when shift+clicking the menu item.
+		$( document ).on( 'click', selector, function( e ) {
+			var navMenuItemParts;
+			if ( ! e.shiftKey ) {
+				return;
+			}
+
+			navMenuItemParts = $( this ).attr( 'class' ).match( /(?:^|\s)menu-item-(-?\d+)(?:\s|$)/ );
+			if ( navMenuItemParts ) {
+				e.preventDefault();
+				e.stopPropagation(); // Make sure a sub-nav menu item will get focused instead of parent items.
+				api.preview.send( 'focus-nav-menu-item-control', parseInt( navMenuItemParts[1], 10 ) );
+			}
+		});
+	};
+
+	api.bind( 'preview-ready', function() {
+		self.init();
+	} );
+
+	return self;
+
+}( jQuery, _, wp, wp.customize ) );
