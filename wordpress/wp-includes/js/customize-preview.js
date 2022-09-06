@@ -479,4 +479,355 @@
 
 		// Inject inputs for new forms added to the page.
 		if ( 'undefined' !== typeof MutationObserver ) {
-			api.mu
+			api.mutationObserver = new MutationObserver( function( mutations ) {
+				_.each( mutations, function( mutation ) {
+					$( mutation.target ).find( 'form' ).each( function() {
+						api.prepareFormPreview( this );
+					} );
+				} );
+			} );
+			api.mutationObserver.observe( document.documentElement, {
+				childList: true,
+				subtree: true
+			} );
+		}
+	};
+
+	/**
+	 * Inject changeset into form inputs.
+	 *
+	 * @since 4.7.0
+	 * @access protected
+	 *
+	 * @param {HTMLFormElement} form Form.
+	 * @returns {void}
+	 */
+	api.prepareFormPreview = function prepareFormPreview( form ) {
+		var urlParser, stateParams = {};
+
+		if ( ! form.action ) {
+			form.action = location.href;
+		}
+
+		urlParser = document.createElement( 'a' );
+		urlParser.href = form.action;
+
+		// Make sure forms in preview use HTTPS if parent frame uses HTTPS.
+		if ( api.settings.channel && 'https' === api.preview.scheme.get() && 'http:' === urlParser.protocol && -1 !== api.settings.url.allowedHosts.indexOf( urlParser.host ) ) {
+			urlParser.protocol = 'https:';
+			form.action = urlParser.href;
+		}
+
+		if ( 'GET' !== form.method.toUpperCase() || ! api.isLinkPreviewable( urlParser ) ) {
+
+			// Style form as unpreviewable only if previewing in iframe; if previewing on frontend, all forms will be allowed to work normally.
+			if ( api.settings.channel ) {
+				$( form ).addClass( 'customize-unpreviewable' );
+			}
+			return;
+		}
+		$( form ).removeClass( 'customize-unpreviewable' );
+
+		stateParams.customize_changeset_uuid = api.settings.changeset.uuid;
+		if ( api.settings.changeset.autosaved ) {
+			stateParams.customize_autosaved = 'on';
+		}
+		if ( ! api.settings.theme.active ) {
+			stateParams.customize_theme = api.settings.theme.stylesheet;
+		}
+		if ( api.settings.channel ) {
+			stateParams.customize_messenger_channel = api.settings.channel;
+		}
+
+		_.each( stateParams, function( value, name ) {
+			var input = $( form ).find( 'input[name="' + name + '"]' );
+			if ( input.length ) {
+				input.val( value );
+			} else {
+				$( form ).prepend( $( '<input>', {
+					type: 'hidden',
+					name: name,
+					value: value
+				} ) );
+			}
+		} );
+
+		// Prevent links from breaking out of preview iframe.
+		if ( api.settings.channel ) {
+			form.target = '_self';
+		}
+	};
+
+	/**
+	 * Watch current URL and send keep-alive (heartbeat) messages to the parent.
+	 *
+	 * Keep the customizer pane notified that the preview is still alive
+	 * and that the user hasn't navigated to a non-customized URL.
+	 *
+	 * @since 4.7.0
+	 * @access protected
+	 */
+	api.keepAliveCurrentUrl = ( function() {
+		var previousPathName = location.pathname,
+			previousQueryString = location.search.substr( 1 ),
+			previousQueryParams = null,
+			stateQueryParams = [ 'customize_theme', 'customize_changeset_uuid', 'customize_messenger_channel', 'customize_autosaved' ];
+
+		return function keepAliveCurrentUrl() {
+			var urlParser, currentQueryParams;
+
+			// Short-circuit with keep-alive if previous URL is identical (as is normal case).
+			if ( previousQueryString === location.search.substr( 1 ) && previousPathName === location.pathname ) {
+				api.preview.send( 'keep-alive' );
+				return;
+			}
+
+			urlParser = document.createElement( 'a' );
+			if ( null === previousQueryParams ) {
+				urlParser.search = previousQueryString;
+				previousQueryParams = api.utils.parseQueryString( previousQueryString );
+				_.each( stateQueryParams, function( name ) {
+					delete previousQueryParams[ name ];
+				} );
+			}
+
+			// Determine if current URL minus customized state params and URL hash.
+			urlParser.href = location.href;
+			currentQueryParams = api.utils.parseQueryString( urlParser.search.substr( 1 ) );
+			_.each( stateQueryParams, function( name ) {
+				delete currentQueryParams[ name ];
+			} );
+
+			if ( previousPathName !== location.pathname || ! _.isEqual( previousQueryParams, currentQueryParams ) ) {
+				urlParser.search = $.param( currentQueryParams );
+				urlParser.hash = '';
+				api.settings.url.self = urlParser.href;
+				api.preview.send( 'ready', {
+					currentUrl: api.settings.url.self,
+					activePanels: api.settings.activePanels,
+					activeSections: api.settings.activeSections,
+					activeControls: api.settings.activeControls,
+					settingValidities: api.settings.settingValidities
+				} );
+			} else {
+				api.preview.send( 'keep-alive' );
+			}
+			previousQueryParams = currentQueryParams;
+			previousQueryString = location.search.substr( 1 );
+			previousPathName = location.pathname;
+		};
+	} )();
+
+	api.settingPreviewHandlers = {
+
+		/**
+		 * Preview changes to custom logo.
+		 *
+		 * @param {number} attachmentId Attachment ID for custom logo.
+		 * @returns {void}
+		 */
+		custom_logo: function( attachmentId ) {
+			$( 'body' ).toggleClass( 'wp-custom-logo', !! attachmentId );
+		},
+
+		/**
+		 * Preview changes to custom css.
+		 *
+		 * @param {string} value Custom CSS..
+		 * @returns {void}
+		 */
+		custom_css: function( value ) {
+			$( '#wp-custom-css' ).text( value );
+		},
+
+		/**
+		 * Preview changes to any of the background settings.
+		 *
+		 * @returns {void}
+		 */
+		background: function() {
+			var css = '', settings = {};
+
+			_.each( ['color', 'image', 'preset', 'position_x', 'position_y', 'size', 'repeat', 'attachment'], function( prop ) {
+				settings[ prop ] = api( 'background_' + prop );
+			} );
+
+			/*
+			 * The body will support custom backgrounds if either the color or image are set.
+			 *
+			 * See get_body_class() in /wp-includes/post-template.php
+			 */
+			$( document.body ).toggleClass( 'custom-background', !! ( settings.color() || settings.image() ) );
+
+			if ( settings.color() ) {
+				css += 'background-color: ' + settings.color() + ';';
+			}
+
+			if ( settings.image() ) {
+				css += 'background-image: url("' + settings.image() + '");';
+				css += 'background-size: ' + settings.size() + ';';
+				css += 'background-position: ' + settings.position_x() + ' ' + settings.position_y() + ';';
+				css += 'background-repeat: ' + settings.repeat() + ';';
+				css += 'background-attachment: ' + settings.attachment() + ';';
+			}
+
+			$( '#custom-background-css' ).text( 'body.custom-background { ' + css + ' }' );
+		}
+	};
+
+	$( function() {
+		var bg, setValue, handleUpdatedChangesetUuid;
+
+		api.settings = window._wpCustomizeSettings;
+		if ( ! api.settings ) {
+			return;
+		}
+
+		api.preview = new api.Preview({
+			url: window.location.href,
+			channel: api.settings.channel
+		});
+
+		api.addLinkPreviewing();
+		api.addRequestPreviewing();
+		api.addFormPreviewing();
+
+		/**
+		 * Create/update a setting value.
+		 *
+		 * @param {string}  id            - Setting ID.
+		 * @param {*}       value         - Setting value.
+		 * @param {boolean} [createDirty] - Whether to create a setting as dirty. Defaults to false.
+		 */
+		setValue = function( id, value, createDirty ) {
+			var setting = api( id );
+			if ( setting ) {
+				setting.set( value );
+			} else {
+				createDirty = createDirty || false;
+				setting = api.create( id, value, {
+					id: id
+				} );
+
+				// Mark dynamically-created settings as dirty so they will get posted.
+				if ( createDirty ) {
+					setting._dirty = true;
+				}
+			}
+		};
+
+		api.preview.bind( 'settings', function( values ) {
+			$.each( values, setValue );
+		});
+
+		api.preview.trigger( 'settings', api.settings.values );
+
+		$.each( api.settings._dirty, function( i, id ) {
+			var setting = api( id );
+			if ( setting ) {
+				setting._dirty = true;
+			}
+		} );
+
+		api.preview.bind( 'setting', function( args ) {
+			var createDirty = true;
+			setValue.apply( null, args.concat( createDirty ) );
+		});
+
+		api.preview.bind( 'sync', function( events ) {
+
+			/*
+			 * Delete any settings that already exist locally which haven't been
+			 * modified in the controls while the preview was loading. This prevents
+			 * situations where the JS value being synced from the pane may differ
+			 * from the PHP-sanitized JS value in the preview which causes the
+			 * non-sanitized JS value to clobber the PHP-sanitized value. This
+			 * is particularly important for selective refresh partials that
+			 * have a fallback refresh behavior since infinite refreshing would
+			 * result.
+			 */
+			if ( events.settings && events['settings-modified-while-loading'] ) {
+				_.each( _.keys( events.settings ), function( syncedSettingId ) {
+					if ( api.has( syncedSettingId ) && ! events['settings-modified-while-loading'][ syncedSettingId ] ) {
+						delete events.settings[ syncedSettingId ];
+					}
+				} );
+			}
+
+			$.each( events, function( event, args ) {
+				api.preview.trigger( event, args );
+			});
+			api.preview.send( 'synced' );
+		});
+
+		api.preview.bind( 'active', function() {
+			api.preview.send( 'nonce', api.settings.nonce );
+
+			api.preview.send( 'documentTitle', document.title );
+
+			// Send scroll in case of loading via non-refresh.
+			api.preview.send( 'scroll', $( window ).scrollTop() );
+		});
+
+		/**
+		 * Handle update to changeset UUID.
+		 *
+		 * @param {string} uuid - UUID.
+		 * @returns {void}
+		 */
+		handleUpdatedChangesetUuid = function( uuid ) {
+			api.settings.changeset.uuid = uuid;
+
+			// Update UUIDs in links and forms.
+			$( document.body ).find( 'a[href], area' ).each( function() {
+				api.prepareLinkPreview( this );
+			} );
+			$( document.body ).find( 'form' ).each( function() {
+				api.prepareFormPreview( this );
+			} );
+
+			/*
+			 * Replace the UUID in the URL. Note that the wrapped history.replaceState()
+			 * will handle injecting the current api.settings.changeset.uuid into the URL,
+			 * so this is merely to trigger that logic.
+			 */
+			if ( history.replaceState ) {
+				history.replaceState( currentHistoryState, '', location.href );
+			}
+		};
+
+		api.preview.bind( 'changeset-uuid', handleUpdatedChangesetUuid );
+
+		api.preview.bind( 'saved', function( response ) {
+			if ( response.next_changeset_uuid ) {
+				handleUpdatedChangesetUuid( response.next_changeset_uuid );
+			}
+			api.trigger( 'saved', response );
+		} );
+
+		// Update the URLs to reflect the fact we've started autosaving.
+		api.preview.bind( 'autosaving', function() {
+			if ( api.settings.changeset.autosaved ) {
+				return;
+			}
+
+			api.settings.changeset.autosaved = true; // Start deferring to any autosave once changeset is updated.
+
+			$( document.body ).find( 'a[href], area' ).each( function() {
+				api.prepareLinkPreview( this );
+			} );
+			$( document.body ).find( 'form' ).each( function() {
+				api.prepareFormPreview( this );
+			} );
+			if ( history.replaceState ) {
+				history.replaceState( currentHistoryState, '', location.href );
+			}
+		} );
+
+		/*
+		 * Clear dirty flag for settings when saved to changeset so that they
+		 * won't be needlessly included in selective refresh or ajax requests.
+		 */
+		api.preview.bind( 'changeset-saved', function( data ) {
+			_.each( data.saved_changeset_values, function( value, settingId ) {
+				var sett
