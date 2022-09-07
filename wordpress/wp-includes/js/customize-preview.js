@@ -830,4 +830,68 @@
 		 */
 		api.preview.bind( 'changeset-saved', function( data ) {
 			_.each( data.saved_changeset_values, function( value, settingId ) {
-				var sett
+				var setting = api( settingId );
+				if ( setting && _.isEqual( setting.get(), value ) ) {
+					setting._dirty = false;
+				}
+			} );
+		} );
+
+		api.preview.bind( 'nonce-refresh', function( nonce ) {
+			$.extend( api.settings.nonce, nonce );
+		} );
+
+		/*
+		 * Send a message to the parent customize frame with a list of which
+		 * containers and controls are active.
+		 */
+		api.preview.send( 'ready', {
+			currentUrl: api.settings.url.self,
+			activePanels: api.settings.activePanels,
+			activeSections: api.settings.activeSections,
+			activeControls: api.settings.activeControls,
+			settingValidities: api.settings.settingValidities
+		} );
+
+		// Send ready when URL changes via JS.
+		setInterval( api.keepAliveCurrentUrl, api.settings.timeouts.keepAliveSend );
+
+		// Display a loading indicator when preview is reloading, and remove on failure.
+		api.preview.bind( 'loading-initiated', function () {
+			$( 'body' ).addClass( 'wp-customizer-unloading' );
+		});
+		api.preview.bind( 'loading-failed', function () {
+			$( 'body' ).removeClass( 'wp-customizer-unloading' );
+		});
+
+		/* Custom Backgrounds */
+		bg = $.map( ['color', 'image', 'preset', 'position_x', 'position_y', 'size', 'repeat', 'attachment'], function( prop ) {
+			return 'background_' + prop;
+		} );
+
+		api.when.apply( api, bg ).done( function() {
+			$.each( arguments, function() {
+				this.bind( api.settingPreviewHandlers.background );
+			});
+		});
+
+		/**
+		 * Custom Logo
+		 *
+		 * Toggle the wp-custom-logo body class when a logo is added or removed.
+		 *
+		 * @since 4.5.0
+		 */
+		api( 'custom_logo', function ( setting ) {
+			api.settingPreviewHandlers.custom_logo.call( setting, setting.get() );
+			setting.bind( api.settingPreviewHandlers.custom_logo );
+		} );
+
+		api( 'custom_css[' + api.settings.theme.stylesheet + ']', function( setting ) {
+			setting.bind( api.settingPreviewHandlers.custom_css );
+		} );
+
+		api.trigger( 'preview-ready' );
+	});
+
+})( wp, jQuery );
