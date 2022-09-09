@@ -625,4 +625,331 @@ wp.customize.selectiveRefresh = ( function( $, api ) {
 	});
 
 	/**
-	 * Mapping of type names to Partia
+	 * Mapping of type names to Partial constructor subclasses.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @type {Object.<string, wp.customize.selectiveRefresh.Partial>}
+	 */
+	self.partialConstructor = {};
+
+	self.partial = new api.Values({ defaultConstructor: Partial });
+
+	/**
+	 * Get the POST vars for a Customizer preview request.
+	 *
+	 * @since 4.5.0
+	 * @see wp.customize.previewer.query()
+	 *
+	 * @return {object}
+	 */
+	self.getCustomizeQuery = function() {
+		var dirtyCustomized = {};
+		api.each( function( value, key ) {
+			if ( value._dirty ) {
+				dirtyCustomized[ key ] = value();
+			}
+		} );
+
+		return {
+			wp_customize: 'on',
+			nonce: api.settings.nonce.preview,
+			customize_theme: api.settings.theme.stylesheet,
+			customized: JSON.stringify( dirtyCustomized ),
+			customize_changeset_uuid: api.settings.changeset.uuid
+		};
+	};
+
+	/**
+	 * Currently-requested partials and their associated deferreds.
+	 *
+	 * @since 4.5.0
+	 * @type {Object<string, { deferred: jQuery.Promise, partial: wp.customize.selectiveRefresh.Partial }>}
+	 */
+	self._pendingPartialRequests = {};
+
+	/**
+	 * Timeout ID for the current requesr, or null if no request is current.
+	 *
+	 * @since 4.5.0
+	 * @type {number|null}
+	 * @private
+	 */
+	self._debouncedTimeoutId = null;
+
+	/**
+	 * Current jqXHR for the request to the partials.
+	 *
+	 * @since 4.5.0
+	 * @type {jQuery.jqXHR|null}
+	 * @private
+	 */
+	self._currentRequest = null;
+
+	/**
+	 * Request full page refresh.
+	 *
+	 * When selective refresh is embedded in the context of front-end editing, this request
+	 * must fail or else changes will be lost, unless transactions are implemented.
+	 *
+	 * @since 4.5.0
+	 */
+	self.requestFullRefresh = function() {
+		api.preview.send( 'refresh' );
+	};
+
+	/**
+	 * Request a re-rendering of a partial.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @param {wp.customize.selectiveRefresh.Partial} partial
+	 * @return {jQuery.Promise}
+	 */
+	self.requestPartial = function( partial ) {
+		var partialRequest;
+
+		if ( self._debouncedTimeoutId ) {
+			clearTimeout( self._debouncedTimeoutId );
+			self._debouncedTimeoutId = null;
+		}
+		if ( self._currentRequest ) {
+			self._currentRequest.abort();
+			self._currentRequest = null;
+		}
+
+		partialRequest = self._pendingPartialRequests[ partial.id ];
+		if ( ! partialRequest || 'pending' !== partialRequest.deferred.state() ) {
+			partialRequest = {
+				deferred: $.Deferred(),
+				partial: partial
+			};
+			self._pendingPartialRequests[ partial.id ] = partialRequest;
+		}
+
+		// Prevent leaking partial into debounced timeout callback.
+		partial = null;
+
+		self._debouncedTimeoutId = setTimeout(
+			function() {
+				var data, partialPlacementContexts, partialsPlacements, request;
+
+				self._debouncedTimeoutId = null;
+				data = self.getCustomizeQuery();
+
+				/*
+				 * It is key that the containers be fetched exactly at the point of the request being
+				 * made, because the containers need to be mapped to responses by array indices.
+				 */
+				partialsPlacements = {};
+
+				partialPlacementContexts = {};
+
+				_.each( self._pendingPartialRequests, function( pending, partialId ) {
+					partialsPlacements[ partialId ] = pending.partial.placements();
+					if ( ! self.partial.has( partialId ) ) {
+						pending.deferred.rejectWith( pending.partial, [ new Error( 'partial_removed' ), partialsPlacements[ partialId ] ] );
+					} else {
+						/*
+						 * Note that this may in fact be an empty array. In that case, it is the responsibility
+						 * of the Partial subclass instance to know where to inject the response, or else to
+						 * just issue a refresh (default behavior). The data being returned with each container
+						 * is the context information that may be needed to render certain partials, such as
+						 * the contained sidebar for rendering widgets or what the nav menu args are for a menu.
+						 */
+						partialPlacementContexts[ partialId ] = _.map( partialsPlacements[ partialId ], function( placement ) {
+							return placement.context || {};
+						} );
+					}
+				} );
+
+				data.partials = JSON.stringify( partialPlacementContexts );
+				data[ self.data.renderQueryVar ] = '1';
+
+				request = self._currentRequest = wp.ajax.send( null, {
+					data: data,
+					url: api.settings.url.self
+				} );
+
+				request.done( function( data ) {
+
+					/**
+					 * Announce the data returned from a request to render partials.
+					 *
+					 * The data is filtered on the server via customize_render_partials_response
+					 * so plugins can inject data from the server to be utilized
+					 * on the client via this event. Plugins may use this filter
+					 * to communicate script and style dependencies that need to get
+					 * injected into the page to support the rendered partials.
+					 * This is similar to the 'saved' event.
+					 */
+					self.trigger( 'render-partials-response', data );
+
+					// Relay errors (warnings) captured during rendering and relay to console.
+					if ( data.errors && 'undefined' !== typeof console && console.warn ) {
+						_.each( data.errors, function( error ) {
+							console.warn( error );
+						} );
+					}
+
+					/*
+					 * Note that data is an array of items that correspond to the array of
+					 * containers that were submitted in the request. So we zip up the
+					 * array of containers with the array of contents for those containers,
+					 * and send them into .
+					 */
+					_.each( self._pendingPartialRequests, function( pending, partialId ) {
+						var placementsContents;
+						if ( ! _.isArray( data.contents[ partialId ] ) ) {
+							pending.deferred.rejectWith( pending.partial, [ new Error( 'unrecognized_partial' ), partialsPlacements[ partialId ] ] );
+						} else {
+							placementsContents = _.map( data.contents[ partialId ], function( content, i ) {
+								var partialPlacement = partialsPlacements[ partialId ][ i ];
+								if ( partialPlacement ) {
+									partialPlacement.addedContent = content;
+								} else {
+									partialPlacement = new Placement( {
+										partial: pending.partial,
+										addedContent: content
+									} );
+								}
+								return partialPlacement;
+							} );
+							pending.deferred.resolveWith( pending.partial, [ placementsContents ] );
+						}
+					} );
+					self._pendingPartialRequests = {};
+				} );
+
+				request.fail( function( data, statusText ) {
+
+					/*
+					 * Ignore failures caused by partial.currentRequest.abort()
+					 * The pending deferreds will remain in self._pendingPartialRequests
+					 * for re-use with the next request.
+					 */
+					if ( 'abort' === statusText ) {
+						return;
+					}
+
+					_.each( self._pendingPartialRequests, function( pending, partialId ) {
+						pending.deferred.rejectWith( pending.partial, [ data, partialsPlacements[ partialId ] ] );
+					} );
+					self._pendingPartialRequests = {};
+				} );
+			},
+			api.settings.timeouts.selectiveRefresh
+		);
+
+		return partialRequest.deferred.promise();
+	};
+
+	/**
+	 * Add partials for any nav menu container elements in the document.
+	 *
+	 * This method may be called multiple times. Containers that already have been
+	 * seen will be skipped.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @param {jQuery|HTMLElement} [rootElement]
+	 * @param {object}             [options]
+	 * @param {boolean=true}       [options.triggerRendered]
+	 */
+	self.addPartials = function( rootElement, options ) {
+		var containerElements;
+		if ( ! rootElement ) {
+			rootElement = document.documentElement;
+		}
+		rootElement = $( rootElement );
+		options = _.extend(
+			{
+				triggerRendered: true
+			},
+			options || {}
+		);
+
+		containerElements = rootElement.find( '[data-customize-partial-id]' );
+		if ( rootElement.is( '[data-customize-partial-id]' ) ) {
+			containerElements = containerElements.add( rootElement );
+		}
+		containerElements.each( function() {
+			var containerElement = $( this ), partial, placement, id, Constructor, partialOptions, containerContext;
+			id = containerElement.data( 'customize-partial-id' );
+			if ( ! id ) {
+				return;
+			}
+			containerContext = containerElement.data( 'customize-partial-placement-context' ) || {};
+
+			partial = self.partial( id );
+			if ( ! partial ) {
+				partialOptions = containerElement.data( 'customize-partial-options' ) || {};
+				partialOptions.constructingContainerContext = containerElement.data( 'customize-partial-placement-context' ) || {};
+				Constructor = self.partialConstructor[ containerElement.data( 'customize-partial-type' ) ] || self.Partial;
+				partial = new Constructor( id, partialOptions );
+				self.partial.add( partial );
+			}
+
+			/*
+			 * Only trigger renders on (nested) partials that have been not been
+			 * handled yet. An example where this would apply is a nav menu
+			 * embedded inside of a navigation menu widget. When the widget's title
+			 * is updated, the entire widget will re-render and then the event
+			 * will be triggered for the nested nav menu to do any initialization.
+			 */
+			if ( options.triggerRendered && ! containerElement.data( 'customize-partial-content-rendered' ) ) {
+
+				placement = new Placement( {
+					partial: partial,
+					context: containerContext,
+					container: containerElement
+				} );
+
+				$( placement.container ).attr( 'title', self.data.l10n.shiftClickToEdit );
+				partial.createEditShortcutForPlacement( placement );
+
+				/**
+				 * Announce when a partial's nested placement has been re-rendered.
+				 */
+				self.trigger( 'partial-content-rendered', placement );
+			}
+			containerElement.data( 'customize-partial-content-rendered', true );
+		} );
+	};
+
+	api.bind( 'preview-ready', function() {
+		var handleSettingChange, watchSettingChange, unwatchSettingChange;
+
+		_.extend( self.data, _customizePartialRefreshExports );
+
+		// Create the partial JS models.
+		_.each( self.data.partials, function( data, id ) {
+			var Constructor, partial = self.partial( id );
+			if ( ! partial ) {
+				Constructor = self.partialConstructor[ data.type ] || self.Partial;
+				partial = new Constructor(
+					id,
+					_.extend( { params: data }, data ) // Inclusion of params alias is for back-compat for custom partials that expect to augment this property.
+				);
+				self.partial.add( partial );
+			} else {
+				_.extend( partial.params, data );
+			}
+		} );
+
+		/**
+		 * Handle change to a setting.
+		 *
+		 * Note this is largely needed because adding a 'change' event handler to wp.customize
+		 * will only include the changed setting object as an argument, not including the
+		 * new value or the old value.
+		 *
+		 * @since 4.5.0
+		 * @this {wp.customize.Setting}
+		 *
+		 * @param {*|null} newValue New value, or null if the setting was just removed.
+		 * @param {*|null} oldValue Old value, or null if the setting was just added.
+		 */
+		handleSettingChange = function( newValue, oldValue ) {
+			var setting = this;
+			self.partial.each( functi
