@@ -952,4 +952,111 @@ wp.customize.selectiveRefresh = ( function( $, api ) {
 		 */
 		handleSettingChange = function( newValue, oldValue ) {
 			var setting = this;
-			self.partial.each( functi
+			self.partial.each( function( partial ) {
+				if ( partial.isRelatedSetting( setting, newValue, oldValue ) ) {
+					partial.refresh();
+				}
+			} );
+		};
+
+		/**
+		 * Trigger the initial change for the added setting, and watch for changes.
+		 *
+		 * @since 4.5.0
+		 * @this {wp.customize.Values}
+		 *
+		 * @param {wp.customize.Setting} setting
+		 */
+		watchSettingChange = function( setting ) {
+			handleSettingChange.call( setting, setting(), null );
+			setting.bind( handleSettingChange );
+		};
+
+		/**
+		 * Trigger the final change for the removed setting, and unwatch for changes.
+		 *
+		 * @since 4.5.0
+		 * @this {wp.customize.Values}
+		 *
+		 * @param {wp.customize.Setting} setting
+		 */
+		unwatchSettingChange = function( setting ) {
+			handleSettingChange.call( setting, null, setting() );
+			setting.unbind( handleSettingChange );
+		};
+
+		api.bind( 'add', watchSettingChange );
+		api.bind( 'remove', unwatchSettingChange );
+		api.each( function( setting ) {
+			setting.bind( handleSettingChange );
+		} );
+
+		// Add (dynamic) initial partials that are declared via data-* attributes.
+		self.addPartials( document.documentElement, {
+			triggerRendered: false
+		} );
+
+		// Add new dynamic partials when the document changes.
+		if ( 'undefined' !== typeof MutationObserver ) {
+			self.mutationObserver = new MutationObserver( function( mutations ) {
+				_.each( mutations, function( mutation ) {
+					self.addPartials( $( mutation.target ) );
+				} );
+			} );
+			self.mutationObserver.observe( document.documentElement, {
+				childList: true,
+				subtree: true
+			} );
+		}
+
+		/**
+		 * Handle rendering of partials.
+		 *
+		 * @param {api.selectiveRefresh.Placement} placement
+		 */
+		api.selectiveRefresh.bind( 'partial-content-rendered', function( placement ) {
+			if ( placement.container ) {
+				self.addPartials( placement.container );
+			}
+		} );
+
+		/**
+		 * Handle setting validities in partial refresh response.
+		 *
+		 * @param {object} data Response data.
+		 * @param {object} data.setting_validities Setting validities.
+		 */
+		api.selectiveRefresh.bind( 'render-partials-response', function handleSettingValiditiesResponse( data ) {
+			if ( data.setting_validities ) {
+				api.preview.send( 'selective-refresh-setting-validities', data.setting_validities );
+			}
+		} );
+
+		api.preview.bind( 'edit-shortcut-visibility', function( visibility ) {
+			api.selectiveRefresh.editShortcutVisibility.set( visibility );
+		} );
+		api.selectiveRefresh.editShortcutVisibility.bind( function( visibility ) {
+			var body = $( document.body ), shouldAnimateHide;
+
+			shouldAnimateHide = ( 'hidden' === visibility && body.hasClass( 'customize-partial-edit-shortcuts-shown' ) && ! body.hasClass( 'customize-partial-edit-shortcuts-hidden' ) );
+			body.toggleClass( 'customize-partial-edit-shortcuts-hidden', shouldAnimateHide );
+			body.toggleClass( 'customize-partial-edit-shortcuts-shown', 'visible' === visibility );
+		} );
+
+		api.preview.bind( 'active', function() {
+
+			// Make all partials ready.
+			self.partial.each( function( partial ) {
+				partial.deferred.ready.resolve();
+			} );
+
+			// Make all partials added henceforth as ready upon add.
+			self.partial.bind( 'add', function( partial ) {
+				partial.deferred.ready.resolve();
+			} );
+		} );
+
+	} );
+
+	return self;
+}( jQuery, wp.customize ) );
