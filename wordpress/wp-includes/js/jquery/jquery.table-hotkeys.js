@@ -57,4 +57,43 @@
 		};
 		get_last_row = function() {
 			var rows = $(opts.cycle_expr, table).filter_visible();
-			r
+			return rows.eq(rows.length-1);
+		};
+		make_key_callback = function(expr) {
+			return function() {
+				if ( null == $.table_hotkeys.current_row ) return false;
+				var clickable = $(expr, $.table_hotkeys.current_row);
+				if (!clickable.length) return false;
+				if (clickable.is('.'+destructive_class)) next_row() || prev_row();
+				clickable.click();
+			};
+		};
+		first_row = get_first_row();
+		if (!first_row.length) return;
+		if (opts.highlight_first)
+			set_current_row(first_row);
+		else if (opts.highlight_last)
+			set_current_row(get_last_row());
+		$.hotkeys.add(opts.prev_key, opts.hotkeys_opts, function() {return adjacent_row_callback('prev');});
+		$.hotkeys.add(opts.next_key, opts.hotkeys_opts, function() {return adjacent_row_callback('next');});
+		$.hotkeys.add(opts.mark_key, opts.hotkeys_opts, check);
+		$.each(keys, function() {
+			var callback, key;
+			
+			if ($.isFunction(this[1])) {
+				callback = this[1];
+				key = this[0];
+				$.hotkeys.add(key, opts.hotkeys_opts, function(event) { return callback(event, $.table_hotkeys.current_row); });
+			} else {
+				key = this;
+				$.hotkeys.add(key, opts.hotkeys_opts, make_key_callback('.'+opts.class_prefix+key));
+			}
+		});
+
+	};
+	$.table_hotkeys.current_row = null;
+	$.table_hotkeys.defaults = {cycle_expr: 'tr', class_prefix: 'vim-', selected_suffix: 'current',
+		destructive_suffix: 'destructive', hotkeys_opts: {disableInInput: true, type: 'keypress'},
+		checkbox_expr: ':checkbox', next_key: 'j', prev_key: 'k', mark_key: 'x',
+		start_row_index: 2, highlight_first: false, highlight_last: false, next_page_link_cb: false, prev_page_link_cb: false};
+})(jQuery);
