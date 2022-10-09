@@ -443,4 +443,430 @@ module.exports = AudioDetails;
 /**
  * wp.media.controller.VideoDetails
  *
- * The controller for the Video Det
+ * The controller for the Video Details state
+ *
+ * @memberOf wp.media.controller
+ *
+ * @class
+ * @augments wp.media.controller.State
+ * @augments Backbone.Model
+ */
+var State = wp.media.controller.State,
+	l10n = wp.media.view.l10n,
+	VideoDetails;
+
+VideoDetails = State.extend(/** @lends wp.media.controller.VideoDetails.prototype */{
+	defaults: {
+		id: 'video-details',
+		toolbar: 'video-details',
+		title: l10n.videoDetailsTitle,
+		content: 'video-details',
+		menu: 'video-details',
+		router: false,
+		priority: 60
+	},
+
+	initialize: function( options ) {
+		this.media = options.media;
+		State.prototype.initialize.apply( this, arguments );
+	}
+});
+
+module.exports = VideoDetails;
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports) {
+
+var Select = wp.media.view.MediaFrame.Select,
+	l10n = wp.media.view.l10n,
+	MediaDetails;
+
+/**
+ * wp.media.view.MediaFrame.MediaDetails
+ *
+ * @memberOf wp.media.view.MediaFrame
+ *
+ * @class
+ * @augments wp.media.view.MediaFrame.Select
+ * @augments wp.media.view.MediaFrame
+ * @augments wp.media.view.Frame
+ * @augments wp.media.View
+ * @augments wp.Backbone.View
+ * @augments Backbone.View
+ * @mixes wp.media.controller.StateMachine
+ */
+MediaDetails = Select.extend(/** @lends wp.media.view.MediaFrame.MediaDetails.prototype */{
+	defaults: {
+		id:      'media',
+		url:     '',
+		menu:    'media-details',
+		content: 'media-details',
+		toolbar: 'media-details',
+		type:    'link',
+		priority: 120
+	},
+
+	initialize: function( options ) {
+		this.DetailsView = options.DetailsView;
+		this.cancelText = options.cancelText;
+		this.addText = options.addText;
+
+		this.media = new wp.media.model.PostMedia( options.metadata );
+		this.options.selection = new wp.media.model.Selection( this.media.attachment, { multiple: false } );
+		Select.prototype.initialize.apply( this, arguments );
+	},
+
+	bindHandlers: function() {
+		var menu = this.defaults.menu;
+
+		Select.prototype.bindHandlers.apply( this, arguments );
+
+		this.on( 'menu:create:' + menu, this.createMenu, this );
+		this.on( 'content:render:' + menu, this.renderDetailsContent, this );
+		this.on( 'menu:render:' + menu, this.renderMenu, this );
+		this.on( 'toolbar:render:' + menu, this.renderDetailsToolbar, this );
+	},
+
+	renderDetailsContent: function() {
+		var view = new this.DetailsView({
+			controller: this,
+			model: this.state().media,
+			attachment: this.state().media.attachment
+		}).render();
+
+		this.content.set( view );
+	},
+
+	renderMenu: function( view ) {
+		var lastState = this.lastState(),
+			previous = lastState && lastState.id,
+			frame = this;
+
+		view.set({
+			cancel: {
+				text:     this.cancelText,
+				priority: 20,
+				click:    function() {
+					if ( previous ) {
+						frame.setState( previous );
+					} else {
+						frame.close();
+					}
+				}
+			},
+			separateCancel: new wp.media.View({
+				className: 'separator',
+				priority: 40
+			})
+		});
+
+	},
+
+	setPrimaryButton: function(text, handler) {
+		this.toolbar.set( new wp.media.view.Toolbar({
+			controller: this,
+			items: {
+				button: {
+					style:    'primary',
+					text:     text,
+					priority: 80,
+					click:    function() {
+						var controller = this.controller;
+						handler.call( this, controller, controller.state() );
+						// Restore and reset the default state.
+						controller.setState( controller.options.state );
+						controller.reset();
+					}
+				}
+			}
+		}) );
+	},
+
+	renderDetailsToolbar: function() {
+		this.setPrimaryButton( l10n.update, function( controller, state ) {
+			controller.close();
+			state.trigger( 'update', controller.media.toJSON() );
+		} );
+	},
+
+	renderReplaceToolbar: function() {
+		this.setPrimaryButton( l10n.replace, function( controller, state ) {
+			var attachment = state.get( 'selection' ).single();
+			controller.media.changeAttachment( attachment );
+			state.trigger( 'replace', controller.media.toJSON() );
+		} );
+	},
+
+	renderAddSourceToolbar: function() {
+		this.setPrimaryButton( this.addText, function( controller, state ) {
+			var attachment = state.get( 'selection' ).single();
+			controller.media.setSource( attachment );
+			state.trigger( 'add-source', controller.media.toJSON() );
+		} );
+	}
+});
+
+module.exports = MediaDetails;
+
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports) {
+
+var MediaDetails = wp.media.view.MediaFrame.MediaDetails,
+	MediaLibrary = wp.media.controller.MediaLibrary,
+
+	l10n = wp.media.view.l10n,
+	AudioDetails;
+
+/**
+ * wp.media.view.MediaFrame.AudioDetails
+ *
+ * @memberOf wp.media.view.MediaFrame
+ *
+ * @class
+ * @augments wp.media.view.MediaFrame.MediaDetails
+ * @augments wp.media.view.MediaFrame.Select
+ * @augments wp.media.view.MediaFrame
+ * @augments wp.media.view.Frame
+ * @augments wp.media.View
+ * @augments wp.Backbone.View
+ * @augments Backbone.View
+ * @mixes wp.media.controller.StateMachine
+ */
+AudioDetails = MediaDetails.extend(/** @lends wp.media.view.MediaFrame.AudioDetails.prototype */{
+	defaults: {
+		id:      'audio',
+		url:     '',
+		menu:    'audio-details',
+		content: 'audio-details',
+		toolbar: 'audio-details',
+		type:    'link',
+		title:    l10n.audioDetailsTitle,
+		priority: 120
+	},
+
+	initialize: function( options ) {
+		options.DetailsView = wp.media.view.AudioDetails;
+		options.cancelText = l10n.audioDetailsCancel;
+		options.addText = l10n.audioAddSourceTitle;
+
+		MediaDetails.prototype.initialize.call( this, options );
+	},
+
+	bindHandlers: function() {
+		MediaDetails.prototype.bindHandlers.apply( this, arguments );
+
+		this.on( 'toolbar:render:replace-audio', this.renderReplaceToolbar, this );
+		this.on( 'toolbar:render:add-audio-source', this.renderAddSourceToolbar, this );
+	},
+
+	createStates: function() {
+		this.states.add([
+			new wp.media.controller.AudioDetails( {
+				media: this.media
+			} ),
+
+			new MediaLibrary( {
+				type: 'audio',
+				id: 'replace-audio',
+				title: l10n.audioReplaceTitle,
+				toolbar: 'replace-audio',
+				media: this.media,
+				menu: 'audio-details'
+			} ),
+
+			new MediaLibrary( {
+				type: 'audio',
+				id: 'add-audio-source',
+				title: l10n.audioAddSourceTitle,
+				toolbar: 'add-audio-source',
+				media: this.media,
+				menu: false
+			} )
+		]);
+	}
+});
+
+module.exports = AudioDetails;
+
+
+/***/ }),
+/* 6 */
+/***/ (function(module, exports) {
+
+var MediaDetails = wp.media.view.MediaFrame.MediaDetails,
+	MediaLibrary = wp.media.controller.MediaLibrary,
+	l10n = wp.media.view.l10n,
+	VideoDetails;
+
+/**
+ * wp.media.view.MediaFrame.VideoDetails
+ *
+ * @memberOf wp.media.view.MediaFrame
+ *
+ * @class
+ * @augments wp.media.view.MediaFrame.MediaDetails
+ * @augments wp.media.view.MediaFrame.Select
+ * @augments wp.media.view.MediaFrame
+ * @augments wp.media.view.Frame
+ * @augments wp.media.View
+ * @augments wp.Backbone.View
+ * @augments Backbone.View
+ * @mixes wp.media.controller.StateMachine
+ */
+VideoDetails = MediaDetails.extend(/** @lends wp.media.view.MediaFrame.VideoDetails.prototype */{
+	defaults: {
+		id:      'video',
+		url:     '',
+		menu:    'video-details',
+		content: 'video-details',
+		toolbar: 'video-details',
+		type:    'link',
+		title:    l10n.videoDetailsTitle,
+		priority: 120
+	},
+
+	initialize: function( options ) {
+		options.DetailsView = wp.media.view.VideoDetails;
+		options.cancelText = l10n.videoDetailsCancel;
+		options.addText = l10n.videoAddSourceTitle;
+
+		MediaDetails.prototype.initialize.call( this, options );
+	},
+
+	bindHandlers: function() {
+		MediaDetails.prototype.bindHandlers.apply( this, arguments );
+
+		this.on( 'toolbar:render:replace-video', this.renderReplaceToolbar, this );
+		this.on( 'toolbar:render:add-video-source', this.renderAddSourceToolbar, this );
+		this.on( 'toolbar:render:select-poster-image', this.renderSelectPosterImageToolbar, this );
+		this.on( 'toolbar:render:add-track', this.renderAddTrackToolbar, this );
+	},
+
+	createStates: function() {
+		this.states.add([
+			new wp.media.controller.VideoDetails({
+				media: this.media
+			}),
+
+			new MediaLibrary( {
+				type: 'video',
+				id: 'replace-video',
+				title: l10n.videoReplaceTitle,
+				toolbar: 'replace-video',
+				media: this.media,
+				menu: 'video-details'
+			} ),
+
+			new MediaLibrary( {
+				type: 'video',
+				id: 'add-video-source',
+				title: l10n.videoAddSourceTitle,
+				toolbar: 'add-video-source',
+				media: this.media,
+				menu: false
+			} ),
+
+			new MediaLibrary( {
+				type: 'image',
+				id: 'select-poster-image',
+				title: l10n.videoSelectPosterImageTitle,
+				toolbar: 'select-poster-image',
+				media: this.media,
+				menu: 'video-details'
+			} ),
+
+			new MediaLibrary( {
+				type: 'text',
+				id: 'add-track',
+				title: l10n.videoAddTrackTitle,
+				toolbar: 'add-track',
+				media: this.media,
+				menu: 'video-details'
+			} )
+		]);
+	},
+
+	renderSelectPosterImageToolbar: function() {
+		this.setPrimaryButton( l10n.videoSelectPosterImageTitle, function( controller, state ) {
+			var urls = [], attachment = state.get( 'selection' ).single();
+
+			controller.media.set( 'poster', attachment.get( 'url' ) );
+			state.trigger( 'set-poster-image', controller.media.toJSON() );
+
+			_.each( wp.media.view.settings.embedExts, function (ext) {
+				if ( controller.media.get( ext ) ) {
+					urls.push( controller.media.get( ext ) );
+				}
+			} );
+
+			wp.ajax.send( 'set-attachment-thumbnail', {
+				data : {
+					urls: urls,
+					thumbnail_id: attachment.get( 'id' )
+				}
+			} );
+		} );
+	},
+
+	renderAddTrackToolbar: function() {
+		this.setPrimaryButton( l10n.videoAddTrackTitle, function( controller, state ) {
+			var attachment = state.get( 'selection' ).single(),
+				content = controller.media.get( 'content' );
+
+			if ( -1 === content.indexOf( attachment.get( 'url' ) ) ) {
+				content += [
+					'<track srclang="en" label="English" kind="subtitles" src="',
+					attachment.get( 'url' ),
+					'" />'
+				].join('');
+
+				controller.media.set( 'content', content );
+			}
+			state.trigger( 'add-track', controller.media.toJSON() );
+		} );
+	}
+});
+
+module.exports = VideoDetails;
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports) {
+
+/* global MediaElementPlayer */
+var AttachmentDisplay = wp.media.view.Settings.AttachmentDisplay,
+	$ = jQuery,
+	MediaDetails;
+
+/**
+ * wp.media.view.MediaDetails
+ *
+ * @memberOf wp.media.view
+ *
+ * @class
+ * @augments wp.media.view.Settings.AttachmentDisplay
+ * @augments wp.media.view.Settings
+ * @augments wp.media.View
+ * @augments wp.Backbone.View
+ * @augments Backbone.View
+ */
+MediaDetails = AttachmentDisplay.extend(/** @lends wp.media.view.MediaDetails.prototype */{
+	initialize: function() {
+		_.bindAll(this, 'success');
+		this.players = [];
+		this.listenTo( this.controller, 'close', wp.media.mixin.unsetPlayers );
+		this.on( 'ready', this.setPlayer );
+		this.on( 'media:setting:remove', wp.media.mixin.unsetPlayers, this );
+		this.on( 'media:setting:remove', this.render );
+		this.on( 'media:setting:remove', this.setPlayer );
+
+		AttachmentDisplay.prototype.initialize.apply( this, arguments );
+	},
+
+	events: function(){
+		return
