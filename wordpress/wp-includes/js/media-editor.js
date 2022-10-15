@@ -911,4 +911,148 @@
 		/**
 		 * Remove the workflow represented by id from the workflow cache
 		 *
-		 * @param 
+		 * @param {string} id A slug used to identify the workflow.
+		 *
+		 * @this wp.media.editor
+		 */
+		remove: function( id ) {
+			id = this.id( id );
+			delete workflows[ id ];
+		},
+		/** @namespace wp.media.editor.send */
+		send: {
+			/**
+			 * Called when sending an attachment to the editor
+			 *   from the medial modal.
+			 *
+			 * @param {Object} props Attachment details (align, link, size, etc).
+			 * @param {Object} attachment The attachment object, media version of Post.
+			 * @returns {Promise}
+			 */
+			attachment: function( props, attachment ) {
+				var caption = attachment.caption,
+					options, html;
+
+				// If captions are disabled, clear the caption.
+				if ( ! wp.media.view.settings.captions ) {
+					delete attachment.caption;
+				}
+
+				props = wp.media.string.props( props, attachment );
+
+				options = {
+					id:           attachment.id,
+					post_content: attachment.description,
+					post_excerpt: caption
+				};
+
+				if ( props.linkUrl ) {
+					options.url = props.linkUrl;
+				}
+
+				if ( 'image' === attachment.type ) {
+					html = wp.media.string.image( props );
+
+					_.each({
+						align: 'align',
+						size:  'image-size',
+						alt:   'image_alt'
+					}, function( option, prop ) {
+						if ( props[ prop ] )
+							options[ option ] = props[ prop ];
+					});
+				} else if ( 'video' === attachment.type ) {
+					html = wp.media.string.video( props, attachment );
+				} else if ( 'audio' === attachment.type ) {
+					html = wp.media.string.audio( props, attachment );
+				} else {
+					html = wp.media.string.link( props );
+					options.post_title = props.title;
+				}
+
+				return wp.media.post( 'send-attachment-to-editor', {
+					nonce:      wp.media.view.settings.nonce.sendToEditor,
+					attachment: options,
+					html:       html,
+					post_id:    wp.media.view.settings.post.id
+				});
+			},
+			/**
+			 * Called when 'Insert From URL' source is not an image. Example: YouTube url.
+			 *
+			 * @param {Object} embed
+			 * @returns {Promise}
+			 */
+			link: function( embed ) {
+				return wp.media.post( 'send-link-to-editor', {
+					nonce:     wp.media.view.settings.nonce.sendToEditor,
+					src:       embed.linkUrl,
+					link_text: embed.linkText,
+					html:      wp.media.string.link( embed ),
+					post_id:   wp.media.view.settings.post.id
+				});
+			}
+		},
+		/**
+		 * Open a workflow
+		 *
+		 * @param {string} [id=undefined] Optional. A slug used to identify the workflow.
+		 * @param {Object} [options={}]
+		 *
+		 * @this wp.media.editor
+		 *
+		 * @returns {wp.media.view.MediaFrame}
+		 */
+		open: function( id, options ) {
+			var workflow;
+
+			options = options || {};
+
+			id = this.id( id );
+			this.activeEditor = id;
+
+			workflow = this.get( id );
+
+			// Redo workflow if state has changed
+			if ( ! workflow || ( workflow.options && options.state !== workflow.options.state ) ) {
+				workflow = this.add( id, options );
+			}
+
+			wp.media.frame = workflow;
+
+			return workflow.open();
+		},
+
+		/**
+		 * Bind click event for .insert-media using event delegation
+		 */
+		init: function() {
+			$(document.body)
+				.on( 'click.add-media-button', '.insert-media', function( event ) {
+					var elem = $( event.currentTarget ),
+						editor = elem.data('editor'),
+						options = {
+							frame:    'post',
+							state:    'insert',
+							title:    wp.media.view.l10n.addMedia,
+							multiple: true
+						};
+
+					event.preventDefault();
+
+					if ( elem.hasClass( 'gallery' ) ) {
+						options.state = 'gallery';
+						options.title = wp.media.view.l10n.createGalleryTitle;
+					}
+
+					wp.media.editor.open( editor, options );
+				});
+
+			// Initialize and render the Editor drag-and-drop uploader.
+			new wp.media.view.EditorUploader().render();
+		}
+	};
+
+	_.bindAll( wp.media.editor, 'open' );
+	$( wp.media.editor.init );
+}(jQuery, _));
