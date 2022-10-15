@@ -518,4 +518,397 @@
 
 				// Destroy the previous gallery frame.
 				if ( this.frame ) {
-					this
+					this.frame.dispose();
+				}
+
+				if ( shortcode.attrs.named.type && 'video' === shortcode.attrs.named.type ) {
+					state = 'video-' + this.tag + '-edit';
+				} else {
+					state = this.tag + '-edit';
+				}
+
+				// Store the current frame.
+				this.frame = wp.media({
+					frame:     'post',
+					state:     state,
+					title:     this.editTitle,
+					editing:   true,
+					multiple:  true,
+					selection: selection
+				}).open();
+
+				return this.frame;
+			},
+
+			setDefaults: function( attrs ) {
+				var self = this;
+				// Remove default attributes from the shortcode.
+				_.each( this.defaults, function( value, key ) {
+					attrs[ key ] = self.coerce( attrs, key );
+					if ( value === attrs[ key ] ) {
+						delete attrs[ key ];
+					}
+				});
+
+				return attrs;
+			}
+		}, attributes );
+	};
+
+	wp.media._galleryDefaults = {
+		itemtag: 'dl',
+		icontag: 'dt',
+		captiontag: 'dd',
+		columns: '3',
+		link: 'post',
+		size: 'thumbnail',
+		order: 'ASC',
+		id: wp.media.view.settings.post && wp.media.view.settings.post.id,
+		orderby : 'menu_order ID'
+	};
+
+	if ( wp.media.view.settings.galleryDefaults ) {
+		wp.media.galleryDefaults = _.extend( {}, wp.media._galleryDefaults, wp.media.view.settings.galleryDefaults );
+	} else {
+		wp.media.galleryDefaults = wp.media._galleryDefaults;
+	}
+
+	wp.media.gallery = new wp.media.collection({
+		tag: 'gallery',
+		type : 'image',
+		editTitle : wp.media.view.l10n.editGalleryTitle,
+		defaults : wp.media.galleryDefaults,
+
+		setDefaults: function( attrs ) {
+			var self = this, changed = ! _.isEqual( wp.media.galleryDefaults, wp.media._galleryDefaults );
+			_.each( this.defaults, function( value, key ) {
+				attrs[ key ] = self.coerce( attrs, key );
+				if ( value === attrs[ key ] && ( ! changed || value === wp.media._galleryDefaults[ key ] ) ) {
+					delete attrs[ key ];
+				}
+			} );
+			return attrs;
+		}
+	});
+
+	/**
+	 * @namespace wp.media.featuredImage
+	 * @memberOf wp.media
+	 */
+	wp.media.featuredImage = {
+		/**
+		 * Get the featured image post ID
+		 *
+		 * @returns {wp.media.view.settings.post.featuredImageId|number}
+		 */
+		get: function() {
+			return wp.media.view.settings.post.featuredImageId;
+		},
+		/**
+		 * Set the featured image id, save the post thumbnail data and
+		 * set the HTML in the post meta box to the new featured image.
+		 *
+		 * @param {number} id The post ID of the featured image, or -1 to unset it.
+		 */
+		set: function( id ) {
+			var settings = wp.media.view.settings;
+
+			settings.post.featuredImageId = id;
+
+			wp.media.post( 'get-post-thumbnail-html', {
+				post_id:      settings.post.id,
+				thumbnail_id: settings.post.featuredImageId,
+				_wpnonce:     settings.post.nonce
+			}).done( function( html ) {
+				if ( html == '0' ) {
+					window.alert( window.setPostThumbnailL10n.error );
+					return;
+				}
+				$( '.inside', '#postimagediv' ).html( html );
+			});
+		},
+		/**
+		 * Remove the featured image id, save the post thumbnail data and
+		 * set the HTML in the post meta box to no featured image.
+		 */
+		remove: function() {
+			wp.media.featuredImage.set( -1 );
+		},
+		/**
+		 * The Featured Image workflow
+		 *
+		 * @this wp.media.featuredImage
+		 *
+		 * @returns {wp.media.view.MediaFrame.Select} A media workflow.
+		 */
+		frame: function() {
+			if ( this._frame ) {
+				wp.media.frame = this._frame;
+				return this._frame;
+			}
+
+			this._frame = wp.media({
+				state: 'featured-image',
+				states: [ new wp.media.controller.FeaturedImage() , new wp.media.controller.EditImage() ]
+			});
+
+			this._frame.on( 'toolbar:create:featured-image', function( toolbar ) {
+				/**
+				 * @this wp.media.view.MediaFrame.Select
+				 */
+				this.createSelectToolbar( toolbar, {
+					text: wp.media.view.l10n.setFeaturedImage
+				});
+			}, this._frame );
+
+			this._frame.on( 'content:render:edit-image', function() {
+				var selection = this.state('featured-image').get('selection'),
+					view = new wp.media.view.EditImage( { model: selection.single(), controller: this } ).render();
+
+				this.content.set( view );
+
+				// after bringing in the frame, load the actual editor via an ajax call
+				view.loadEditor();
+
+			}, this._frame );
+
+			this._frame.state('featured-image').on( 'select', this.select );
+			return this._frame;
+		},
+		/**
+		 * 'select' callback for Featured Image workflow, triggered when
+		 *  the 'Set Featured Image' button is clicked in the media modal.
+		 *
+		 * @this wp.media.controller.FeaturedImage
+		 */
+		select: function() {
+			var selection = this.get('selection').single();
+
+			if ( ! wp.media.view.settings.post.featuredImageId ) {
+				return;
+			}
+
+			wp.media.featuredImage.set( selection ? selection.id : -1 );
+		},
+		/**
+		 * Open the content media manager to the 'featured image' tab when
+		 * the post thumbnail is clicked.
+		 *
+		 * Update the featured image id when the 'remove' link is clicked.
+		 */
+		init: function() {
+			$('#postimagediv').on( 'click', '#set-post-thumbnail', function( event ) {
+				event.preventDefault();
+				// Stop propagation to prevent thickbox from activating.
+				event.stopPropagation();
+
+				wp.media.featuredImage.frame().open();
+			}).on( 'click', '#remove-post-thumbnail', function() {
+				wp.media.featuredImage.remove();
+				return false;
+			});
+		}
+	};
+
+	$( wp.media.featuredImage.init );
+
+	/** @namespace wp.media.editor */
+	wp.media.editor = {
+		/**
+		 * Send content to the editor
+		 *
+		 * @param {string} html Content to send to the editor
+		 */
+		insert: function( html ) {
+			var editor, wpActiveEditor,
+				hasTinymce = ! _.isUndefined( window.tinymce ),
+				hasQuicktags = ! _.isUndefined( window.QTags );
+
+			if ( this.activeEditor ) {
+				wpActiveEditor = window.wpActiveEditor = this.activeEditor;
+			} else {
+				wpActiveEditor = window.wpActiveEditor;
+			}
+
+			// Delegate to the global `send_to_editor` if it exists.
+			// This attempts to play nice with any themes/plugins that have
+			// overridden the insert functionality.
+			if ( window.send_to_editor ) {
+				return window.send_to_editor.apply( this, arguments );
+			}
+
+			if ( ! wpActiveEditor ) {
+				if ( hasTinymce && tinymce.activeEditor ) {
+					editor = tinymce.activeEditor;
+					wpActiveEditor = window.wpActiveEditor = editor.id;
+				} else if ( ! hasQuicktags ) {
+					return false;
+				}
+			} else if ( hasTinymce ) {
+				editor = tinymce.get( wpActiveEditor );
+			}
+
+			if ( editor && ! editor.isHidden() ) {
+				editor.execCommand( 'mceInsertContent', false, html );
+			} else if ( hasQuicktags ) {
+				QTags.insertContent( html );
+			} else {
+				document.getElementById( wpActiveEditor ).value += html;
+			}
+
+			// If the old thickbox remove function exists, call it in case
+			// a theme/plugin overloaded it.
+			if ( window.tb_remove ) {
+				try { window.tb_remove(); } catch( e ) {}
+			}
+		},
+
+		/**
+		 * Setup 'workflow' and add to the 'workflows' cache. 'open' can
+		 *  subsequently be called upon it.
+		 *
+		 * @param {string} id A slug used to identify the workflow.
+		 * @param {Object} [options={}]
+		 *
+		 * @this wp.media.editor
+		 *
+		 * @returns {wp.media.view.MediaFrame.Select} A media workflow.
+		 */
+		add: function( id, options ) {
+			var workflow = this.get( id );
+
+			// only add once: if exists return existing
+			if ( workflow ) {
+				return workflow;
+			}
+
+			workflow = workflows[ id ] = wp.media( _.defaults( options || {}, {
+				frame:    'post',
+				state:    'insert',
+				title:    wp.media.view.l10n.addMedia,
+				multiple: true
+			} ) );
+
+			workflow.on( 'insert', function( selection ) {
+				var state = workflow.state();
+
+				selection = selection || state.get('selection');
+
+				if ( ! selection )
+					return;
+
+				$.when.apply( $, selection.map( function( attachment ) {
+					var display = state.display( attachment ).toJSON();
+					/**
+					 * @this wp.media.editor
+					 */
+					return this.send.attachment( display, attachment.toJSON() );
+				}, this ) ).done( function() {
+					wp.media.editor.insert( _.toArray( arguments ).join('\n\n') );
+				});
+			}, this );
+
+			workflow.state('gallery-edit').on( 'update', function( selection ) {
+				/**
+				 * @this wp.media.editor
+				 */
+				this.insert( wp.media.gallery.shortcode( selection ).string() );
+			}, this );
+
+			workflow.state('playlist-edit').on( 'update', function( selection ) {
+				/**
+				 * @this wp.media.editor
+				 */
+				this.insert( wp.media.playlist.shortcode( selection ).string() );
+			}, this );
+
+			workflow.state('video-playlist-edit').on( 'update', function( selection ) {
+				/**
+				 * @this wp.media.editor
+				 */
+				this.insert( wp.media.playlist.shortcode( selection ).string() );
+			}, this );
+
+			workflow.state('embed').on( 'select', function() {
+				/**
+				 * @this wp.media.editor
+				 */
+				var state = workflow.state(),
+					type = state.get('type'),
+					embed = state.props.toJSON();
+
+				embed.url = embed.url || '';
+
+				if ( 'link' === type ) {
+					_.defaults( embed, {
+						linkText: embed.url,
+						linkUrl: embed.url
+					});
+
+					this.send.link( embed ).done( function( resp ) {
+						wp.media.editor.insert( resp );
+					});
+
+				} else if ( 'image' === type ) {
+					_.defaults( embed, {
+						title:   embed.url,
+						linkUrl: '',
+						align:   'none',
+						link:    'none'
+					});
+
+					if ( 'none' === embed.link ) {
+						embed.linkUrl = '';
+					} else if ( 'file' === embed.link ) {
+						embed.linkUrl = embed.url;
+					}
+
+					this.insert( wp.media.string.image( embed ) );
+				}
+			}, this );
+
+			workflow.state('featured-image').on( 'select', wp.media.featuredImage.select );
+			workflow.setState( workflow.options.state );
+			return workflow;
+		},
+		/**
+		 * Determines the proper current workflow id
+		 *
+		 * @param {string} [id=''] A slug used to identify the workflow.
+		 *
+		 * @returns {wpActiveEditor|string|tinymce.activeEditor.id}
+		 */
+		id: function( id ) {
+			if ( id ) {
+				return id;
+			}
+
+			// If an empty `id` is provided, default to `wpActiveEditor`.
+			id = window.wpActiveEditor;
+
+			// If that doesn't work, fall back to `tinymce.activeEditor.id`.
+			if ( ! id && ! _.isUndefined( window.tinymce ) && tinymce.activeEditor ) {
+				id = tinymce.activeEditor.id;
+			}
+
+			// Last but not least, fall back to the empty string.
+			id = id || '';
+			return id;
+		},
+		/**
+		 * Return the workflow specified by id
+		 *
+		 * @param {string} id A slug used to identify the workflow.
+		 *
+		 * @this wp.media.editor
+		 *
+		 * @returns {wp.media.view.MediaFrame} A media workflow.
+		 */
+		get: function( id ) {
+			id = this.id( id );
+			return workflows[ id ];
+		},
+		/**
+		 * Remove the workflow represented by id from the workflow cache
+		 *
+		 * @param 
