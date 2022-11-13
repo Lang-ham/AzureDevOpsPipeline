@@ -300,4 +300,207 @@ function uploadError(fileObj, errorCode, message, uploader) {
 			wpFileError(fileObj, pluploadL10n.image_dimensions_exceeded);
 			break;
 		case plupload.GENERIC_ERROR:
-			wpQueueError(pluploadL10n.uplo
+			wpQueueError(pluploadL10n.upload_failed);
+			break;
+		case plupload.IO_ERROR:
+			max = parseInt( uploader.settings.filters.max_file_size, 10 );
+
+			if ( max > hundredmb && fileObj.size > hundredmb )
+				wpFileError( fileObj, pluploadL10n.big_upload_failed.replace('%1$s', '<a class="uploader-html" href="#">').replace('%2$s', '</a>') );
+			else
+				wpQueueError(pluploadL10n.io_error);
+			break;
+		case plupload.HTTP_ERROR:
+			wpQueueError(pluploadL10n.http_error);
+			break;
+		case plupload.INIT_ERROR:
+			jQuery('.media-upload-form').addClass('html-uploader');
+			break;
+		case plupload.SECURITY_ERROR:
+			wpQueueError(pluploadL10n.security_error);
+			break;
+/*		case plupload.UPLOAD_ERROR.UPLOAD_STOPPED:
+		case plupload.UPLOAD_ERROR.FILE_CANCELLED:
+			jQuery('#media-item-' + fileObj.id).remove();
+			break;*/
+		default:
+			wpFileError(fileObj, pluploadL10n.default_error);
+	}
+}
+
+function uploadSizeError( up, file ) {
+	var message, errorDiv;
+
+	message = pluploadL10n.file_exceeds_size_limit.replace('%s', file.name);
+
+	// Construct the error div.
+	errorDiv = jQuery( '<div />' )
+		.attr( {
+			'id':    'media-item-' + file.id,
+			'class': 'media-item error'
+		} )
+		.append(
+			jQuery( '<p />' )
+				.text( message )
+		);
+
+	// Append the error.
+	jQuery('#media-items').append( errorDiv );
+	up.removeFile(file);
+}
+
+function wpFileExtensionError( up, file, message ) {
+	jQuery('#media-items').append('<div id="media-item-' + file.id + '" class="media-item error"><p>' + message + '</p></div>');
+	up.removeFile(file);
+}
+
+jQuery(document).ready(function($){
+	$('.media-upload-form').bind('click.uploader', function(e) {
+		var target = $(e.target), tr, c;
+
+		if ( target.is('input[type="radio"]') ) { // remember the last used image size and alignment
+			tr = target.closest('tr');
+
+			if ( tr.hasClass('align') )
+				setUserSetting('align', target.val());
+			else if ( tr.hasClass('image-size') )
+				setUserSetting('imgsize', target.val());
+
+		} else if ( target.is('button.button') ) { // remember the last used image link url
+			c = e.target.className || '';
+			c = c.match(/url([^ '"]+)/);
+
+			if ( c && c[1] ) {
+				setUserSetting('urlbutton', c[1]);
+				target.siblings('.urlfield').val( target.data('link-url') );
+			}
+		} else if ( target.is('a.dismiss') ) {
+			target.parents('.media-item').fadeOut(200, function(){
+				$(this).remove();
+			});
+		} else if ( target.is('.upload-flash-bypass a') || target.is('a.uploader-html') ) { // switch uploader to html4
+			$('#media-items, p.submit, span.big-file-warning').css('display', 'none');
+			switchUploader(0);
+			e.preventDefault();
+		} else if ( target.is('.upload-html-bypass a') ) { // switch uploader to multi-file
+			$('#media-items, p.submit, span.big-file-warning').css('display', '');
+			switchUploader(1);
+			e.preventDefault();
+		} else if ( target.is('a.describe-toggle-on') ) { // Show
+			target.parent().addClass('open');
+			target.siblings('.slidetoggle').fadeIn(250, function(){
+				var S = $(window).scrollTop(), H = $(window).height(), top = $(this).offset().top, h = $(this).height(), b, B;
+
+				if ( H && top && h ) {
+					b = top + h;
+					B = S + H;
+
+					if ( b > B ) {
+						if ( b - B < top - S )
+							window.scrollBy(0, (b - B) + 10);
+						else
+							window.scrollBy(0, top - S - 40);
+					}
+				}
+			});
+			e.preventDefault();
+		} else if ( target.is('a.describe-toggle-off') ) { // Hide
+			target.siblings('.slidetoggle').fadeOut(250, function(){
+				target.parent().removeClass('open');
+			});
+			e.preventDefault();
+		}
+	});
+
+	// init and set the uploader
+	uploader_init = function() {
+		var isIE = navigator.userAgent.indexOf('Trident/') != -1 || navigator.userAgent.indexOf('MSIE ') != -1;
+
+		// Make sure flash sends cookies (seems in IE it does whitout switching to urlstream mode)
+		if ( ! isIE && 'flash' === plupload.predictRuntime( wpUploaderInit ) &&
+			( ! wpUploaderInit.required_features || ! wpUploaderInit.required_features.hasOwnProperty( 'send_binary_string' ) ) ) {
+
+			wpUploaderInit.required_features = wpUploaderInit.required_features || {};
+			wpUploaderInit.required_features.send_binary_string = true;
+		}
+
+		uploader = new plupload.Uploader(wpUploaderInit);
+
+		$('#image_resize').bind('change', function() {
+			var arg = $(this).prop('checked');
+
+			setResize( arg );
+
+			if ( arg )
+				setUserSetting('upload_resize', '1');
+			else
+				deleteUserSetting('upload_resize');
+		});
+
+		uploader.bind('Init', function(up) {
+			var uploaddiv = $('#plupload-upload-ui');
+
+			setResize( getUserSetting('upload_resize', false) );
+
+			if ( up.features.dragdrop && ! $(document.body).hasClass('mobile') ) {
+				uploaddiv.addClass('drag-drop');
+				$('#drag-drop-area').on('dragover.wp-uploader', function(){ // dragenter doesn't fire right :(
+					uploaddiv.addClass('drag-over');
+				}).on('dragleave.wp-uploader, drop.wp-uploader', function(){
+					uploaddiv.removeClass('drag-over');
+				});
+			} else {
+				uploaddiv.removeClass('drag-drop');
+				$('#drag-drop-area').off('.wp-uploader');
+			}
+
+			if ( up.runtime === 'html4' ) {
+				$('.upload-flash-bypass').hide();
+			}
+		});
+
+		uploader.bind( 'postinit', function( up ) {
+			up.refresh();
+		});
+
+		uploader.init();
+
+		uploader.bind('FilesAdded', function( up, files ) {
+			$('#media-upload-error').empty();
+			uploadStart();
+
+			plupload.each( files, function( file ) {
+				fileQueued( file );
+			});
+
+			up.refresh();
+			up.start();
+		});
+
+		uploader.bind('UploadFile', function(up, file) {
+			fileUploading(up, file);
+		});
+
+		uploader.bind('UploadProgress', function(up, file) {
+			uploadProgress(up, file);
+		});
+
+		uploader.bind('Error', function(up, err) {
+			uploadError(err.file, err.code, err.message, up);
+			up.refresh();
+		});
+
+		uploader.bind('FileUploaded', function(up, file, response) {
+			uploadSuccess(file, response.response);
+		});
+
+		uploader.bind('UploadComplete', function() {
+			uploadComplete();
+		});
+	};
+
+	if ( typeof(wpUploaderInit) == 'object' ) {
+		uploader_init();
+	}
+
+});
