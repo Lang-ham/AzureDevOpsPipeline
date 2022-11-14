@@ -8470,3 +8470,1433 @@ define("moxie/runtime/html5/image/PNG", [
 				start: start,
 				CRC: CRC
 			};
+		}
+	}
+
+	return PNG;
+});
+
+// Included from: src/javascript/runtime/html5/image/ImageInfo.js
+
+/**
+ * ImageInfo.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html5/image/ImageInfo
+@private
+*/
+define("moxie/runtime/html5/image/ImageInfo", [
+	"moxie/core/utils/Basic",
+	"moxie/core/Exceptions",
+	"moxie/runtime/html5/image/JPEG",
+	"moxie/runtime/html5/image/PNG"
+], function(Basic, x, JPEG, PNG) {
+	/**
+	Optional image investigation tool for HTML5 runtime. Provides the following features:
+	- ability to distinguish image type (JPEG or PNG) by signature
+	- ability to extract image width/height directly from it's internals, without preloading in memory (fast)
+	- ability to extract APP headers from JPEGs (Exif, GPS, etc)
+	- ability to replace width/height tags in extracted JPEG headers
+	- ability to restore APP headers, that were for example stripped during image manipulation
+
+	@class ImageInfo
+	@constructor
+	@param {String} data Image source as binary string
+	*/
+	return function(data) {
+		var _cs = [JPEG, PNG], _img;
+
+		// figure out the format, throw: ImageError.WRONG_FORMAT if not supported
+		_img = (function() {
+			for (var i = 0; i < _cs.length; i++) {
+				try {
+					return new _cs[i](data);
+				} catch (ex) {
+					// console.info(ex);
+				}
+			}
+			throw new x.ImageError(x.ImageError.WRONG_FORMAT);
+		}());
+
+		Basic.extend(this, {
+			/**
+			Image Mime Type extracted from it's depths
+
+			@property type
+			@type {String}
+			@default ''
+			*/
+			type: '',
+
+			/**
+			Image size in bytes
+
+			@property size
+			@type {Number}
+			@default 0
+			*/
+			size: 0,
+
+			/**
+			Image width extracted from image source
+
+			@property width
+			@type {Number}
+			@default 0
+			*/
+			width: 0,
+
+			/**
+			Image height extracted from image source
+
+			@property height
+			@type {Number}
+			@default 0
+			*/
+			height: 0,
+
+			/**
+			Sets Exif tag. Currently applicable only for width and height tags. Obviously works only with JPEGs.
+
+			@method setExif
+			@param {String} tag Tag to set
+			@param {Mixed} value Value to assign to the tag
+			*/
+			setExif: function() {},
+
+			/**
+			Restores headers to the source.
+
+			@method writeHeaders
+			@param {String} data Image source as binary string
+			@return {String} Updated binary string
+			*/
+			writeHeaders: function(data) {
+				return data;
+			},
+
+			/**
+			Strip all headers from the source.
+
+			@method stripHeaders
+			@param {String} data Image source as binary string
+			@return {String} Updated binary string
+			*/
+			stripHeaders: function(data) {
+				return data;
+			},
+
+			/**
+			Dispose resources.
+
+			@method purge
+			*/
+			purge: function() {
+				data = null;
+			}
+		});
+
+		Basic.extend(this, _img);
+
+		this.purge = function() {
+			_img.purge();
+			_img = null;
+		};
+	};
+});
+
+// Included from: src/javascript/runtime/html5/image/MegaPixel.js
+
+/**
+(The MIT License)
+
+Copyright (c) 2012 Shinichi Tomita <shinichi.tomita@gmail.com>;
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+/**
+ * Mega pixel image rendering library for iOS6 Safari
+ *
+ * Fixes iOS6 Safari's image file rendering issue for large size image (over mega-pixel),
+ * which causes unexpected subsampling when drawing it in canvas.
+ * By using this library, you can safely render the image with proper stretching.
+ *
+ * Copyright (c) 2012 Shinichi Tomita <shinichi.tomita@gmail.com>
+ * Released under the MIT license
+ */
+
+/**
+@class moxie/runtime/html5/image/MegaPixel
+@private
+*/
+define("moxie/runtime/html5/image/MegaPixel", [], function() {
+
+	/**
+	 * Rendering image element (with resizing) into the canvas element
+	 */
+	function renderImageToCanvas(img, canvas, options) {
+		var iw = img.naturalWidth, ih = img.naturalHeight;
+		var width = options.width, height = options.height;
+		var x = options.x || 0, y = options.y || 0;
+		var ctx = canvas.getContext('2d');
+		if (detectSubsampling(img)) {
+			iw /= 2;
+			ih /= 2;
+		}
+		var d = 1024; // size of tiling canvas
+		var tmpCanvas = document.createElement('canvas');
+		tmpCanvas.width = tmpCanvas.height = d;
+		var tmpCtx = tmpCanvas.getContext('2d');
+		var vertSquashRatio = detectVerticalSquash(img, iw, ih);
+		var sy = 0;
+		while (sy < ih) {
+			var sh = sy + d > ih ? ih - sy : d;
+			var sx = 0;
+			while (sx < iw) {
+				var sw = sx + d > iw ? iw - sx : d;
+				tmpCtx.clearRect(0, 0, d, d);
+				tmpCtx.drawImage(img, -sx, -sy);
+				var dx = (sx * width / iw + x) << 0;
+				var dw = Math.ceil(sw * width / iw);
+				var dy = (sy * height / ih / vertSquashRatio + y) << 0;
+				var dh = Math.ceil(sh * height / ih / vertSquashRatio);
+				ctx.drawImage(tmpCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
+				sx += d;
+			}
+			sy += d;
+		}
+		tmpCanvas = tmpCtx = null;
+	}
+
+	/**
+	 * Detect subsampling in loaded image.
+	 * In iOS, larger images than 2M pixels may be subsampled in rendering.
+	 */
+	function detectSubsampling(img) {
+		var iw = img.naturalWidth, ih = img.naturalHeight;
+		if (iw * ih > 1024 * 1024) { // subsampling may happen over megapixel image
+			var canvas = document.createElement('canvas');
+			canvas.width = canvas.height = 1;
+			var ctx = canvas.getContext('2d');
+			ctx.drawImage(img, -iw + 1, 0);
+			// subsampled image becomes half smaller in rendering size.
+			// check alpha channel value to confirm image is covering edge pixel or not.
+			// if alpha value is 0 image is not covering, hence subsampled.
+			return ctx.getImageData(0, 0, 1, 1).data[3] === 0;
+		} else {
+			return false;
+		}
+	}
+
+
+	/**
+	 * Detecting vertical squash in loaded image.
+	 * Fixes a bug which squash image vertically while drawing into canvas for some images.
+	 */
+	function detectVerticalSquash(img, iw, ih) {
+		var canvas = document.createElement('canvas');
+		canvas.width = 1;
+		canvas.height = ih;
+		var ctx = canvas.getContext('2d');
+		ctx.drawImage(img, 0, 0);
+		var data = ctx.getImageData(0, 0, 1, ih).data;
+		// search image edge pixel position in case it is squashed vertically.
+		var sy = 0;
+		var ey = ih;
+		var py = ih;
+		while (py > sy) {
+			var alpha = data[(py - 1) * 4 + 3];
+			if (alpha === 0) {
+				ey = py;
+			} else {
+			sy = py;
+			}
+			py = (ey + sy) >> 1;
+		}
+		canvas = null;
+		var ratio = (py / ih);
+		return (ratio === 0) ? 1 : ratio;
+	}
+
+	return {
+		isSubsampled: detectSubsampling,
+		renderTo: renderImageToCanvas
+	};
+});
+
+// Included from: src/javascript/runtime/html5/image/Image.js
+
+/**
+ * Image.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html5/image/Image
+@private
+*/
+define("moxie/runtime/html5/image/Image", [
+	"moxie/runtime/html5/Runtime",
+	"moxie/core/utils/Basic",
+	"moxie/core/Exceptions",
+	"moxie/core/utils/Encode",
+	"moxie/file/Blob",
+	"moxie/file/File",
+	"moxie/runtime/html5/image/ImageInfo",
+	"moxie/runtime/html5/image/MegaPixel",
+	"moxie/core/utils/Mime",
+	"moxie/core/utils/Env"
+], function(extensions, Basic, x, Encode, Blob, File, ImageInfo, MegaPixel, Mime, Env) {
+	
+	function HTML5Image() {
+		var me = this
+		, _img, _imgInfo, _canvas, _binStr, _blob
+		, _modified = false // is set true whenever image is modified
+		, _preserveHeaders = true
+		;
+
+		Basic.extend(this, {
+			loadFromBlob: function(blob) {
+				var comp = this, I = comp.getRuntime()
+				, asBinary = arguments.length > 1 ? arguments[1] : true
+				;
+
+				if (!I.can('access_binary')) {
+					throw new x.RuntimeError(x.RuntimeError.NOT_SUPPORTED_ERR);
+				}
+
+				_blob = blob;
+
+				if (blob.isDetached()) {
+					_binStr = blob.getSource();
+					_preload.call(this, _binStr);
+					return;
+				} else {
+					_readAsDataUrl.call(this, blob.getSource(), function(dataUrl) {
+						if (asBinary) {
+							_binStr = _toBinary(dataUrl);
+						}
+						_preload.call(comp, dataUrl);
+					});
+				}
+			},
+
+			loadFromImage: function(img, exact) {
+				this.meta = img.meta;
+
+				_blob = new File(null, {
+					name: img.name,
+					size: img.size,
+					type: img.type
+				});
+
+				_preload.call(this, exact ? (_binStr = img.getAsBinaryString()) : img.getAsDataURL());
+			},
+
+			getInfo: function() {
+				var I = this.getRuntime(), info;
+
+				if (!_imgInfo && _binStr && I.can('access_image_binary')) {
+					_imgInfo = new ImageInfo(_binStr);
+				}
+
+				info = {
+					width: _getImg().width || 0,
+					height: _getImg().height || 0,
+					type: _blob.type || Mime.getFileMime(_blob.name),
+					size: _binStr && _binStr.length || _blob.size || 0,
+					name: _blob.name || '',
+					meta: _imgInfo && _imgInfo.meta || this.meta || {}
+				};
+
+				// store thumbnail data as blob
+				if (info.meta && info.meta.thumb && !(info.meta.thumb.data instanceof Blob)) {
+					info.meta.thumb.data = new Blob(null, {
+						type: 'image/jpeg',
+						data: info.meta.thumb.data
+					});
+				}
+
+				return info;
+			},
+
+			downsize: function() {
+				_downsize.apply(this, arguments);
+			},
+
+			getAsCanvas: function() {
+				if (_canvas) {
+					_canvas.id = this.uid + '_canvas';
+				}
+				return _canvas;
+			},
+
+			getAsBlob: function(type, quality) {
+				if (type !== this.type) {
+					// if different mime type requested prepare image for conversion
+					_downsize.call(this, this.width, this.height, false);
+				}
+				return new File(null, {
+					name: _blob.name || '',
+					type: type,
+					data: me.getAsBinaryString.call(this, type, quality)
+				});
+			},
+
+			getAsDataURL: function(type) {
+				var quality = arguments[1] || 90;
+
+				// if image has not been modified, return the source right away
+				if (!_modified) {
+					return _img.src;
+				}
+
+				if ('image/jpeg' !== type) {
+					return _canvas.toDataURL('image/png');
+				} else {
+					try {
+						// older Geckos used to result in an exception on quality argument
+						return _canvas.toDataURL('image/jpeg', quality/100);
+					} catch (ex) {
+						return _canvas.toDataURL('image/jpeg');
+					}
+				}
+			},
+
+			getAsBinaryString: function(type, quality) {
+				// if image has not been modified, return the source right away
+				if (!_modified) {
+					// if image was not loaded from binary string
+					if (!_binStr) {
+						_binStr = _toBinary(me.getAsDataURL(type, quality));
+					}
+					return _binStr;
+				}
+
+				if ('image/jpeg' !== type) {
+					_binStr = _toBinary(me.getAsDataURL(type, quality));
+				} else {
+					var dataUrl;
+
+					// if jpeg
+					if (!quality) {
+						quality = 90;
+					}
+
+					try {
+						// older Geckos used to result in an exception on quality argument
+						dataUrl = _canvas.toDataURL('image/jpeg', quality/100);
+					} catch (ex) {
+						dataUrl = _canvas.toDataURL('image/jpeg');
+					}
+
+					_binStr = _toBinary(dataUrl);
+
+					if (_imgInfo) {
+						_binStr = _imgInfo.stripHeaders(_binStr);
+
+						if (_preserveHeaders) {
+							// update dimensions info in exif
+							if (_imgInfo.meta && _imgInfo.meta.exif) {
+								_imgInfo.setExif({
+									PixelXDimension: this.width,
+									PixelYDimension: this.height
+								});
+							}
+
+							// re-inject the headers
+							_binStr = _imgInfo.writeHeaders(_binStr);
+						}
+
+						// will be re-created from fresh on next getInfo call
+						_imgInfo.purge();
+						_imgInfo = null;
+					}
+				}
+
+				_modified = false;
+
+				return _binStr;
+			},
+
+			destroy: function() {
+				me = null;
+				_purge.call(this);
+				this.getRuntime().getShim().removeInstance(this.uid);
+			}
+		});
+
+
+		function _getImg() {
+			if (!_canvas && !_img) {
+				throw new x.ImageError(x.DOMException.INVALID_STATE_ERR);
+			}
+			return _canvas || _img;
+		}
+
+
+		function _toBinary(str) {
+			return Encode.atob(str.substring(str.indexOf('base64,') + 7));
+		}
+
+
+		function _toDataUrl(str, type) {
+			return 'data:' + (type || '') + ';base64,' + Encode.btoa(str);
+		}
+
+
+		function _preload(str) {
+			var comp = this;
+
+			_img = new Image();
+			_img.onerror = function() {
+				_purge.call(this);
+				comp.trigger('error', x.ImageError.WRONG_FORMAT);
+			};
+			_img.onload = function() {
+				comp.trigger('load');
+			};
+
+			_img.src = str.substr(0, 5) == 'data:' ? str : _toDataUrl(str, _blob.type);
+		}
+
+
+		function _readAsDataUrl(file, callback) {
+			var comp = this, fr;
+
+			// use FileReader if it's available
+			if (window.FileReader) {
+				fr = new FileReader();
+				fr.onload = function() {
+					callback(this.result);
+				};
+				fr.onerror = function() {
+					comp.trigger('error', x.ImageError.WRONG_FORMAT);
+				};
+				fr.readAsDataURL(file);
+			} else {
+				return callback(file.getAsDataURL());
+			}
+		}
+
+		function _downsize(width, height, crop, preserveHeaders) {
+			var self = this
+			, scale
+			, mathFn
+			, x = 0
+			, y = 0
+			, img
+			, destWidth
+			, destHeight
+			, orientation
+			;
+
+			_preserveHeaders = preserveHeaders; // we will need to check this on export (see getAsBinaryString())
+
+			// take into account orientation tag
+			orientation = (this.meta && this.meta.tiff && this.meta.tiff.Orientation) || 1;
+
+			if (Basic.inArray(orientation, [5,6,7,8]) !== -1) { // values that require 90 degree rotation
+				// swap dimensions
+				var tmp = width;
+				width = height;
+				height = tmp;
+			}
+
+			img = _getImg();
+
+			// unify dimensions
+			if (!crop) {
+				scale = Math.min(width/img.width, height/img.height);
+			} else {
+				// one of the dimensions may exceed the actual image dimensions - we need to take the smallest value
+				width = Math.min(width, img.width);
+				height = Math.min(height, img.height);
+
+				scale = Math.max(width/img.width, height/img.height);
+			}
+		
+			// we only downsize here
+			if (scale > 1 && !crop && preserveHeaders) {
+				this.trigger('Resize');
+				return;
+			}
+
+			// prepare canvas if necessary
+			if (!_canvas) {
+				_canvas = document.createElement("canvas");
+			}
+
+			// calculate dimensions of proportionally resized image
+			destWidth = Math.round(img.width * scale);	
+			destHeight = Math.round(img.height * scale);
+
+			// scale image and canvas
+			if (crop) {
+				_canvas.width = width;
+				_canvas.height = height;
+
+				// if dimensions of the resulting image still larger than canvas, center it
+				if (destWidth > width) {
+					x = Math.round((destWidth - width) / 2);
+				}
+
+				if (destHeight > height) {
+					y = Math.round((destHeight - height) / 2);
+				}
+			} else {
+				_canvas.width = destWidth;
+				_canvas.height = destHeight;
+			}
+
+			// rotate if required, according to orientation tag
+			if (!_preserveHeaders) {
+				_rotateToOrientaion(_canvas.width, _canvas.height, orientation);
+			}
+
+			_drawToCanvas.call(this, img, _canvas, -x, -y, destWidth, destHeight);
+
+			this.width = _canvas.width;
+			this.height = _canvas.height;
+
+			_modified = true;
+			self.trigger('Resize');
+		}
+
+
+		function _drawToCanvas(img, canvas, x, y, w, h) {
+			if (Env.OS === 'iOS') { 
+				// avoid squish bug in iOS6
+				MegaPixel.renderTo(img, canvas, { width: w, height: h, x: x, y: y });
+			} else {
+				var ctx = canvas.getContext('2d');
+				ctx.drawImage(img, x, y, w, h);
+			}
+		}
+
+
+		/**
+		* Transform canvas coordination according to specified frame size and orientation
+		* Orientation value is from EXIF tag
+		* @author Shinichi Tomita <shinichi.tomita@gmail.com>
+		*/
+		function _rotateToOrientaion(width, height, orientation) {
+			switch (orientation) {
+				case 5:
+				case 6:
+				case 7:
+				case 8:
+					_canvas.width = height;
+					_canvas.height = width;
+					break;
+				default:
+					_canvas.width = width;
+					_canvas.height = height;
+			}
+
+			/**
+			1 = The 0th row is at the visual top of the image, and the 0th column is the visual left-hand side.
+			2 = The 0th row is at the visual top of the image, and the 0th column is the visual right-hand side.
+			3 = The 0th row is at the visual bottom of the image, and the 0th column is the visual right-hand side.
+			4 = The 0th row is at the visual bottom of the image, and the 0th column is the visual left-hand side.
+			5 = The 0th row is the visual left-hand side of the image, and the 0th column is the visual top.
+			6 = The 0th row is the visual right-hand side of the image, and the 0th column is the visual top.
+			7 = The 0th row is the visual right-hand side of the image, and the 0th column is the visual bottom.
+			8 = The 0th row is the visual left-hand side of the image, and the 0th column is the visual bottom.
+			*/
+
+			var ctx = _canvas.getContext('2d');
+			switch (orientation) {
+				case 2:
+					// horizontal flip
+					ctx.translate(width, 0);
+					ctx.scale(-1, 1);
+					break;
+				case 3:
+					// 180 rotate left
+					ctx.translate(width, height);
+					ctx.rotate(Math.PI);
+					break;
+				case 4:
+					// vertical flip
+					ctx.translate(0, height);
+					ctx.scale(1, -1);
+					break;
+				case 5:
+					// vertical flip + 90 rotate right
+					ctx.rotate(0.5 * Math.PI);
+					ctx.scale(1, -1);
+					break;
+				case 6:
+					// 90 rotate right
+					ctx.rotate(0.5 * Math.PI);
+					ctx.translate(0, -height);
+					break;
+				case 7:
+					// horizontal flip + 90 rotate right
+					ctx.rotate(0.5 * Math.PI);
+					ctx.translate(width, -height);
+					ctx.scale(-1, 1);
+					break;
+				case 8:
+					// 90 rotate left
+					ctx.rotate(-0.5 * Math.PI);
+					ctx.translate(-width, 0);
+					break;
+			}
+		}
+
+
+		function _purge() {
+			if (_imgInfo) {
+				_imgInfo.purge();
+				_imgInfo = null;
+			}
+			_binStr = _img = _canvas = _blob = null;
+			_modified = false;
+		}
+	}
+
+	return (extensions.Image = HTML5Image);
+});
+
+/**
+ * Stub for moxie/runtime/flash/Runtime
+ * @private
+ */
+define("moxie/runtime/flash/Runtime", [
+], function() {
+	return {};
+});
+
+/**
+ * Stub for moxie/runtime/silverlight/Runtime
+ * @private
+ */
+define("moxie/runtime/silverlight/Runtime", [
+], function() {
+	return {};
+});
+
+// Included from: src/javascript/runtime/html4/Runtime.js
+
+/**
+ * Runtime.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/*global File:true */
+
+/**
+Defines constructor for HTML4 runtime.
+
+@class moxie/runtime/html4/Runtime
+@private
+*/
+define("moxie/runtime/html4/Runtime", [
+	"moxie/core/utils/Basic",
+	"moxie/core/Exceptions",
+	"moxie/runtime/Runtime",
+	"moxie/core/utils/Env"
+], function(Basic, x, Runtime, Env) {
+	
+	var type = 'html4', extensions = {};
+
+	function Html4Runtime(options) {
+		var I = this
+		, Test = Runtime.capTest
+		, True = Runtime.capTrue
+		;
+
+		Runtime.call(this, options, type, {
+			access_binary: Test(window.FileReader || window.File && File.getAsDataURL),
+			access_image_binary: false,
+			display_media: Test(extensions.Image && (Env.can('create_canvas') || Env.can('use_data_uri_over32kb'))),
+			do_cors: false,
+			drag_and_drop: false,
+			filter_by_extension: Test(function() { // if you know how to feature-detect this, please suggest
+				return (Env.browser === 'Chrome' && Env.verComp(Env.version, 28, '>=')) || 
+					(Env.browser === 'IE' && Env.verComp(Env.version, 10, '>=')) || 
+					(Env.browser === 'Safari' && Env.verComp(Env.version, 7, '>='));
+			}()),
+			resize_image: function() {
+				return extensions.Image && I.can('access_binary') && Env.can('create_canvas');
+			},
+			report_upload_progress: false,
+			return_response_headers: false,
+			return_response_type: function(responseType) {
+				if (responseType === 'json' && !!window.JSON) {
+					return true;
+				} 
+				return !!~Basic.inArray(responseType, ['text', 'document', '']);
+			},
+			return_status_code: function(code) {
+				return !Basic.arrayDiff(code, [200, 404]);
+			},
+			select_file: function() {
+				return Env.can('use_fileinput');
+			},
+			select_multiple: false,
+			send_binary_string: false,
+			send_custom_headers: false,
+			send_multipart: true,
+			slice_blob: false,
+			stream_upload: function() {
+				return I.can('select_file');
+			},
+			summon_file_dialog: function() { // yeah... some dirty sniffing here...
+				return I.can('select_file') && (
+					(Env.browser === 'Firefox' && Env.verComp(Env.version, 4, '>=')) ||
+					(Env.browser === 'Opera' && Env.verComp(Env.version, 12, '>=')) ||
+					(Env.browser === 'IE' && Env.verComp(Env.version, 10, '>=')) ||
+					!!~Basic.inArray(Env.browser, ['Chrome', 'Safari'])
+				);
+			},
+			upload_filesize: True,
+			use_http_method: function(methods) {
+				return !Basic.arrayDiff(methods, ['GET', 'POST']);
+			}
+		});
+
+
+		Basic.extend(this, {
+			init : function() {
+				this.trigger("Init");
+			},
+
+			destroy: (function(destroy) { // extend default destroy method
+				return function() {
+					destroy.call(I);
+					destroy = I = null;
+				};
+			}(this.destroy))
+		});
+
+		Basic.extend(this.getShim(), extensions);
+	}
+
+	Runtime.addConstructor(type, Html4Runtime);
+
+	return extensions;
+});
+
+// Included from: src/javascript/runtime/html4/file/FileInput.js
+
+/**
+ * FileInput.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html4/file/FileInput
+@private
+*/
+define("moxie/runtime/html4/file/FileInput", [
+	"moxie/runtime/html4/Runtime",
+	"moxie/file/File",
+	"moxie/core/utils/Basic",
+	"moxie/core/utils/Dom",
+	"moxie/core/utils/Events",
+	"moxie/core/utils/Mime",
+	"moxie/core/utils/Env"
+], function(extensions, File, Basic, Dom, Events, Mime, Env) {
+	
+	function FileInput() {
+		var _uid, _mimes = [], _options;
+
+		function addInput() {
+			var comp = this, I = comp.getRuntime(), shimContainer, browseButton, currForm, form, input, uid;
+
+			uid = Basic.guid('uid_');
+
+			shimContainer = I.getShimContainer(); // we get new ref everytime to avoid memory leaks in IE
+
+			if (_uid) { // move previous form out of the view
+				currForm = Dom.get(_uid + '_form');
+				if (currForm) {
+					Basic.extend(currForm.style, { top: '100%' });
+				}
+			}
+
+			// build form in DOM, since innerHTML version not able to submit file for some reason
+			form = document.createElement('form');
+			form.setAttribute('id', uid + '_form');
+			form.setAttribute('method', 'post');
+			form.setAttribute('enctype', 'multipart/form-data');
+			form.setAttribute('encoding', 'multipart/form-data');
+
+			Basic.extend(form.style, {
+				overflow: 'hidden',
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: '100%',
+				height: '100%'
+			});
+
+			input = document.createElement('input');
+			input.setAttribute('id', uid);
+			input.setAttribute('type', 'file');
+			input.setAttribute('name', _options.name || 'Filedata');
+			input.setAttribute('accept', _mimes.join(','));
+
+			Basic.extend(input.style, {
+				fontSize: '999px',
+				opacity: 0
+			});
+
+			form.appendChild(input);
+			shimContainer.appendChild(form);
+
+			// prepare file input to be placed underneath the browse_button element
+			Basic.extend(input.style, {
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: '100%',
+				height: '100%'
+			});
+
+			if (Env.browser === 'IE' && Env.verComp(Env.version, 10, '<')) {
+				Basic.extend(input.style, {
+					filter : "progid:DXImageTransform.Microsoft.Alpha(opacity=0)"
+				});
+			}
+
+			input.onchange = function() { // there should be only one handler for this
+				var file;
+
+				if (!this.value) {
+					return;
+				}
+
+				if (this.files) { // check if browser is fresh enough
+					file = this.files[0];
+
+					// ignore empty files (IE10 for example hangs if you try to send them via XHR)
+					if (file.size === 0) {
+						form.parentNode.removeChild(form);
+						return;
+					}
+				} else {
+					file = {
+						name: this.value
+					};
+				}
+
+				file = new File(I.uid, file);
+
+				// clear event handler
+				this.onchange = function() {}; 
+				addInput.call(comp); 
+
+				comp.files = [file];
+
+				// substitute all ids with file uids (consider file.uid read-only - we cannot do it the other way around)
+				input.setAttribute('id', file.uid);
+				form.setAttribute('id', file.uid + '_form');
+				
+				comp.trigger('change');
+
+				input = form = null;
+			};
+
+
+			// route click event to the input
+			if (I.can('summon_file_dialog')) {
+				browseButton = Dom.get(_options.browse_button);
+				Events.removeEvent(browseButton, 'click', comp.uid);
+				Events.addEvent(browseButton, 'click', function(e) {
+					if (input && !input.disabled) { // for some reason FF (up to 8.0.1 so far) lets to click disabled input[type=file]
+						input.click();
+					}
+					e.preventDefault();
+				}, comp.uid);
+			}
+
+			_uid = uid;
+
+			shimContainer = currForm = browseButton = null;
+		}
+
+		Basic.extend(this, {
+			init: function(options) {
+				var comp = this, I = comp.getRuntime(), shimContainer;
+
+				// figure out accept string
+				_options = options;
+				_mimes = options.accept.mimes || Mime.extList2mimes(options.accept, I.can('filter_by_extension'));
+
+				shimContainer = I.getShimContainer();
+
+				(function() {
+					var browseButton, zIndex, top;
+
+					browseButton = Dom.get(options.browse_button);
+
+					// Route click event to the input[type=file] element for browsers that support such behavior
+					if (I.can('summon_file_dialog')) {
+						if (Dom.getStyle(browseButton, 'position') === 'static') {
+							browseButton.style.position = 'relative';
+						}
+
+						zIndex = parseInt(Dom.getStyle(browseButton, 'z-index'), 10) || 1;
+
+						browseButton.style.zIndex = zIndex;
+						shimContainer.style.zIndex = zIndex - 1;
+					}
+
+					/* Since we have to place input[type=file] on top of the browse_button for some browsers,
+					browse_button loses interactivity, so we restore it here */
+					top = I.can('summon_file_dialog') ? browseButton : shimContainer;
+
+					Events.addEvent(top, 'mouseover', function() {
+						comp.trigger('mouseenter');
+					}, comp.uid);
+
+					Events.addEvent(top, 'mouseout', function() {
+						comp.trigger('mouseleave');
+					}, comp.uid);
+
+					Events.addEvent(top, 'mousedown', function() {
+						comp.trigger('mousedown');
+					}, comp.uid);
+
+					Events.addEvent(Dom.get(options.container), 'mouseup', function() {
+						comp.trigger('mouseup');
+					}, comp.uid);
+
+					browseButton = null;
+				}());
+
+				addInput.call(this);
+
+				shimContainer = null;
+
+				// trigger ready event asynchronously
+				comp.trigger({
+					type: 'ready',
+					async: true
+				});
+			},
+
+
+			disable: function(state) {
+				var input;
+
+				if ((input = Dom.get(_uid))) {
+					input.disabled = !!state;
+				}
+			},
+
+			destroy: function() {
+				var I = this.getRuntime()
+				, shim = I.getShim()
+				, shimContainer = I.getShimContainer()
+				;
+				
+				Events.removeAllEvents(shimContainer, this.uid);
+				Events.removeAllEvents(_options && Dom.get(_options.container), this.uid);
+				Events.removeAllEvents(_options && Dom.get(_options.browse_button), this.uid);
+				
+				if (shimContainer) {
+					shimContainer.innerHTML = '';
+				}
+
+				shim.removeInstance(this.uid);
+
+				_uid = _mimes = _options = shimContainer = shim = null;
+			}
+		});
+	}
+
+	return (extensions.FileInput = FileInput);
+});
+
+// Included from: src/javascript/runtime/html4/file/FileReader.js
+
+/**
+ * FileReader.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html4/file/FileReader
+@private
+*/
+define("moxie/runtime/html4/file/FileReader", [
+	"moxie/runtime/html4/Runtime",
+	"moxie/runtime/html5/file/FileReader"
+], function(extensions, FileReader) {
+	return (extensions.FileReader = FileReader);
+});
+
+// Included from: src/javascript/runtime/html4/xhr/XMLHttpRequest.js
+
+/**
+ * XMLHttpRequest.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html4/xhr/XMLHttpRequest
+@private
+*/
+define("moxie/runtime/html4/xhr/XMLHttpRequest", [
+	"moxie/runtime/html4/Runtime",
+	"moxie/core/utils/Basic",
+	"moxie/core/utils/Dom",
+	"moxie/core/utils/Url",
+	"moxie/core/Exceptions",
+	"moxie/core/utils/Events",
+	"moxie/file/Blob",
+	"moxie/xhr/FormData"
+], function(extensions, Basic, Dom, Url, x, Events, Blob, FormData) {
+	
+	function XMLHttpRequest() {
+		var _status, _response, _iframe;
+
+		function cleanup(cb) {
+			var target = this, uid, form, inputs, i, hasFile = false;
+
+			if (!_iframe) {
+				return;
+			}
+
+			uid = _iframe.id.replace(/_iframe$/, '');
+
+			form = Dom.get(uid + '_form');
+			if (form) {
+				inputs = form.getElementsByTagName('input');
+				i = inputs.length;
+
+				while (i--) {
+					switch (inputs[i].getAttribute('type')) {
+						case 'hidden':
+							inputs[i].parentNode.removeChild(inputs[i]);
+							break;
+						case 'file':
+							hasFile = true; // flag the case for later
+							break;
+					}
+				}
+				inputs = [];
+
+				if (!hasFile) { // we need to keep the form for sake of possible retries
+					form.parentNode.removeChild(form);
+				}
+				form = null;
+			}
+
+			// without timeout, request is marked as canceled (in console)
+			setTimeout(function() {
+				Events.removeEvent(_iframe, 'load', target.uid);
+				if (_iframe.parentNode) { // #382
+					_iframe.parentNode.removeChild(_iframe);
+				}
+
+				// check if shim container has any other children, if - not, remove it as well
+				var shimContainer = target.getRuntime().getShimContainer();
+				if (!shimContainer.children.length) {
+					shimContainer.parentNode.removeChild(shimContainer);
+				}
+
+				shimContainer = _iframe = null;
+				cb();
+			}, 1);
+		}
+
+		Basic.extend(this, {
+			send: function(meta, data) {
+				var target = this, I = target.getRuntime(), uid, form, input, blob;
+
+				_status = _response = null;
+
+				function createIframe() {
+					var container = I.getShimContainer() || document.body
+					, temp = document.createElement('div')
+					;
+
+					// IE 6 won't be able to set the name using setAttribute or iframe.name
+					temp.innerHTML = '<iframe id="' + uid + '_iframe" name="' + uid + '_iframe" src="javascript:&quot;&quot;" style="display:none"></iframe>';
+					_iframe = temp.firstChild;
+					container.appendChild(_iframe);
+
+					/* _iframe.onreadystatechange = function() {
+						console.info(_iframe.readyState);
+					};*/
+
+					Events.addEvent(_iframe, 'load', function() { // _iframe.onload doesn't work in IE lte 8
+						var el;
+
+						try {
+							el = _iframe.contentWindow.document || _iframe.contentDocument || window.frames[_iframe.id].document;
+
+							// try to detect some standard error pages
+							if (/^4(0[0-9]|1[0-7]|2[2346])\s/.test(el.title)) { // test if title starts with 4xx HTTP error
+								_status = el.title.replace(/^(\d+).*$/, '$1');
+							} else {
+								_status = 200;
+								// get result
+								_response = Basic.trim(el.body.innerHTML);
+
+								// we need to fire these at least once
+								target.trigger({
+									type: 'progress',
+									loaded: _response.length,
+									total: _response.length
+								});
+
+								if (blob) { // if we were uploading a file
+									target.trigger({
+										type: 'uploadprogress',
+										loaded: blob.size || 1025,
+										total: blob.size || 1025
+									});
+								}
+							}
+						} catch (ex) {
+							if (Url.hasSameOrigin(meta.url)) {
+								// if response is sent with error code, iframe in IE gets redirected to res://ieframe.dll/http_x.htm
+								// which obviously results to cross domain error (wtf?)
+								_status = 404;
+							} else {
+								cleanup.call(target, function() {
+									target.trigger('error');
+								});
+								return;
+							}
+						}	
+					
+						cleanup.call(target, function() {
+							target.trigger('load');
+						});
+					}, target.uid);
+				} // end createIframe
+
+				// prepare data to be sent and convert if required
+				if (data instanceof FormData && data.hasBlob()) {
+					blob = data.getBlob();
+					uid = blob.uid;
+					input = Dom.get(uid);
+					form = Dom.get(uid + '_form');
+					if (!form) {
+						throw new x.DOMException(x.DOMException.NOT_FOUND_ERR);
+					}
+				} else {
+					uid = Basic.guid('uid_');
+
+					form = document.createElement('form');
+					form.setAttribute('id', uid + '_form');
+					form.setAttribute('method', meta.method);
+					form.setAttribute('enctype', 'multipart/form-data');
+					form.setAttribute('encoding', 'multipart/form-data');
+
+					I.getShimContainer().appendChild(form);
+				}
+
+				// set upload target
+				form.setAttribute('target', uid + '_iframe');
+
+				if (data instanceof FormData) {
+					data.each(function(value, name) {
+						if (value instanceof Blob) {
+							if (input) {
+								input.setAttribute('name', name);
+							}
+						} else {
+							var hidden = document.createElement('input');
+
+							Basic.extend(hidden, {
+								type : 'hidden',
+								name : name,
+								value : value
+							});
+
+							// make sure that input[type="file"], if it's there, comes last
+							if (input) {
+								form.insertBefore(hidden, input);
+							} else {
+								form.appendChild(hidden);
+							}
+						}
+					});
+				}
+
+				// set destination url
+				form.setAttribute("action", meta.url);
+
+				createIframe();
+				form.submit();
+				target.trigger('loadstart');
+			},
+
+			getStatus: function() {
+				return _status;
+			},
+
+			getResponse: function(responseType) {
+				if ('json' === responseType) {
+					// strip off <pre>..</pre> tags that might be enclosing the response
+					if (Basic.typeOf(_response) === 'string' && !!window.JSON) {
+						try {
+							return JSON.parse(_response.replace(/^\s*<pre[^>]*>/, '').replace(/<\/pre>\s*$/, ''));
+						} catch (ex) {
+							return null;
+						}
+					} 
+				} else if ('document' === responseType) {
+
+				}
+				return _response;
+			},
+
+			abort: function() {
+				var target = this;
+
+				if (_iframe && _iframe.contentWindow) {
+					if (_iframe.contentWindow.stop) { // FireFox/Safari/Chrome
+						_iframe.contentWindow.stop();
+					} else if (_iframe.contentWindow.document.execCommand) { // IE
+						_iframe.contentWindow.document.execCommand('Stop');
+					} else {
+						_iframe.src = "about:blank";
+					}
+				}
+
+				cleanup.call(this, function() {
+					// target.dispatchEvent('readystatechange');
+					target.dispatchEvent('abort');
+				});
+			}
+		});
+	}
+
+	return (extensions.XMLHttpRequest = XMLHttpRequest);
+});
+
+// Included from: src/javascript/runtime/html4/image/Image.js
+
+/**
+ * Image.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/**
+@class moxie/runtime/html4/image/Image
+@private
+*/
+define("moxie/runtime/html4/image/Image", [
+	"moxie/runtime/html4/Runtime",
+	"moxie/runtime/html5/image/Image"
+], function(extensions, Image) {
+	return (extensions.Image = Image);
+});
+
+expose(["moxie/core/utils/Basic","moxie/core/utils/Env","moxie/core/I18n","moxie/core/utils/Mime","moxie/core/utils/Dom","moxie/core/Exceptions","moxie/core/EventTarget","moxie/runtime/Runtime","moxie/runtime/RuntimeClient","moxie/file/FileInput","moxie/core/utils/Encode","moxie/file/Blob","moxie/file/File","moxie/file/FileDrop","moxie/file/FileReader","moxie/core/utils/Url","moxie/runtime/RuntimeTarget","moxie/file/FileReaderSync","moxie/xhr/FormData","moxie/xhr/XMLHttpRequest","moxie/runtime/Transporter","moxie/image/Image","moxie/core/utils/Events"]);
+})(this);
+/**
+ * o.js
+ *
+ * Copyright 2013, Moxiecode Systems AB
+ * Released under GPL License.
+ *
+ * License: http://www.plupload.com/license
+ * Contributing: http://www.plupload.com/contributing
+ */
+
+/*global moxie:true */
+
+/**
+Globally exposed namespace with the most frequently used public classes and handy methods.
+
+@class o
+@static
+@private
+*/
+(function(exports) {
+	"use strict";
+
+	var o = {}, inArray = exports.moxie.core.utils.Basic.inArray;
+
+	// directly add some public classes
+	// (we do it dynamically here, since for custom builds we cannot know beforehand what modules were included)
+	(function addAlias(ns) {
+		var name, itemType;
+		for (name in ns) {
+			itemType = typeof(ns[name]);
+			if (itemType === 'object' && !~inArray(name, ['Exceptions', 'Env', 'Mime'])) {
+				addAlias(ns[name]);
+			} else if (itemType === 'function') {
+				o[name] = ns[name];
+			}
+		}
+	})(exports.moxie);
+
+	// add some manually
+	o.Env = exports.moxie.core.utils.Env;
+	o.Mime = exports.moxie.core.utils.Mime;
+	o.Exceptions = exports.moxie.core.Exceptions;
+
+	// expose globally
+	exports.mOxie = o;
+	if (!exports.o) {
+		exports.o = o;
+	}
+	return o;
+})(this);
