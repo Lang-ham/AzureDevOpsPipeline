@@ -734,4 +734,394 @@ define(
                   setAttributes(attrs, {
                     src: data["source" + index],
                     type: data["source" + index + "mime"]
-     
+                  });
+
+                  writer.start("source", attrs, true);
+                }
+              }
+            }
+          }
+
+          if (data.poster && name === "object" && updateAll && !hasImage) {
+            var imgAttrs = [];
+            imgAttrs.map = {};
+
+            setAttributes(imgAttrs, {
+              src: data.poster,
+              width: data.width,
+              height: data.height
+            });
+
+            writer.start("img", imgAttrs, true);
+          }
+
+          writer.end(name);
+        }
+      }, new Schema({})).parse(html);
+
+      return writer.getContent();
+    };
+
+    var isEphoxEmbed = function (html) {
+      var fragment = DOM.createFragment(html);
+      return DOM.getAttrib(fragment.firstChild, 'data-ephox-embed-iri') !== '';
+    };
+
+    var updateEphoxEmbed = function (html, data) {
+      var fragment = DOM.createFragment(html);
+      var div = fragment.firstChild;
+
+      Size.setMaxWidth(div, data.width);
+      Size.setMaxHeight(div, data.height);
+
+      return normalizeHtml(div.outerHTML);
+    };
+
+    var updateHtml = function (html, data, updateAll) {
+      return isEphoxEmbed(html) ? updateEphoxEmbed(html, data) : updateHtmlSax(html, data, updateAll);
+    };
+
+    return {
+      updateHtml: updateHtml
+    };
+  }
+);
+/**
+ * ResolveGlobal.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.core.util.Delay',
+  [
+    'global!tinymce.util.Tools.resolve'
+  ],
+  function (resolve) {
+    return resolve('tinymce.util.Delay');
+  }
+);
+
+/**
+ * HtmlToData.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.core.HtmlToData',
+  [
+    'tinymce.core.util.Tools',
+    'tinymce.core.html.SaxParser',
+    'tinymce.core.html.Schema',
+    'tinymce.core.dom.DOMUtils',
+    'tinymce.plugins.media.core.VideoScript',
+    'tinymce.plugins.media.core.Size'
+  ],
+  function (Tools, SaxParser, Schema, DOMUtils, VideoScript, Size) {
+    var DOM = DOMUtils.DOM;
+
+    var getEphoxEmbedIri = function (elm) {
+      return DOM.getAttrib(elm, 'data-ephox-embed-iri');
+    };
+
+    var isEphoxEmbed = function (html) {
+      var fragment = DOM.createFragment(html);
+      return getEphoxEmbedIri(fragment.firstChild) !== '';
+    };
+
+    var htmlToDataSax = function (prefixes, html) {
+      var data = {};
+
+      new SaxParser({
+        validate: false,
+        allow_conditional_comments: true,
+        special: 'script,noscript',
+        start: function (name, attrs) {
+          if (!data.source1 && name === "param") {
+            data.source1 = attrs.map.movie;
+          }
+
+          if (name === "iframe" || name === "object" || name === "embed" || name === "video" || name === "audio") {
+            if (!data.type) {
+              data.type = name;
+            }
+
+            data = Tools.extend(attrs.map, data);
+          }
+
+          if (name === "script") {
+            var videoScript = VideoScript.getVideoScriptMatch(prefixes, attrs.map.src);
+            if (!videoScript) {
+              return;
+            }
+
+            data = {
+              type: "script",
+              source1: attrs.map.src,
+              width: videoScript.width,
+              height: videoScript.height
+            };
+          }
+
+          if (name === "source") {
+            if (!data.source1) {
+              data.source1 = attrs.map.src;
+            } else if (!data.source2) {
+              data.source2 = attrs.map.src;
+            }
+          }
+
+          if (name === "img" && !data.poster) {
+            data.poster = attrs.map.src;
+          }
+        }
+      }).parse(html);
+
+      data.source1 = data.source1 || data.src || data.data;
+      data.source2 = data.source2 || '';
+      data.poster = data.poster || '';
+
+      return data;
+    };
+
+    var ephoxEmbedHtmlToData = function (html) {
+      var fragment = DOM.createFragment(html);
+      var div = fragment.firstChild;
+
+      return {
+        type: 'ephox-embed-iri',
+        source1: getEphoxEmbedIri(div),
+        source2: '',
+        poster: '',
+        width: Size.getMaxWidth(div),
+        height: Size.getMaxHeight(div)
+      };
+    };
+
+    var htmlToData = function (prefixes, html) {
+      return isEphoxEmbed(html) ? ephoxEmbedHtmlToData(html) : htmlToDataSax(prefixes, html);
+    };
+
+    return {
+      htmlToData: htmlToData
+    };
+  }
+);
+/**
+ * Mime.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.core.Mime',
+  [
+  ],
+  function () {
+    var guess = function (url) {
+      var mimes = {
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'swf': 'application/x-shockwave-flash'
+      };
+      var fileEnd = url.toLowerCase().split('.').pop();
+      var mime = mimes[fileEnd];
+
+      return mime ? mime : '';
+    };
+
+    return {
+      guess: guess
+    };
+  }
+);
+/**
+ * UrlPatterns.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.core.UrlPatterns',
+  [
+  ],
+  function () {
+    var urlPatterns = [
+      {
+        regex: /youtu\.be\/([\w\-.]+)/,
+        type: 'iframe', w: 560, h: 314,
+        url: '//www.youtube.com/embed/$1',
+        allowFullscreen: true
+      },
+      {
+        regex: /youtube\.com(.+)v=([^&]+)/,
+        type: 'iframe', w: 560, h: 314,
+        url: '//www.youtube.com/embed/$2',
+        allowFullscreen: true
+      },
+      {
+        regex: /youtube.com\/embed\/([a-z0-9\-_]+(?:\?.+)?)/i,
+        type: 'iframe', w: 560, h: 314,
+        url: '//www.youtube.com/embed/$1',
+        allowFullscreen: true
+      },
+      {
+        regex: /vimeo\.com\/([0-9]+)/,
+        type: 'iframe', w: 425, h: 350,
+        url: '//player.vimeo.com/video/$1?title=0&byline=0&portrait=0&color=8dc7dc',
+        allowfullscreen: true
+      },
+      {
+        regex: /vimeo\.com\/(.*)\/([0-9]+)/,
+        type: "iframe", w: 425, h: 350,
+        url: "//player.vimeo.com/video/$2?title=0&amp;byline=0",
+        allowfullscreen: true
+      },
+      {
+        regex: /maps\.google\.([a-z]{2,3})\/maps\/(.+)msid=(.+)/,
+        type: 'iframe', w: 425, h: 350,
+        url: '//maps.google.com/maps/ms?msid=$2&output=embed"',
+        allowFullscreen: false
+      },
+      {
+        regex: /dailymotion\.com\/video\/([^_]+)/,
+        type: 'iframe', w: 480, h: 270,
+        url: '//www.dailymotion.com/embed/video/$1',
+        allowFullscreen: true
+      }
+    ];
+
+    return {
+      urlPatterns: urlPatterns
+    };
+  }
+);
+/**
+ * DataToHtml.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.core.DataToHtml',
+  [
+    'tinymce.plugins.media.core.Mime',
+    'tinymce.plugins.media.core.HtmlToData',
+    'tinymce.plugins.media.core.UrlPatterns',
+    'tinymce.plugins.media.core.VideoScript',
+    'tinymce.plugins.media.core.UpdateHtml',
+    'tinymce.core.util.Tools'
+  ],
+  function (Mime, HtmlToData, UrlPatterns, VideoScript, UpdateHtml, Tools) {
+    var dataToHtml = function (editor, dataIn) {
+      var html = '';
+      var data = Tools.extend({}, dataIn);
+
+      if (!data.source1) {
+        Tools.extend(data, HtmlToData.htmlToData(editor.settings.media_scripts, data.embed));
+        if (!data.source1) {
+          return '';
+        }
+      }
+
+      if (!data.source2) {
+        data.source2 = '';
+      }
+
+      if (!data.poster) {
+        data.poster = '';
+      }
+
+      data.source1 = editor.convertURL(data.source1, "source");
+      data.source2 = editor.convertURL(data.source2, "source");
+      data.source1mime = Mime.guess(data.source1);
+      data.source2mime = Mime.guess(data.source2);
+      data.poster = editor.convertURL(data.poster, "poster");
+
+      Tools.each(UrlPatterns.urlPatterns, function (pattern) {
+        var i;
+        var url;
+
+        var match = pattern.regex.exec(data.source1);
+
+        if (match) {
+          url = pattern.url;
+
+          for (i = 0; match[i]; i++) {
+            /*jshint loopfunc:true*/
+            /*eslint no-loop-func:0 */
+            url = url.replace('$' + i, function () {
+              return match[i];
+            });
+          }
+
+          data.source1 = url;
+          data.type = pattern.type;
+          data.allowFullscreen = pattern.allowFullscreen;
+          data.width = data.width || pattern.w;
+          data.height = data.height || pattern.h;
+        }
+      });
+
+      if (data.embed) {
+        html = UpdateHtml.updateHtml(data.embed, data, true);
+      } else {
+        var videoScript = VideoScript.getVideoScriptMatch(editor.settings.media_scripts, data.source1);
+        if (videoScript) {
+          data.type = 'script';
+          data.width = videoScript.width;
+          data.height = videoScript.height;
+        }
+
+        data.width = data.width || 300;
+        data.height = data.height || 150;
+
+        Tools.each(data, function (value, key) {
+          data[key] = editor.dom.encode(value);
+        });
+
+        if (data.type === "iframe") {
+          var allowFullscreen = data.allowFullscreen ? ' allowFullscreen="1"' : '';
+          html +=
+            '<iframe src="' + data.source1 +
+            '" width="' + data.width +
+            '" height="' + data.height +
+            '"' + allowFullscreen + '></iframe>';
+        } else if (data.source1mime === "application/x-shockwave-flash") {
+          html +=
+            '<object data="' + data.source1 +
+            '" width="' + data.width +
+            '" height="' + data.height +
+            '" type="application/x-shockwave-flash">';
+
+          if (data.poster) {
+            html += '<img src="' + data.poster + '" width="' + data.width + '" height="' + data.height + '" />';
+          }
+
+          html += '</object>';
+        } else if (data.source1mime.indexOf('audio') !== -1) {
+          if (edi
