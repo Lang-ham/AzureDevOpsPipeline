@@ -1124,4 +1124,379 @@ define(
 
           html += '</object>';
         } else if (data.source1mime.indexOf('audio') !== -1) {
-          if (edi
+          if (editor.settings.audio_template_callback) {
+            html = editor.settings.audio_template_callback(data);
+          } else {
+            html += (
+              '<audio controls="controls" src="' + data.source1 + '">' +
+              (
+                data.source2 ?
+                  '\n<source src="' + data.source2 + '"' +
+                  (data.source2mime ? ' type="' + data.source2mime + '"' : '') +
+                  ' />\n' : '') +
+              '</audio>'
+            );
+          }
+        } else if (data.type === "script") {
+          html += '<script src="' + data.source1 + '"></script>';
+        } else {
+          if (editor.settings.video_template_callback) {
+            html = editor.settings.video_template_callback(data);
+          } else {
+            html = (
+              '<video width="' + data.width +
+              '" height="' + data.height + '"' +
+              (data.poster ? ' poster="' + data.poster + '"' : '') + ' controls="controls">\n' +
+              '<source src="' + data.source1 + '"' +
+              (data.source1mime ? ' type="' + data.source1mime + '"' : '') + ' />\n' +
+              (data.source2 ? '<source src="' + data.source2 + '"' +
+                (data.source2mime ? ' type="' + data.source2mime + '"' : '') + ' />\n' : '') +
+              '</video>'
+            );
+          }
+        }
+      }
+
+      return html;
+    };
+
+    return {
+      dataToHtml: dataToHtml
+    };
+  }
+);
+/**
+ * ResolveGlobal.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.core.util.Promise',
+  [
+    'global!tinymce.util.Tools.resolve'
+  ],
+  function (resolve) {
+    return resolve('tinymce.util.Promise');
+  }
+);
+
+/**
+ * Service.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.core.Service',
+  [
+    'tinymce.plugins.media.core.DataToHtml',
+    'tinymce.core.util.Promise'
+  ],
+  function (DataToHtml, Promise) {
+    var embedPromise = function (data, dataToHtml, handler) {
+      var cache = {};
+      return new Promise(function (res, rej) {
+        var wrappedResolve = function (response) {
+          if (response.html) {
+            cache[data.source1] = response;
+          }
+          return res({
+            url: data.source1,
+            html: response.html ? response.html : dataToHtml(data)
+          });
+        };
+        if (cache[data.source1]) {
+          wrappedResolve(cache[data.source1]);
+        } else {
+          handler({ url: data.source1 }, wrappedResolve, rej);
+        }
+      });
+    };
+
+    var defaultPromise = function (data, dataToHtml) {
+      return new Promise(function (res) {
+        res({ html: dataToHtml(data), url: data.source1 });
+      });
+    };
+
+    var loadedData = function (editor) {
+      return function (data) {
+        return DataToHtml.dataToHtml(editor, data);
+      };
+    };
+
+    var getEmbedHtml = function (editor, data) {
+      var embedHandler = editor.settings.media_url_resolver;
+
+      return embedHandler ? embedPromise(data, loadedData(editor), embedHandler) : defaultPromise(data, loadedData(editor));
+    };
+
+    return {
+      getEmbedHtml: getEmbedHtml
+    };
+  }
+);
+/**
+ * SizeManager.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.ui.SizeManager',
+  [
+  ],
+  function () {
+    var doSyncSize = function (widthCtrl, heightCtrl) {
+      widthCtrl.state.set('oldVal', widthCtrl.value());
+      heightCtrl.state.set('oldVal', heightCtrl.value());
+    };
+    var doSizeControls = function (win, f) {
+      var widthCtrl = win.find('#width')[0];
+      var heightCtrl = win.find('#height')[0];
+      var constrained = win.find('#constrain')[0];
+      if (widthCtrl && heightCtrl && constrained) {
+        f(widthCtrl, heightCtrl, constrained.checked());
+      }
+    };
+
+    var doUpdateSize = function (widthCtrl, heightCtrl, isContrained) {
+      var oldWidth = widthCtrl.state.get('oldVal');
+      var oldHeight = heightCtrl.state.get('oldVal');
+      var newWidth = widthCtrl.value();
+      var newHeight = heightCtrl.value();
+
+      if (isContrained && oldWidth && oldHeight && newWidth && newHeight) {
+        if (newWidth !== oldWidth) {
+          newHeight = Math.round((newWidth / oldWidth) * newHeight);
+
+          if (!isNaN(newHeight)) {
+            heightCtrl.value(newHeight);
+          }
+        } else {
+          newWidth = Math.round((newHeight / oldHeight) * newWidth);
+
+          if (!isNaN(newWidth)) {
+            widthCtrl.value(newWidth);
+          }
+        }
+      }
+
+      doSyncSize(widthCtrl, heightCtrl);
+    };
+
+    var syncSize = function (win) {
+      doSizeControls(win, doSyncSize);
+    };
+
+    var updateSize = function (win) {
+      doSizeControls(win, doUpdateSize);
+    };
+
+    var createUi = function (onChange) {
+      var recalcSize = function () {
+        onChange(function (win) {
+          updateSize(win);
+        });
+      };
+
+      return {
+        type: 'container',
+        label: 'Dimensions',
+        layout: 'flex',
+        align: 'center',
+        spacing: 5,
+        items: [
+          {
+            name: 'width', type: 'textbox', maxLength: 5, size: 5,
+            onchange: recalcSize, ariaLabel: 'Width'
+          },
+          { type: 'label', text: 'x' },
+          {
+            name: 'height', type: 'textbox', maxLength: 5, size: 5,
+            onchange: recalcSize, ariaLabel: 'Height'
+          },
+          { name: 'constrain', type: 'checkbox', checked: true, text: 'Constrain proportions' }
+        ]
+      };
+    };
+
+    return {
+      createUi: createUi,
+      syncSize: syncSize,
+      updateSize: updateSize
+    };
+  }
+);
+/**
+ * Dialog.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+define(
+  'tinymce.plugins.media.ui.Dialog',
+  [
+    'tinymce.core.util.Delay',
+    'tinymce.plugins.media.core.HtmlToData',
+    'tinymce.plugins.media.core.UpdateHtml',
+    'tinymce.plugins.media.core.Service',
+    'tinymce.plugins.media.core.Size',
+    'tinymce.core.util.Tools',
+    'tinymce.core.Env',
+    'tinymce.plugins.media.ui.SizeManager'
+  ],
+  function (Delay, HtmlToData, UpdateHtml, Service, Size, Tools, Env, SizeManager) {
+    var embedChange = (Env.ie && Env.ie <= 8) ? 'onChange' : 'onInput';
+
+    var handleError = function (editor) {
+      return function (error) {
+        var errorMessage = error && error.msg ?
+          'Media embed handler error: ' + error.msg :
+          'Media embed handler threw unknown error.';
+        editor.notificationManager.open({ type: 'error', text: errorMessage });
+      };
+    };
+
+    var getData = function (editor) {
+      var element = editor.selection.getNode();
+      var dataEmbed = element.getAttribute('data-ephox-embed-iri');
+
+      if (dataEmbed) {
+        return {
+          source1: dataEmbed,
+          'data-ephox-embed-iri': dataEmbed,
+          width: Size.getMaxWidth(element),
+          height: Size.getMaxHeight(element)
+        };
+      }
+
+      return element.getAttribute('data-mce-object') ?
+        HtmlToData.htmlToData(editor.settings.media_scripts, editor.serializer.serialize(element, { selection: true })) :
+        {};
+    };
+
+    var getSource = function (editor) {
+      var elm = editor.selection.getNode();
+
+      if (elm.getAttribute('data-mce-object') || elm.getAttribute('data-ephox-embed-iri')) {
+        return editor.selection.getContent();
+      }
+    };
+
+    var addEmbedHtml = function (win, editor) {
+      return function (response) {
+        var html = response.html;
+        var embed = win.find('#embed')[0];
+        var data = Tools.extend(HtmlToData.htmlToData(editor.settings.media_scripts, html), { source1: response.url });
+        win.fromJSON(data);
+
+        if (embed) {
+          embed.value(html);
+          SizeManager.updateSize(win);
+        }
+      };
+    };
+
+    var selectPlaceholder = function (editor, beforeObjects) {
+      var i;
+      var y;
+      var afterObjects = editor.dom.select('img[data-mce-object]');
+
+      // Find new image placeholder so we can select it
+      for (i = 0; i < beforeObjects.length; i++) {
+        for (y = afterObjects.length - 1; y >= 0; y--) {
+          if (beforeObjects[i] === afterObjects[y]) {
+            afterObjects.splice(y, 1);
+          }
+        }
+      }
+
+      editor.selection.select(afterObjects[0]);
+    };
+
+    var handleInsert = function (editor, html) {
+      var beforeObjects = editor.dom.select('img[data-mce-object]');
+
+      editor.insertContent(html);
+      selectPlaceholder(editor, beforeObjects);
+      editor.nodeChanged();
+    };
+
+    var submitForm = function (win, editor) {
+      var data = win.toJSON();
+
+      data.embed = UpdateHtml.updateHtml(data.embed, data);
+
+      if (data.embed) {
+        handleInsert(editor, data.embed);
+      } else {
+        Service.getEmbedHtml(editor, data)
+          .then(function (response) {
+            handleInsert(editor, response.html);
+          })["catch"](handleError(editor));
+      }
+    };
+
+    var populateMeta = function (win, meta) {
+      Tools.each(meta, function (value, key) {
+        win.find('#' + key).value(value);
+      });
+    };
+
+    var showDialog = function (editor) {
+      var win;
+      var data;
+
+      var generalFormItems = [
+        {
+          name: 'source1',
+          type: 'filepicker',
+          filetype: 'media',
+          size: 40,
+          autofocus: true,
+          label: 'Source',
+          onpaste: function () {
+            setTimeout(function () {
+              Service.getEmbedHtml(editor, win.toJSON())
+                .then(
+                addEmbedHtml(win, editor)
+                )["catch"](handleError(editor));
+            }, 1);
+          },
+          onchange: function (e) {
+            Service.getEmbedHtml(editor, win.toJSON())
+              .then(
+              addEmbedHtml(win, editor)
+              )["catch"](handleError(editor));
+
+            populateMeta(win, e.meta);
+          },
+          onbeforecall: function (e) {
+            e.meta = win.toJSON();
+          }
+        }
+      ];
+
+      var advancedFormItems = [];
+
+      var reserialise = function (update) {
+        update(win);
+        data = win.to
