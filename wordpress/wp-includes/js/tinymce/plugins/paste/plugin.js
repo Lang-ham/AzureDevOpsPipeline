@@ -2188,3 +2188,302 @@ define(
     'tinymce.plugins.paste.core.Utils'
   ],
   function (Env, Tools, WordFilter, Utils) {
+    function addPreProcessFilter(editor, filterFunc) {
+      editor.on('PastePreProcess', function (e) {
+        e.content = filterFunc(editor, e.content, e.internal, e.wordContent);
+      });
+    }
+
+    function addPostProcessFilter(editor, filterFunc) {
+      editor.on('PastePostProcess', function (e) {
+        filterFunc(editor, e.node);
+      });
+    }
+
+    /**
+     * Removes BR elements after block elements. IE9 has a nasty bug where it puts a BR element after each
+     * block element when pasting from word. This removes those elements.
+     *
+     * This:
+     *  <p>a</p><br><p>b</p>
+     *
+     * Becomes:
+     *  <p>a</p><p>b</p>
+     */
+    function removeExplorerBrElementsAfterBlocks(editor, html) {
+      // Only filter word specific content
+      if (!WordFilter.isWordContent(html)) {
+        return html;
+      }
+
+      // Produce block regexp based on the block elements in schema
+      var blockElements = [];
+
+      Tools.each(editor.schema.getBlockElements(), function (block, blockName) {
+        blockElements.push(blockName);
+      });
+
+      var explorerBlocksRegExp = new RegExp(
+        '(?:<br>&nbsp;[\\s\\r\\n]+|<br>)*(<\\/?(' + blockElements.join('|') + ')[^>]*>)(?:<br>&nbsp;[\\s\\r\\n]+|<br>)*',
+        'g'
+      );
+
+      // Remove BR:s from: <BLOCK>X</BLOCK><BR>
+      html = Utils.filter(html, [
+        [explorerBlocksRegExp, '$1']
+      ]);
+
+      // IE9 also adds an extra BR element for each soft-linefeed and it also adds a BR for each word wrap break
+      html = Utils.filter(html, [
+        [/<br><br>/g, '<BR><BR>'], // Replace multiple BR elements with uppercase BR to keep them intact
+        [/<br>/g, ' '],            // Replace single br elements with space since they are word wrap BR:s
+        [/<BR><BR>/g, '<br>']      // Replace back the double brs but into a single BR
+      ]);
+
+      return html;
+    }
+
+    /**
+     * WebKit has a nasty bug where the all computed styles gets added to style attributes when copy/pasting contents.
+     * This fix solves that by simply removing the whole style attribute.
+     *
+     * The paste_webkit_styles option can be set to specify what to keep:
+     *  paste_webkit_styles: "none" // Keep no styles
+     *  paste_webkit_styles: "all", // Keep all of them
+     *  paste_webkit_styles: "font-weight color" // Keep specific ones
+     */
+    function removeWebKitStyles(editor, content, internal, isWordHtml) {
+      // WordFilter has already processed styles at this point and internal doesn't need any processing
+      if (isWordHtml || internal) {
+        return content;
+      }
+
+      // Filter away styles that isn't matching the target node
+      var webKitStyles = editor.settings.paste_webkit_styles;
+
+      if (editor.settings.paste_remove_styles_if_webkit === false || webKitStyles == "all") {
+        return content;
+      }
+
+      if (webKitStyles) {
+        webKitStyles = webKitStyles.split(/[, ]/);
+      }
+
+      // Keep specific styles that doesn't match the current node computed style
+      if (webKitStyles) {
+        var dom = editor.dom, node = editor.selection.getNode();
+
+        content = content.replace(/(<[^>]+) style="([^"]*)"([^>]*>)/gi, function (all, before, value, after) {
+          var inputStyles = dom.parseStyle(dom.decode(value), 'span');
+          var outputStyles = {};
+
+          if (webKitStyles === "none") {
+            return before + after;
+          }
+
+          for (var i = 0; i < webKitStyles.length; i++) {
+            var inputValue = inputStyles[webKitStyles[i]], currentValue = dom.getStyle(node, webKitStyles[i], true);
+
+            if (/color/.test(webKitStyles[i])) {
+              inputValue = dom.toHex(inputValue);
+              currentValue = dom.toHex(currentValue);
+            }
+
+            if (currentValue != inputValue) {
+              outputStyles[webKitStyles[i]] = inputValue;
+            }
+          }
+
+          outputStyles = dom.serializeStyle(outputStyles, 'span');
+          if (outputStyles) {
+            return before + ' style="' + outputStyles + '"' + after;
+          }
+
+          return before + after;
+        });
+      } else {
+        // Remove all external styles
+        content = content.replace(/(<[^>]+) style="([^"]*)"([^>]*>)/gi, '$1$3');
+      }
+
+      // Keep internal styles
+      content = content.replace(/(<[^>]+) data-mce-style="([^"]+)"([^>]*>)/gi, function (all, before, value, after) {
+        return before + ' style="' + value + '"' + after;
+      });
+
+      return content;
+    }
+
+    function removeUnderlineAndFontInAnchor(editor, root) {
+      editor.$('a', root).find('font,u').each(function (i, node) {
+        editor.dom.remove(node, true);
+      });
+    }
+
+    var setup = function (editor) {
+      if (Env.webkit) {
+        addPreProcessFilter(editor, removeWebKitStyles);
+      }
+
+      if (Env.ie) {
+        addPreProcessFilter(editor, removeExplorerBrElementsAfterBlocks);
+        addPostProcessFilter(editor, removeUnderlineAndFontInAnchor);
+      }
+    };
+
+    return {
+      setup: setup
+    };
+  }
+);
+/**
+ * Plugin.js
+ *
+ * Released under LGPL License.
+ * Copyright (c) 1999-2017 Ephox Corp. All rights reserved
+ *
+ * License: http://www.tinymce.com/license
+ * Contributing: http://www.tinymce.com/contributing
+ */
+
+/**
+ * This class contains all core logic for the paste plugin.
+ *
+ * @class tinymce.paste.Plugin
+ * @private
+ */
+define(
+  'tinymce.plugins.paste.Plugin',
+  [
+    'tinymce.core.PluginManager',
+    'tinymce.plugins.paste.api.Events',
+    'tinymce.plugins.paste.core.Clipboard',
+    'tinymce.plugins.paste.core.CutCopy',
+    'tinymce.plugins.paste.core.Quirks'
+  ],
+  function (PluginManager, Events, Clipboard, CutCopy, Quirks) {
+    var userIsInformed;
+
+    PluginManager.add('paste', function (editor) {
+      var self = this, clipboard, settings = editor.settings;
+
+      function isUserInformedAboutPlainText() {
+        return userIsInformed || editor.settings.paste_plaintext_inform === false;
+      }
+
+      function togglePlainTextPaste() {
+        if (clipboard.pasteFormat == "text") {
+          clipboard.pasteFormat = "html";
+          Events.firePastePlainTextToggle(editor, false);
+        } else {
+          clipboard.pasteFormat = "text";
+          Events.firePastePlainTextToggle(editor, true);
+
+          if (!isUserInformedAboutPlainText()) {
+            var message = editor.translate('Paste is now in plain text mode. Contents will now ' +
+              'be pasted as plain text until you toggle this option off.');
+
+            editor.notificationManager.open({
+              text: message,
+              type: 'info'
+            });
+
+            userIsInformed = true;
+          }
+        }
+
+        editor.focus();
+      }
+
+      function stateChange() {
+        var self = this;
+
+        self.active(clipboard.pasteFormat === 'text');
+
+        editor.on('PastePlainTextToggle', function (e) {
+          self.active(e.state);
+        });
+      }
+
+      // draw back if power version is requested and registered
+      if (/(^|[ ,])powerpaste([, ]|$)/.test(settings.plugins) && PluginManager.get('powerpaste')) {
+        /*eslint no-console:0 */
+        if (typeof console !== "undefined" && console.log) {
+          console.log("PowerPaste is incompatible with Paste plugin! Remove 'paste' from the 'plugins' option.");
+        }
+        return;
+      }
+
+      self.clipboard = clipboard = new Clipboard(editor);
+      self.quirks = Quirks.setup(editor);
+
+      if (editor.settings.paste_as_text) {
+        self.clipboard.pasteFormat = "text";
+      }
+
+      if (settings.paste_preprocess) {
+        editor.on('PastePreProcess', function (e) {
+          settings.paste_preprocess.call(self, self, e);
+        });
+      }
+
+      if (settings.paste_postprocess) {
+        editor.on('PastePostProcess', function (e) {
+          settings.paste_postprocess.call(self, self, e);
+        });
+      }
+
+      editor.addCommand('mceInsertClipboardContent', function (ui, value) {
+        if (value.content) {
+          self.clipboard.pasteHtml(value.content, value.internal);
+        }
+
+        if (value.text) {
+          self.clipboard.pasteText(value.text);
+        }
+      });
+
+      // Block all drag/drop events
+      if (editor.settings.paste_block_drop) {
+        editor.on('dragend dragover draggesture dragdrop drop drag', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+      }
+
+      // Prevent users from dropping data images on Gecko
+      if (!editor.settings.paste_data_images) {
+        editor.on('drop', function (e) {
+          var dataTransfer = e.dataTransfer;
+
+          if (dataTransfer && dataTransfer.files && dataTransfer.files.length > 0) {
+            e.preventDefault();
+          }
+        });
+      }
+
+      editor.addCommand('mceTogglePlainTextPaste', togglePlainTextPaste);
+
+      editor.addButton('pastetext', {
+        icon: 'pastetext',
+        tooltip: 'Paste as text',
+        onclick: togglePlainTextPaste,
+        onPostRender: stateChange
+      });
+
+      editor.addMenuItem('pastetext', {
+        text: 'Paste as text',
+        selectable: true,
+        active: clipboard.pasteFormat,
+        onclick: togglePlainTextPaste,
+        onPostRender: stateChange
+      });
+
+      CutCopy.register(editor);
+    });
+
+    return function () { };
+  }
+);
+dem('tinymce.plugins.paste.Plugin')();
+})();
