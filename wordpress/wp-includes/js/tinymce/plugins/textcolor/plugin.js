@@ -376,4 +376,108 @@ define(
           applyFormat(buttonCtrl.settings.format, value);
         }
 
-        function resetC
+        function resetColor() {
+          buttonCtrl.hidePanel();
+          buttonCtrl.resetColor();
+          removeFormat(buttonCtrl.settings.format);
+        }
+
+        function setDivColor(div, value) {
+          div.style.background = value;
+          div.setAttribute('data-mce-color', value);
+        }
+
+        if (DOMUtils.DOM.getParent(e.target, '.mce-custom-color-btn')) {
+          buttonCtrl.hidePanel();
+
+          editor.settings.color_picker_callback.call(editor, function (value) {
+            var tableElm = buttonCtrl.panel.getEl().getElementsByTagName('table')[0];
+            var customColorCells, div, i;
+
+            customColorCells = Tools.map(tableElm.rows[tableElm.rows.length - 1].childNodes, function (elm) {
+              return elm.firstChild;
+            });
+
+            for (i = 0; i < customColorCells.length; i++) {
+              div = customColorCells[i];
+              if (!div.getAttribute('data-mce-color')) {
+                break;
+              }
+            }
+
+            // Shift colors to the right
+            // TODO: Might need to be the left on RTL
+            if (i == cols[type]) {
+              for (i = 0; i < cols[type] - 1; i++) {
+                setDivColor(customColorCells[i], customColorCells[i + 1].getAttribute('data-mce-color'));
+              }
+            }
+
+            setDivColor(div, value);
+            selectColor(value);
+          }, getCurrentColor(buttonCtrl.settings.format));
+        }
+
+        value = e.target.getAttribute('data-mce-color');
+        if (value) {
+          if (this.lastId) {
+            document.getElementById(this.lastId).setAttribute('aria-selected', false);
+          }
+
+          e.target.setAttribute('aria-selected', true);
+          this.lastId = e.target.id;
+
+          if (value == 'transparent') {
+            resetColor();
+          } else {
+            selectColor(value);
+          }
+        } else if (value !== null) {
+          buttonCtrl.hidePanel();
+        }
+      }
+
+      function onButtonClick() {
+        var self = this;
+
+        if (self._color) {
+          applyFormat(self.settings.format, self._color);
+        } else {
+          removeFormat(self.settings.format);
+        }
+      }
+
+      editor.addButton('forecolor', {
+        type: 'colorbutton',
+        tooltip: 'Text color',
+        format: 'forecolor',
+        panel: {
+          origin: 'forecolor',
+          role: 'application',
+          ariaRemember: true,
+          html: renderColorPicker,
+          onclick: onPanelClick
+        },
+        onclick: onButtonClick
+      });
+
+      editor.addButton('backcolor', {
+        type: 'colorbutton',
+        tooltip: 'Background color',
+        format: 'hilitecolor',
+        panel: {
+          origin: 'backcolor',
+          role: 'application',
+          ariaRemember: true,
+          html: renderColorPicker,
+          onclick: onPanelClick
+        },
+        onclick: onButtonClick
+      });
+    });
+
+    return function () { };
+  }
+);
+dem('tinymce.plugins.textcolor.Plugin')();
+})();
