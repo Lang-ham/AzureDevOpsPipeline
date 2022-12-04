@@ -634,4 +634,244 @@ tinymce.PluginManager.add( 'wpeditimage', function( editor ) {
 		// Pasting in a caption node.
 		if ( editor.dom.getParent( editor.selection.getNode(), 'dd.wp-caption-dd' ) ) {
 			// Remove "non-block" elements that should not be in captions.
-			editor.$( 'img, audio, video, object, embed, iframe, script, style', e
+			editor.$( 'img, audio, video, object, embed, iframe, script, style', event.node ).remove();
+
+			editor.$( '*', event.node ).each( function( i, node ) {
+				if ( editor.dom.isBlock( node ) ) {
+					// Insert <br> where the blocks used to be. Makes it look better after pasting in the caption.
+					if ( tinymce.trim( node.textContent || node.innerText ) ) {
+						editor.dom.insertAfter( editor.dom.create( 'br' ), node );
+						editor.dom.remove( node, true );
+					} else {
+						editor.dom.remove( node );
+					}
+				}
+			});
+
+			// Trim <br> tags.
+			editor.$( 'br',  event.node ).each( function( i, node ) {
+				if ( ! node.nextSibling || node.nextSibling.nodeName === 'BR' ||
+					! node.previousSibling || node.previousSibling.nodeName === 'BR' ) {
+
+					editor.dom.remove( node );
+				}
+			} );
+
+			// Pasted HTML is cleaned up for inserting in the caption.
+			pasteInCaption = true;
+		}
+	});
+
+	editor.on( 'BeforeExecCommand', function( event ) {
+		var node, p, DL, align, replacement, captionParent,
+			cmd = event.command,
+			dom = editor.dom;
+
+		if ( cmd === 'mceInsertContent' || cmd === 'Indent' || cmd === 'Outdent' ) {
+			node = editor.selection.getNode();
+			captionParent = dom.getParent( node, 'div.mceTemp' );
+
+			if ( captionParent ) {
+				if ( cmd === 'mceInsertContent' ) {
+					if ( pasteInCaption ) {
+						pasteInCaption = false;
+						// We are in the caption element, and in 'paste' context,
+						// and the pasted HTML was cleaned up on 'pastePostProcess' above.
+						// Let it be pasted in the caption.
+						return;
+					}
+
+					// The paste is somewhere else in the caption DL element.
+					// Prevent pasting in there as it will break the caption.
+					// Make new paragraph under the caption DL and move the caret there.
+					p = dom.create( 'p' );
+					dom.insertAfter( p, captionParent );
+					editor.selection.setCursorLocation( p, 0 );
+
+					// If the image is selected and the user pastes "over" it,
+					// replace both the image and the caption elements with the pasted content.
+					// This matches the behavior when pasting over non-caption images.
+					if ( node.nodeName === 'IMG' ) {
+                        editor.$( captionParent ).remove();
+                    }
+
+					editor.nodeChanged();
+				} else {
+					// Clicking Indent or Outdent while an image with a caption is selected breaks the caption.
+					// See #38313.
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					return false;
+				}
+			}
+		} else if ( cmd === 'JustifyLeft' || cmd === 'JustifyRight' || cmd === 'JustifyCenter' || cmd === 'wpAlignNone' ) {
+			node = editor.selection.getNode();
+			align = 'align' + cmd.slice( 7 ).toLowerCase();
+			DL = editor.dom.getParent( node, '.wp-caption' );
+
+			if ( node.nodeName !== 'IMG' && ! DL ) {
+				return;
+			}
+
+			node = DL || node;
+
+			if ( editor.dom.hasClass( node, align ) ) {
+				replacement = ' alignnone';
+			} else {
+				replacement = ' ' + align;
+			}
+
+			node.className = trim( node.className.replace( / ?align(left|center|right|none)/g, '' ) + replacement );
+
+			editor.nodeChanged();
+			event.preventDefault();
+
+			if ( toolbar ) {
+				toolbar.reposition();
+			}
+
+			editor.fire( 'ExecCommand', {
+				command: cmd,
+				ui: event.ui,
+				value: event.value
+			} );
+		}
+	});
+
+	editor.on( 'keydown', function( event ) {
+		var node, wrap, P, spacer,
+			selection = editor.selection,
+			keyCode = event.keyCode,
+			dom = editor.dom,
+			VK = tinymce.util.VK;
+
+		if ( keyCode === VK.ENTER ) {
+			// When pressing Enter inside a caption move the caret to a new parapraph under it
+			node = selection.getNode();
+			wrap = dom.getParent( node, 'div.mceTemp' );
+
+			if ( wrap ) {
+				dom.events.cancel( event ); // Doesn't cancel all :(
+
+				// Remove any extra dt and dd cleated on pressing Enter...
+				tinymce.each( dom.select( 'dt, dd', wrap ), function( element ) {
+					if ( dom.isEmpty( element ) ) {
+						dom.remove( element );
+					}
+				});
+
+				spacer = tinymce.Env.ie && tinymce.Env.ie < 11 ? '' : '<br data-mce-bogus="1" />';
+				P = dom.create( 'p', null, spacer );
+
+				if ( node.nodeName === 'DD' ) {
+					dom.insertAfter( P, wrap );
+				} else {
+					wrap.parentNode.insertBefore( P, wrap );
+				}
+
+				editor.nodeChanged();
+				selection.setCursorLocation( P, 0 );
+			}
+		} else if ( keyCode === VK.DELETE || keyCode === VK.BACKSPACE ) {
+			node = selection.getNode();
+
+			if ( node.nodeName === 'DIV' && dom.hasClass( node, 'mceTemp' ) ) {
+				wrap = node;
+			} else if ( node.nodeName === 'IMG' || node.nodeName === 'DT' || node.nodeName === 'A' ) {
+				wrap = dom.getParent( node, 'div.mceTemp' );
+			}
+
+			if ( wrap ) {
+				dom.events.cancel( event );
+				removeImage( node );
+				return false;
+			}
+		}
+	});
+
+	// After undo/redo FF seems to set the image height very slowly when it is set to 'auto' in the CSS.
+	// This causes image.getBoundingClientRect() to return wrong values and the resize handles are shown in wrong places.
+	// Collapse the selection to remove the resize handles.
+	if ( tinymce.Env.gecko ) {
+		editor.on( 'undo redo', function() {
+			if ( editor.selection.getNode().nodeName === 'IMG' ) {
+				editor.selection.collapse();
+			}
+		});
+	}
+
+	editor.wpSetImgCaption = function( content ) {
+		return parseShortcode( content );
+	};
+
+	editor.wpGetImgCaption = function( content ) {
+		return getShortcode( content );
+	};
+
+	editor.on( 'beforeGetContent', function( event ) {
+		if ( event.format !== 'raw' ) {
+			editor.$( 'img[id="__wp-temp-img-id"]' ).attr( 'id', null );
+		}
+	});
+
+	editor.on( 'BeforeSetContent', function( event ) {
+		if ( event.format !== 'raw' ) {
+			event.content = editor.wpSetImgCaption( event.content );
+		}
+	});
+
+	editor.on( 'PostProcess', function( event ) {
+		if ( event.get ) {
+			event.content = editor.wpGetImgCaption( event.content );
+		}
+	});
+
+	( function() {
+		var wrap;
+
+		editor.on( 'dragstart', function() {
+			var node = editor.selection.getNode();
+
+			if ( node.nodeName === 'IMG' ) {
+				wrap = editor.dom.getParent( node, '.mceTemp' );
+
+				if ( ! wrap && node.parentNode.nodeName === 'A' && ! hasTextContent( node.parentNode ) ) {
+					wrap = node.parentNode;
+				}
+			}
+		} );
+
+		editor.on( 'drop', function( event ) {
+			var dom = editor.dom,
+				rng = tinymce.dom.RangeUtils.getCaretRangeFromPoint( event.clientX, event.clientY, editor.getDoc() );
+
+			// Don't allow anything to be dropped in a captioned image.
+			if ( rng && dom.getParent( rng.startContainer, '.mceTemp' ) ) {
+				event.preventDefault();
+			} else if ( wrap ) {
+				event.preventDefault();
+
+				editor.undoManager.transact( function() {
+					if ( rng ) {
+						editor.selection.setRng( rng );
+					}
+
+					editor.selection.setNode( wrap );
+					dom.remove( wrap );
+				} );
+			}
+
+			wrap = null;
+		} );
+	} )();
+
+	// Add to editor.wp
+	editor.wp = editor.wp || {};
+	editor.wp.isPlaceholder = isPlaceholder;
+
+	// Back-compat.
+	return {
+		_do_shcode: parseShortcode,
+		_get_shcode: getShortcode
+	};
+});
