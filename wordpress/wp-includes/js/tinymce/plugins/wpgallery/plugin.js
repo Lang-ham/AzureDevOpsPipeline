@@ -70,4 +70,43 @@ tinymce.PluginManager.add('wpgallery', function( editor ) {
 			dom.removeClass( dom.select( 'img.wp-media-selected' ), 'wp-media-selected' );
 		}
 
-		if ( node.nodeName === 'IMG' && dom.getAttrib( node, 'data-wp-media' )
+		if ( node.nodeName === 'IMG' && dom.getAttrib( node, 'data-wp-media' ) ) {
+			// Don't trigger on right-click
+			if ( event.button !== 2 ) {
+				if ( dom.hasClass( node, 'wp-media-selected' ) ) {
+					editMedia( node );
+				} else {
+					unselect();
+					dom.addClass( node, 'wp-media-selected' );
+				}
+			}
+		} else {
+			unselect();
+		}
+	});
+
+	// Display gallery, audio or video instead of img in the element path
+	editor.on( 'ResolveName', function( event ) {
+		var dom = editor.dom,
+			node = event.target;
+
+		if ( node.nodeName === 'IMG' && dom.getAttrib( node, 'data-wp-media' ) ) {
+			if ( dom.hasClass( node, 'wp-gallery' ) ) {
+				event.name = 'gallery';
+			}
+		}
+	});
+
+	editor.on( 'BeforeSetContent', function( event ) {
+		// 'wpview' handles the gallery shortcode when present
+		if ( ! editor.plugins.wpview || typeof wp === 'undefined' || ! wp.mce ) {
+			event.content = replaceGalleryShortcodes( event.content );
+		}
+	});
+
+	editor.on( 'PostProcess', function( event ) {
+		if ( event.get ) {
+			event.content = restoreMediaShortcodes( event.content );
+		}
+	});
+});
