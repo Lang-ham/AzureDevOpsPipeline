@@ -739,4 +739,359 @@ function load_plugin_textdomain( $domain, $deprecated = false, $plugin_rel_path 
  * @since 4.6.0 The function now tries to load the .mo file from the languages directory first.
  *
  * @param string $domain             Text domain. Unique identifier for retrieving translated strings.
- * @param string $mu_plugin_rel_path Optional. Relative to `WPMU_PLUGIN_DIR` 
+ * @param string $mu_plugin_rel_path Optional. Relative to `WPMU_PLUGIN_DIR` directory in which the .mo
+ *                                   file resides. Default empty string.
+ * @return bool True when textdomain is successfully loaded, false otherwise.
+ */
+function load_muplugin_textdomain( $domain, $mu_plugin_rel_path = '' ) {
+	/** This filter is documented in wp-includes/l10n.php */
+	$locale = apply_filters( 'plugin_locale', is_admin() ? get_user_locale() : get_locale(), $domain );
+
+	$mofile = $domain . '-' . $locale . '.mo';
+
+	// Try to load from the languages directory first.
+	if ( load_textdomain( $domain, WP_LANG_DIR . '/plugins/' . $mofile ) ) {
+		return true;
+	}
+
+	$path = WPMU_PLUGIN_DIR . '/' . ltrim( $mu_plugin_rel_path, '/' );
+
+	return load_textdomain( $domain, $path . '/' . $mofile );
+}
+
+/**
+ * Load the theme's translated strings.
+ *
+ * If the current locale exists as a .mo file in the theme's root directory, it
+ * will be included in the translated strings by the $domain.
+ *
+ * The .mo files must be named based on the locale exactly.
+ *
+ * @since 1.5.0
+ * @since 4.6.0 The function now tries to load the .mo file from the languages directory first.
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @param string $path   Optional. Path to the directory containing the .mo file.
+ *                       Default false.
+ * @return bool True when textdomain is successfully loaded, false otherwise.
+ */
+function load_theme_textdomain( $domain, $path = false ) {
+	/**
+	 * Filters a theme's locale.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $locale The theme's current locale.
+	 * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+	 */
+	$locale = apply_filters( 'theme_locale', is_admin() ? get_user_locale() : get_locale(), $domain );
+
+	$mofile = $domain . '-' . $locale . '.mo';
+
+	// Try to load from the languages directory first.
+	if ( load_textdomain( $domain, WP_LANG_DIR . '/themes/' . $mofile ) ) {
+		return true;
+	}
+
+	if ( ! $path ) {
+		$path = get_template_directory();
+	}
+
+	return load_textdomain( $domain, $path . '/' . $locale . '.mo' );
+}
+
+/**
+ * Load the child themes translated strings.
+ *
+ * If the current locale exists as a .mo file in the child themes
+ * root directory, it will be included in the translated strings by the $domain.
+ *
+ * The .mo files must be named based on the locale exactly.
+ *
+ * @since 2.9.0
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @param string $path   Optional. Path to the directory containing the .mo file.
+ *                       Default false.
+ * @return bool True when the theme textdomain is successfully loaded, false otherwise.
+ */
+function load_child_theme_textdomain( $domain, $path = false ) {
+	if ( ! $path )
+		$path = get_stylesheet_directory();
+	return load_theme_textdomain( $domain, $path );
+}
+
+/**
+ * Loads plugin and theme textdomains just-in-time.
+ *
+ * When a textdomain is encountered for the first time, we try to load
+ * the translation file from `wp-content/languages`, removing the need
+ * to call load_plugin_texdomain() or load_theme_texdomain().
+ *
+ * @since 4.6.0
+ * @access private
+ *
+ * @see get_translations_for_domain()
+ * @global array $l10n_unloaded An array of all text domains that have been unloaded again.
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @return bool True when the textdomain is successfully loaded, false otherwise.
+ */
+function _load_textdomain_just_in_time( $domain ) {
+	global $l10n_unloaded;
+
+	$l10n_unloaded = (array) $l10n_unloaded;
+
+	// Short-circuit if domain is 'default' which is reserved for core.
+	if ( 'default' === $domain || isset( $l10n_unloaded[ $domain ] ) ) {
+		return false;
+	}
+
+	$translation_path = _get_path_to_translation( $domain );
+	if ( false === $translation_path ) {
+		return false;
+	}
+
+	return load_textdomain( $domain, $translation_path );
+}
+
+/**
+ * Gets the path to a translation file for loading a textdomain just in time.
+ *
+ * Caches the retrieved results internally.
+ *
+ * @since 4.7.0
+ * @access private
+ *
+ * @see _load_textdomain_just_in_time()
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @param bool   $reset  Whether to reset the internal cache. Used by the switch to locale functionality.
+ * @return string|false The path to the translation file or false if no translation file was found.
+ */
+function _get_path_to_translation( $domain, $reset = false ) {
+	static $available_translations = array();
+
+	if ( true === $reset ) {
+		$available_translations = array();
+	}
+
+	if ( ! isset( $available_translations[ $domain ] ) ) {
+		$available_translations[ $domain ] = _get_path_to_translation_from_lang_dir( $domain );
+	}
+
+	return $available_translations[ $domain ];
+}
+
+/**
+ * Gets the path to a translation file in the languages directory for the current locale.
+ *
+ * Holds a cached list of available .mo files to improve performance.
+ *
+ * @since 4.7.0
+ * @access private
+ *
+ * @see _get_path_to_translation()
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @return string|false The path to the translation file or false if no translation file was found.
+ */
+function _get_path_to_translation_from_lang_dir( $domain ) {
+	static $cached_mofiles = null;
+
+	if ( null === $cached_mofiles ) {
+		$cached_mofiles = array();
+
+		$locations = array(
+			WP_LANG_DIR . '/plugins',
+			WP_LANG_DIR . '/themes',
+		);
+
+		foreach ( $locations as $location ) {
+			$mofiles = glob( $location . '/*.mo' );
+			if ( $mofiles ) {
+				$cached_mofiles = array_merge( $cached_mofiles, $mofiles );
+			}
+		}
+	}
+
+	$locale = is_admin() ? get_user_locale() : get_locale();
+	$mofile = "{$domain}-{$locale}.mo";
+
+	$path = WP_LANG_DIR . '/plugins/' . $mofile;
+	if ( in_array( $path, $cached_mofiles ) ) {
+		return $path;
+	}
+
+	$path = WP_LANG_DIR . '/themes/' . $mofile;
+	if ( in_array( $path, $cached_mofiles ) ) {
+		return $path;
+	}
+
+	return false;
+}
+
+/**
+ * Return the Translations instance for a text domain.
+ *
+ * If there isn't one, returns empty Translations instance.
+ *
+ * @since 2.8.0
+ *
+ * @global array $l10n
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @return Translations|NOOP_Translations A Translations instance.
+ */
+function get_translations_for_domain( $domain ) {
+	global $l10n;
+	if ( isset( $l10n[ $domain ] ) || ( _load_textdomain_just_in_time( $domain ) && isset( $l10n[ $domain ] ) ) ) {
+		return $l10n[ $domain ];
+	}
+
+	static $noop_translations = null;
+	if ( null === $noop_translations ) {
+		$noop_translations = new NOOP_Translations;
+	}
+
+	return $noop_translations;
+}
+
+/**
+ * Whether there are translations for the text domain.
+ *
+ * @since 3.0.0
+ *
+ * @global array $l10n
+ *
+ * @param string $domain Text domain. Unique identifier for retrieving translated strings.
+ * @return bool Whether there are translations.
+ */
+function is_textdomain_loaded( $domain ) {
+	global $l10n;
+	return isset( $l10n[ $domain ] );
+}
+
+/**
+ * Translates role name.
+ *
+ * Since the role names are in the database and not in the source there
+ * are dummy gettext calls to get them into the POT file and this function
+ * properly translates them back.
+ *
+ * The before_last_bar() call is needed, because older installations keep the roles
+ * using the old context format: 'Role name|User role' and just skipping the
+ * content after the last bar is easier than fixing them in the DB. New installations
+ * won't suffer from that problem.
+ *
+ * @since 2.8.0
+ *
+ * @param string $name The role name.
+ * @return string Translated role name on success, original name on failure.
+ */
+function translate_user_role( $name ) {
+	return translate_with_gettext_context( before_last_bar($name), 'User role' );
+}
+
+/**
+ * Get all available languages based on the presence of *.mo files in a given directory.
+ *
+ * The default directory is WP_LANG_DIR.
+ *
+ * @since 3.0.0
+ * @since 4.7.0 The results are now filterable with the {@see 'get_available_languages'} filter.
+ *
+ * @param string $dir A directory to search for language files.
+ *                    Default WP_LANG_DIR.
+ * @return array An array of language codes or an empty array if no languages are present. Language codes are formed by stripping the .mo extension from the language file names.
+ */
+function get_available_languages( $dir = null ) {
+	$languages = array();
+
+	$lang_files = glob( ( is_null( $dir ) ? WP_LANG_DIR : $dir ) . '/*.mo' );
+	if ( $lang_files ) {
+		foreach ( $lang_files as $lang_file ) {
+			$lang_file = basename( $lang_file, '.mo' );
+			if ( 0 !== strpos( $lang_file, 'continents-cities' ) && 0 !== strpos( $lang_file, 'ms-' ) &&
+				0 !== strpos( $lang_file, 'admin-' ) ) {
+				$languages[] = $lang_file;
+			}
+		}
+	}
+
+	/**
+	 * Filters the list of available language codes.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array  $languages An array of available language codes.
+	 * @param string $dir       The directory where the language files were found.
+	 */
+	return apply_filters( 'get_available_languages', $languages, $dir );
+}
+
+/**
+ * Get installed translations.
+ *
+ * Looks in the wp-content/languages directory for translations of
+ * plugins or themes.
+ *
+ * @since 3.7.0
+ *
+ * @param string $type What to search for. Accepts 'plugins', 'themes', 'core'.
+ * @return array Array of language data.
+ */
+function wp_get_installed_translations( $type ) {
+	if ( $type !== 'themes' && $type !== 'plugins' && $type !== 'core' )
+		return array();
+
+	$dir = 'core' === $type ? '' : "/$type";
+
+	if ( ! is_dir( WP_LANG_DIR ) )
+		return array();
+
+	if ( $dir && ! is_dir( WP_LANG_DIR . $dir ) )
+		return array();
+
+	$files = scandir( WP_LANG_DIR . $dir );
+	if ( ! $files )
+		return array();
+
+	$language_data = array();
+
+	foreach ( $files as $file ) {
+		if ( '.' === $file[0] || is_dir( WP_LANG_DIR . "$dir/$file" ) ) {
+			continue;
+		}
+		if ( substr( $file, -3 ) !== '.po' ) {
+			continue;
+		}
+		if ( ! preg_match( '/(?:(.+)-)?([a-z]{2,3}(?:_[A-Z]{2})?(?:_[a-z0-9]+)?).po/', $file, $match ) ) {
+			continue;
+		}
+		if ( ! in_array( substr( $file, 0, -3 ) . '.mo', $files ) )  {
+			continue;
+		}
+
+		list( , $textdomain, $language ) = $match;
+		if ( '' === $textdomain ) {
+			$textdomain = 'default';
+		}
+		$language_data[ $textdomain ][ $language ] = wp_get_pomo_file_data( WP_LANG_DIR . "$dir/$file" );
+	}
+	return $language_data;
+}
+
+/**
+ * Extract headers from a PO file.
+ *
+ * @since 3.7.0
+ *
+ * @param string $po_file Path to PO file.
+ * @return array PO file headers.
+ */
+function wp_get_pomo_file_data( $po_file ) {
+	$headers = get_file_data( $po_file, array(
+		'POT-Creation-Date'  => '"POT-Creation-Date',
+		'PO-Revision-Date'   => '"PO-Revision-Date',
+		'Project-Id-Version' => '
