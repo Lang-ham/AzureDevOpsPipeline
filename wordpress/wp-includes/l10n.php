@@ -150,4 +150,290 @@ function before_last_bar( $string ) {
 	if ( false === $last_bar ) {
 		return $string;
 	} else {
-		return substr( $str
+		return substr( $string, 0, $last_bar );
+	}
+}
+
+/**
+ * Retrieve the translation of $text in the context defined in $context.
+ *
+ * If there is no translation, or the text domain isn't loaded the original
+ * text is returned.
+ *
+ * *Note:* Don't use translate_with_gettext_context() directly, use _x() or related functions.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text    Text to translate.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string Translated text on success, original text on failure.
+ */
+function translate_with_gettext_context( $text, $context, $domain = 'default' ) {
+	$translations = get_translations_for_domain( $domain );
+	$translation  = $translations->translate( $text, $context );
+	/**
+	 * Filters text with its translation based on context information.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $translation  Translated text.
+	 * @param string $text         Text to translate.
+	 * @param string $context      Context information for the translators.
+	 * @param string $domain       Text domain. Unique identifier for retrieving translated strings.
+	 */
+	return apply_filters( 'gettext_with_context', $translation, $text, $context, $domain );
+}
+
+/**
+ * Retrieve the translation of $text.
+ *
+ * If there is no translation, or the text domain isn't loaded, the original text is returned.
+ *
+ * @since 2.1.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ * @return string Translated text.
+ */
+function __( $text, $domain = 'default' ) {
+	return translate( $text, $domain );
+}
+
+/**
+ * Retrieve the translation of $text and escapes it for safe use in an attribute.
+ *
+ * If there is no translation, or the text domain isn't loaded, the original text is returned.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ * @return string Translated text on success, original text on failure.
+ */
+function esc_attr__( $text, $domain = 'default' ) {
+	return esc_attr( translate( $text, $domain ) );
+}
+
+/**
+ * Retrieve the translation of $text and escapes it for safe use in HTML output.
+ *
+ * If there is no translation, or the text domain isn't loaded, the original text
+ * is escaped and returned..
+ *
+ * @since 2.8.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ * @return string Translated text
+ */
+function esc_html__( $text, $domain = 'default' ) {
+	return esc_html( translate( $text, $domain ) );
+}
+
+/**
+ * Display translated text.
+ *
+ * @since 1.2.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ */
+function _e( $text, $domain = 'default' ) {
+	echo translate( $text, $domain );
+}
+
+/**
+ * Display translated text that has been escaped for safe use in an attribute.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ */
+function esc_attr_e( $text, $domain = 'default' ) {
+	echo esc_attr( translate( $text, $domain ) );
+}
+
+/**
+ * Display translated text that has been escaped for safe use in HTML output.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ */
+function esc_html_e( $text, $domain = 'default' ) {
+	echo esc_html( translate( $text, $domain ) );
+}
+
+/**
+ * Retrieve translated string with gettext context.
+ *
+ * Quite a few times, there will be collisions with similar translatable text
+ * found in more than two places, but with different translated context.
+ *
+ * By including the context in the pot file, translators can translate the two
+ * strings differently.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text    Text to translate.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string Translated context string without pipe.
+ */
+function _x( $text, $context, $domain = 'default' ) {
+	return translate_with_gettext_context( $text, $context, $domain );
+}
+
+/**
+ * Display translated string with gettext context.
+ *
+ * @since 3.0.0
+ *
+ * @param string $text    Text to translate.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string Translated context string without pipe.
+ */
+function _ex( $text, $context, $domain = 'default' ) {
+	echo _x( $text, $context, $domain );
+}
+
+/**
+ * Translate string with gettext context, and escapes it for safe use in an attribute.
+ *
+ * @since 2.8.0
+ *
+ * @param string $text    Text to translate.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string Translated text
+ */
+function esc_attr_x( $text, $context, $domain = 'default' ) {
+	return esc_attr( translate_with_gettext_context( $text, $context, $domain ) );
+}
+
+/**
+ * Translate string with gettext context, and escapes it for safe use in HTML output.
+ *
+ * @since 2.9.0
+ *
+ * @param string $text    Text to translate.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string Translated text.
+ */
+function esc_html_x( $text, $context, $domain = 'default' ) {
+	return esc_html( translate_with_gettext_context( $text, $context, $domain ) );
+}
+
+/**
+ * Translates and retrieves the singular or plural form based on the supplied number.
+ *
+ * Used when you want to use the appropriate form of a string based on whether a
+ * number is singular or plural.
+ *
+ * Example:
+ *
+ *     printf( _n( '%s person', '%s people', $count, 'text-domain' ), number_format_i18n( $count ) );
+ *
+ * @since 2.8.0
+ *
+ * @param string $single The text to be used if the number is singular.
+ * @param string $plural The text to be used if the number is plural.
+ * @param int    $number The number to compare against to use either the singular or plural form.
+ * @param string $domain Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                       Default 'default'.
+ * @return string The translated singular or plural form.
+ */
+function _n( $single, $plural, $number, $domain = 'default' ) {
+	$translations = get_translations_for_domain( $domain );
+	$translation  = $translations->translate_plural( $single, $plural, $number );
+
+	/**
+	 * Filters the singular or plural form of a string.
+	 *
+	 * @since 2.2.0
+	 *
+	 * @param string $translation Translated text.
+	 * @param string $single      The text to be used if the number is singular.
+	 * @param string $plural      The text to be used if the number is plural.
+	 * @param string $number      The number to compare against to use either the singular or plural form.
+	 * @param string $domain      Text domain. Unique identifier for retrieving translated strings.
+	 */
+	return apply_filters( 'ngettext', $translation, $single, $plural, $number, $domain );
+}
+
+/**
+ * Translates and retrieves the singular or plural form based on the supplied number, with gettext context.
+ *
+ * This is a hybrid of _n() and _x(). It supports context and plurals.
+ *
+ * Used when you want to use the appropriate form of a string with context based on whether a
+ * number is singular or plural.
+ *
+ * Example of a generic phrase which is disambiguated via the context parameter:
+ *
+ *     printf( _nx( '%s group', '%s groups', $people, 'group of people', 'text-domain' ), number_format_i18n( $people ) );
+ *     printf( _nx( '%s group', '%s groups', $animals, 'group of animals', 'text-domain' ), number_format_i18n( $animals ) );
+ *
+ * @since 2.8.0
+ *
+ * @param string $single  The text to be used if the number is singular.
+ * @param string $plural  The text to be used if the number is plural.
+ * @param int    $number  The number to compare against to use either the singular or plural form.
+ * @param string $context Context information for the translators.
+ * @param string $domain  Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                        Default 'default'.
+ * @return string The translated singular or plural form.
+ */
+function _nx($single, $plural, $number, $context, $domain = 'default') {
+	$translations = get_translations_for_domain( $domain );
+	$translation  = $translations->translate_plural( $single, $plural, $number, $context );
+
+	/**
+	 * Filters the singular or plural form of a string with gettext context.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param string $translation Translated text.
+	 * @param string $single      The text to be used if the number is singular.
+	 * @param string $plural      The text to be used if the number is plural.
+	 * @param string $number      The number to compare against to use either the singular or plural form.
+	 * @param string $context     Context information for the translators.
+	 * @param string $domain      Text domain. Unique identifier for retrieving translated strings.
+	 */
+	return apply_filters( 'ngettext_with_context', $translation, $single, $plural, $number, $context, $domain );
+}
+
+/**
+ * Registers plural strings in POT file, but does not translate them.
+ *
+ * Used when you want to keep structures with translatable plural
+ * strings and use them later when the number is known.
+ *
+ * Example:
+ *
+ *     $message = _n_noop( '%s post', '%s posts', 'text-domain' );
+ *     ...
+ *     printf( translate_nooped_plural( $message, $count, 'text-domain' ), number_format_i18n( $count ) );
+ *
+ * @since 2.5.0
+ *
+ * @param string $singular Singular form to be localized.
+ * @param string $plural   Plural form to be localized.
+ * @param string $domain   Optional. Text domain. Unique identifier for retrieving translated strings.
+ *                         Defa
