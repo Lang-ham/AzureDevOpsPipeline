@@ -1094,4 +1094,241 @@ function wp_get_pomo_file_data( $po_file ) {
 	$headers = get_file_data( $po_file, array(
 		'POT-Creation-Date'  => '"POT-Creation-Date',
 		'PO-Revision-Date'   => '"PO-Revision-Date',
-		'Project-Id-Version' => '
+		'Project-Id-Version' => '"Project-Id-Version',
+		'X-Generator'        => '"X-Generator',
+	) );
+	foreach ( $headers as $header => $value ) {
+		// Remove possible contextual '\n' and closing double quote.
+		$headers[ $header ] = preg_replace( '~(\\\n)?"$~', '', $value );
+	}
+	return $headers;
+}
+
+/**
+ * Language selector.
+ *
+ * @since 4.0.0
+ * @since 4.3.0 Introduced the `echo` argument.
+ * @since 4.7.0 Introduced the `show_option_site_default` argument.
+ *
+ * @see get_available_languages()
+ * @see wp_get_available_translations()
+ *
+ * @param string|array $args {
+ *     Optional. Array or string of arguments for outputting the language selector.
+ *
+ *     @type string   $id                           ID attribute of the select element. Default 'locale'.
+ *     @type string   $name                         Name attribute of the select element. Default 'locale'.
+ *     @type array    $languages                    List of installed languages, contain only the locales.
+ *                                                  Default empty array.
+ *     @type array    $translations                 List of available translations. Default result of
+ *                                                  wp_get_available_translations().
+ *     @type string   $selected                     Language which should be selected. Default empty.
+ *     @type bool|int $echo                         Whether to echo the generated markup. Accepts 0, 1, or their
+ *                                                  boolean equivalents. Default 1.
+ *     @type bool     $show_available_translations  Whether to show available translations. Default true.
+ *     @type bool     $show_option_site_default     Whether to show an option to fall back to the site's locale. Default false.
+ * }
+ * @return string HTML content
+ */
+function wp_dropdown_languages( $args = array() ) {
+
+	$parsed_args = wp_parse_args( $args, array(
+		'id'           => 'locale',
+		'name'         => 'locale',
+		'languages'    => array(),
+		'translations' => array(),
+		'selected'     => '',
+		'echo'         => 1,
+		'show_available_translations' => true,
+		'show_option_site_default'    => false,
+	) );
+
+	// Bail if no ID or no name.
+	if ( ! $parsed_args['id'] || ! $parsed_args['name'] ) {
+		return;
+	}
+
+	// English (United States) uses an empty string for the value attribute.
+	if ( 'en_US' === $parsed_args['selected'] ) {
+		$parsed_args['selected'] = '';
+	}
+
+	$translations = $parsed_args['translations'];
+	if ( empty( $translations ) ) {
+		require_once( ABSPATH . 'wp-admin/includes/translation-install.php' );
+		$translations = wp_get_available_translations();
+	}
+
+	/*
+	 * $parsed_args['languages'] should only contain the locales. Find the locale in
+	 * $translations to get the native name. Fall back to locale.
+	 */
+	$languages = array();
+	foreach ( $parsed_args['languages'] as $locale ) {
+		if ( isset( $translations[ $locale ] ) ) {
+			$translation = $translations[ $locale ];
+			$languages[] = array(
+				'language'    => $translation['language'],
+				'native_name' => $translation['native_name'],
+				'lang'        => current( $translation['iso'] ),
+			);
+
+			// Remove installed language from available translations.
+			unset( $translations[ $locale ] );
+		} else {
+			$languages[] = array(
+				'language'    => $locale,
+				'native_name' => $locale,
+				'lang'        => '',
+			);
+		}
+	}
+
+	$translations_available = ( ! empty( $translations ) && $parsed_args['show_available_translations'] );
+
+	// Holds the HTML markup.
+	$structure = array();
+
+	// List installed languages.
+	if ( $translations_available ) {
+		$structure[] = '<optgroup label="' . esc_attr_x( 'Installed', 'translations' ) . '">';
+	}
+
+	// Site default.
+	if ( $parsed_args['show_option_site_default'] ) {
+		$structure[] = sprintf(
+			'<option value="site-default" data-installed="1"%s>%s</option>',
+			selected( 'site-default', $parsed_args['selected'], false ),
+			_x( 'Site Default', 'default site language' )
+		);
+	}
+
+	// Always show English.
+	$structure[] = sprintf(
+		'<option value="" lang="en" data-installed="1"%s>English (United States)</option>',
+		selected( '', $parsed_args['selected'], false )
+	);
+
+	// List installed languages. 
+	foreach ( $languages as $language ) {
+		$structure[] = sprintf(
+			'<option value="%s" lang="%s"%s data-installed="1">%s</option>',
+			esc_attr( $language['language'] ),
+			esc_attr( $language['lang'] ),
+			selected( $language['language'], $parsed_args['selected'], false ),
+			esc_html( $language['native_name'] )
+		);
+	}
+	if ( $translations_available ) {
+		$structure[] = '</optgroup>';
+	}
+
+	// List available translations.
+	if ( $translations_available ) {
+		$structure[] = '<optgroup label="' . esc_attr_x( 'Available', 'translations' ) . '">';
+		foreach ( $translations as $translation ) {
+			$structure[] = sprintf(
+				'<option value="%s" lang="%s"%s>%s</option>',
+				esc_attr( $translation['language'] ),
+				esc_attr( current( $translation['iso'] ) ),
+				selected( $translation['language'], $parsed_args['selected'], false ),
+				esc_html( $translation['native_name'] )
+			);
+		}
+		$structure[] = '</optgroup>';
+	}
+
+	// Combine the output string.
+	$output  = sprintf( '<select name="%s" id="%s">', esc_attr( $parsed_args['name'] ), esc_attr( $parsed_args['id'] ) );
+	$output .= join( "\n", $structure );
+	$output .= '</select>';
+
+	if ( $parsed_args['echo'] ) {
+		echo $output;
+	}
+
+	return $output;
+}
+
+/**
+ * Checks if current locale is RTL.
+ *
+ * @since 3.0.0
+ *
+ * @global WP_Locale $wp_locale
+ *
+ * @return bool Whether locale is RTL.
+ */
+function is_rtl() {
+	global $wp_locale;
+	if ( ! ( $wp_locale instanceof WP_Locale ) ) {
+		return false;
+	}
+	return $wp_locale->is_rtl();
+}
+
+/**
+ * Switches the translations according to the given locale.
+ *
+ * @since 4.7.0
+ *
+ * @global WP_Locale_Switcher $wp_locale_switcher
+ *
+ * @param string $locale The locale.
+ * @return bool True on success, false on failure.
+ */
+function switch_to_locale( $locale ) {
+	/* @var WP_Locale_Switcher $wp_locale_switcher */
+	global $wp_locale_switcher;
+
+	return $wp_locale_switcher->switch_to_locale( $locale );
+}
+
+/**
+ * Restores the translations according to the previous locale.
+ *
+ * @since 4.7.0
+ *
+ * @global WP_Locale_Switcher $wp_locale_switcher
+ *
+ * @return string|false Locale on success, false on error.
+ */
+function restore_previous_locale() {
+	/* @var WP_Locale_Switcher $wp_locale_switcher */
+	global $wp_locale_switcher;
+
+	return $wp_locale_switcher->restore_previous_locale();
+}
+
+/**
+ * Restores the translations according to the original locale.
+ *
+ * @since 4.7.0
+ *
+ * @global WP_Locale_Switcher $wp_locale_switcher
+ *
+ * @return string|false Locale on success, false on error.
+ */
+function restore_current_locale() {
+	/* @var WP_Locale_Switcher $wp_locale_switcher */
+	global $wp_locale_switcher;
+
+	return $wp_locale_switcher->restore_current_locale();
+}
+
+/**
+ * Whether switch_to_locale() is in effect.
+ *
+ * @since 4.7.0
+ *
+ * @global WP_Locale_Switcher $wp_locale_switcher
+ *
+ * @return bool True if the locale has been switched, false otherwise.
+ */
+function is_locale_switched() {
+	/* @var WP_Locale_Switcher $wp_locale_switcher */
+	global $wp_locale_switcher;
+
+	return $wp_locale_switcher->is_switched();
+}
