@@ -423,4 +423,374 @@ function delete_metadata($meta_type, $object_id, $meta_key, $meta_value = '', $d
 	 *
 	 * @param array  $meta_ids   An array of deleted metadata entry IDs.
 	 * @param int    $object_id  Object ID.
-	 * @param string $meta_key   Meta key
+	 * @param string $meta_key   Meta key.
+	 * @param mixed  $meta_value Meta value.
+	 */
+	do_action( "deleted_{$meta_type}_meta", $meta_ids, $object_id, $meta_key, $_meta_value );
+
+	// Old-style action.
+	if ( 'post' == $meta_type ) {
+		/**
+		 * Fires immediately after deleting metadata for a post.
+		 *
+		 * @since 2.9.0
+		 *
+		 * @param array $meta_ids An array of deleted post metadata entry IDs.
+		 */
+		do_action( 'deleted_postmeta', $meta_ids );
+	}
+
+	return true;
+}
+
+/**
+ * Retrieve metadata for the specified object.
+ *
+ * @since 2.9.0
+ *
+ * @param string $meta_type Type of object metadata is for (e.g., comment, post, or user)
+ * @param int    $object_id ID of the object metadata is for
+ * @param string $meta_key  Optional. Metadata key. If not specified, retrieve all metadata for
+ * 		                    the specified object.
+ * @param bool   $single    Optional, default is false.
+ *                          If true, return only the first value of the specified meta_key.
+ *                          This parameter has no effect if meta_key is not specified.
+ * @return mixed Single metadata value, or array of values
+ */
+function get_metadata($meta_type, $object_id, $meta_key = '', $single = false) {
+	if ( ! $meta_type || ! is_numeric( $object_id ) ) {
+		return false;
+	}
+
+	$object_id = absint( $object_id );
+	if ( ! $object_id ) {
+		return false;
+	}
+
+	/**
+	 * Filters whether to retrieve metadata of a specific type.
+	 *
+	 * The dynamic portion of the hook, `$meta_type`, refers to the meta
+	 * object type (comment, post, or user). Returning a non-null value
+	 * will effectively short-circuit the function.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param null|array|string $value     The value get_metadata() should return - a single metadata value,
+	 *                                     or an array of values.
+	 * @param int               $object_id Object ID.
+	 * @param string            $meta_key  Meta key.
+	 * @param bool              $single    Whether to return only the first value of the specified $meta_key.
+	 */
+	$check = apply_filters( "get_{$meta_type}_metadata", null, $object_id, $meta_key, $single );
+	if ( null !== $check ) {
+		if ( $single && is_array( $check ) )
+			return $check[0];
+		else
+			return $check;
+	}
+
+	$meta_cache = wp_cache_get($object_id, $meta_type . '_meta');
+
+	if ( !$meta_cache ) {
+		$meta_cache = update_meta_cache( $meta_type, array( $object_id ) );
+		$meta_cache = $meta_cache[$object_id];
+	}
+
+	if ( ! $meta_key ) {
+		return $meta_cache;
+	}
+
+	if ( isset($meta_cache[$meta_key]) ) {
+		if ( $single )
+			return maybe_unserialize( $meta_cache[$meta_key][0] );
+		else
+			return array_map('maybe_unserialize', $meta_cache[$meta_key]);
+	}
+
+	if ($single)
+		return '';
+	else
+		return array();
+}
+
+/**
+ * Determine if a meta key is set for a given object
+ *
+ * @since 3.3.0
+ *
+ * @param string $meta_type Type of object metadata is for (e.g., comment, post, or user)
+ * @param int    $object_id ID of the object metadata is for
+ * @param string $meta_key  Metadata key.
+ * @return bool True of the key is set, false if not.
+ */
+function metadata_exists( $meta_type, $object_id, $meta_key ) {
+	if ( ! $meta_type || ! is_numeric( $object_id ) ) {
+		return false;
+	}
+
+	$object_id = absint( $object_id );
+	if ( ! $object_id ) {
+		return false;
+	}
+
+	/** This filter is documented in wp-includes/meta.php */
+	$check = apply_filters( "get_{$meta_type}_metadata", null, $object_id, $meta_key, true );
+	if ( null !== $check )
+		return (bool) $check;
+
+	$meta_cache = wp_cache_get( $object_id, $meta_type . '_meta' );
+
+	if ( !$meta_cache ) {
+		$meta_cache = update_meta_cache( $meta_type, array( $object_id ) );
+		$meta_cache = $meta_cache[$object_id];
+	}
+
+	if ( isset( $meta_cache[ $meta_key ] ) )
+		return true;
+
+	return false;
+}
+
+/**
+ * Get meta data by meta ID
+ *
+ * @since 3.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $meta_type Type of object metadata is for (e.g., comment, post, term, or user).
+ * @param int    $meta_id   ID for a specific meta row
+ * @return object|false Meta object or false.
+ */
+function get_metadata_by_mid( $meta_type, $meta_id ) {
+	global $wpdb;
+
+	if ( ! $meta_type || ! is_numeric( $meta_id ) || floor( $meta_id ) != $meta_id ) {
+		return false;
+	}
+
+	$meta_id = intval( $meta_id );
+	if ( $meta_id <= 0 ) {
+		return false;
+	}
+
+	$table = _get_meta_table( $meta_type );
+	if ( ! $table ) {
+		return false;
+	}
+
+	$id_column = ( 'user' == $meta_type ) ? 'umeta_id' : 'meta_id';
+
+	$meta = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE $id_column = %d", $meta_id ) );
+
+	if ( empty( $meta ) )
+		return false;
+
+	if ( isset( $meta->meta_value ) )
+		$meta->meta_value = maybe_unserialize( $meta->meta_value );
+
+	return $meta;
+}
+
+/**
+ * Update meta data by meta ID
+ *
+ * @since 3.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $meta_type  Type of object metadata is for (e.g., comment, post, or user)
+ * @param int    $meta_id    ID for a specific meta row
+ * @param string $meta_value Metadata value
+ * @param string $meta_key   Optional, you can provide a meta key to update it
+ * @return bool True on successful update, false on failure.
+ */
+function update_metadata_by_mid( $meta_type, $meta_id, $meta_value, $meta_key = false ) {
+	global $wpdb;
+
+	// Make sure everything is valid.
+	if ( ! $meta_type || ! is_numeric( $meta_id ) || floor( $meta_id ) != $meta_id ) {
+		return false;
+	}
+
+	$meta_id = intval( $meta_id );
+	if ( $meta_id <= 0 ) {
+		return false;
+	}
+
+	$table = _get_meta_table( $meta_type );
+	if ( ! $table ) {
+		return false;
+	}
+
+	$column = sanitize_key($meta_type . '_id');
+	$id_column = 'user' == $meta_type ? 'umeta_id' : 'meta_id';
+
+	// Fetch the meta and go on if it's found.
+	if ( $meta = get_metadata_by_mid( $meta_type, $meta_id ) ) {
+		$original_key = $meta->meta_key;
+		$object_id = $meta->{$column};
+
+		// If a new meta_key (last parameter) was specified, change the meta key,
+		// otherwise use the original key in the update statement.
+		if ( false === $meta_key ) {
+			$meta_key = $original_key;
+		} elseif ( ! is_string( $meta_key ) ) {
+			return false;
+		}
+
+		// Sanitize the meta
+		$_meta_value = $meta_value;
+		$meta_value = sanitize_meta( $meta_key, $meta_value, $meta_type );
+		$meta_value = maybe_serialize( $meta_value );
+
+		// Format the data query arguments.
+		$data = array(
+			'meta_key' => $meta_key,
+			'meta_value' => $meta_value
+		);
+
+		// Format the where query arguments.
+		$where = array();
+		$where[$id_column] = $meta_id;
+
+		/** This action is documented in wp-includes/meta.php */
+		do_action( "update_{$meta_type}_meta", $meta_id, $object_id, $meta_key, $_meta_value );
+
+		if ( 'post' == $meta_type ) {
+			/** This action is documented in wp-includes/meta.php */
+			do_action( 'update_postmeta', $meta_id, $object_id, $meta_key, $meta_value );
+		}
+
+		// Run the update query, all fields in $data are %s, $where is a %d.
+		$result = $wpdb->update( $table, $data, $where, '%s', '%d' );
+		if ( ! $result )
+			return false;
+
+		// Clear the caches.
+		wp_cache_delete($object_id, $meta_type . '_meta');
+
+		/** This action is documented in wp-includes/meta.php */
+		do_action( "updated_{$meta_type}_meta", $meta_id, $object_id, $meta_key, $_meta_value );
+
+		if ( 'post' == $meta_type ) {
+			/** This action is documented in wp-includes/meta.php */
+			do_action( 'updated_postmeta', $meta_id, $object_id, $meta_key, $meta_value );
+		}
+
+		return true;
+	}
+
+	// And if the meta was not found.
+	return false;
+}
+
+/**
+ * Delete meta data by meta ID
+ *
+ * @since 3.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $meta_type Type of object metadata is for (e.g., comment, post, term, or user).
+ * @param int    $meta_id   ID for a specific meta row
+ * @return bool True on successful delete, false on failure.
+ */
+function delete_metadata_by_mid( $meta_type, $meta_id ) {
+	global $wpdb;
+
+	// Make sure everything is valid.
+	if ( ! $meta_type || ! is_numeric( $meta_id ) || floor( $meta_id ) != $meta_id ) {
+		return false;
+	}
+
+	$meta_id = intval( $meta_id );
+	if ( $meta_id <= 0 ) {
+		return false;
+	}
+
+	$table = _get_meta_table( $meta_type );
+	if ( ! $table ) {
+		return false;
+	}
+
+	// object and id columns
+	$column = sanitize_key($meta_type . '_id');
+	$id_column = 'user' == $meta_type ? 'umeta_id' : 'meta_id';
+
+	// Fetch the meta and go on if it's found.
+	if ( $meta = get_metadata_by_mid( $meta_type, $meta_id ) ) {
+		$object_id = $meta->{$column};
+
+		/** This action is documented in wp-includes/meta.php */
+		do_action( "delete_{$meta_type}_meta", (array) $meta_id, $object_id, $meta->meta_key, $meta->meta_value );
+
+		// Old-style action.
+		if ( 'post' == $meta_type || 'comment' == $meta_type ) {
+			/**
+			 * Fires immediately before deleting post or comment metadata of a specific type.
+			 *
+			 * The dynamic portion of the hook, `$meta_type`, refers to the meta
+			 * object type (post or comment).
+			 *
+			 * @since 3.4.0
+			 *
+			 * @param int $meta_id ID of the metadata entry to delete.
+			 */
+			do_action( "delete_{$meta_type}meta", $meta_id );
+		}
+
+		// Run the query, will return true if deleted, false otherwise
+		$result = (bool) $wpdb->delete( $table, array( $id_column => $meta_id ) );
+
+		// Clear the caches.
+		wp_cache_delete($object_id, $meta_type . '_meta');
+
+		/** This action is documented in wp-includes/meta.php */
+		do_action( "deleted_{$meta_type}_meta", (array) $meta_id, $object_id, $meta->meta_key, $meta->meta_value );
+
+		// Old-style action.
+		if ( 'post' == $meta_type || 'comment' == $meta_type ) {
+			/**
+			 * Fires immediately after deleting post or comment metadata of a specific type.
+			 *
+			 * The dynamic portion of the hook, `$meta_type`, refers to the meta
+			 * object type (post or comment).
+			 *
+			 * @since 3.4.0
+			 *
+			 * @param int $meta_ids Deleted metadata entry ID.
+			 */
+			do_action( "deleted_{$meta_type}meta", $meta_id );
+		}
+
+		return $result;
+
+	}
+
+	// Meta id was not found.
+	return false;
+}
+
+/**
+ * Update the metadata cache for the specified objects.
+ *
+ * @since 2.9.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string    $meta_type  Type of object metadata is for (e.g., comment, post, or user)
+ * @param int|array $object_ids Array or comma delimited list of object IDs to update cache for
+ * @return array|false Metadata cache for the specified objects, or false on failure.
+ */
+function update_meta_cache($meta_type, $object_ids) {
+	global $wpdb;
+
+	if ( ! $meta_type || ! $object_ids ) {
+		return false;
+	}
+
+	$table = _get_meta_table( $meta_type );
+	if ( ! $table ) {
+		return false
