@@ -1152,4 +1152,60 @@ function get_registered_meta_keys( $object_type ) {
  * @param string $object_type Type of object to request metadata for. (e.g. comment, post, term, user)
  * @param int    $object_id   ID of the object the metadata is for.
  * @param string $meta_key    Optional. Registered metadata key. If not specified, retrieve all registered
+ *                            metadata for the specified object.
+ * @return mixed A single value or array of values for a key if specified. An array of all registered keys
+ *               and values for an object ID if not.
+ */
+function get_registered_metadata( $object_type, $object_id, $meta_key = '' ) {
+	if ( ! empty( $meta_key ) ) {
+		if ( ! registered_meta_key_exists( $object_type, $meta_key ) ) {
+			return false;
+		}
+		$meta_keys = get_registered_meta_keys( $object_type );
+		$meta_key_data = $meta_keys[ $meta_key ];
+
+		$data = get_metadata( $object_type, $object_id, $meta_key, $meta_key_data['single'] );
+
+		return $data;
+	}
+
+	$data = get_metadata( $object_type, $object_id );
+
+	$meta_keys = get_registered_meta_keys( $object_type );
+	$registered_data = array();
+
+	// Someday, array_filter()
+	foreach ( $meta_keys as $k => $v ) {
+		if ( isset( $data[ $k ] ) ) {
+			$registered_data[ $k ] = $data[ $k ];
+		}
+	}
+
+	return $registered_data;
+}
+
+/**
+ * Filter out `register_meta()` args based on a whitelist.
+ * `register_meta()` args may change over time, so requiring the whitelist
+ * to be explicitly turned off is a warranty seal of sorts.
  *
+ * @access private
+ * @since  4.6.0
+ *
+ * @param  array $args         Arguments from `register_meta()`.
+ * @param  array $default_args Default arguments for `register_meta()`.
+ *
+ * @return array Filtered arguments.
+ */
+function _wp_register_meta_args_whitelist( $args, $default_args ) {
+	$whitelist = array_keys( $default_args );
+
+	// In an anonymous function world, this would be better as an array_filter()
+	foreach ( $args as $key => $value ) {
+		if ( ! in_array( $key, $whitelist ) ) {
+			unset( $args[ $key ] );
+		}
+	}
+
+	return $args;
+}
