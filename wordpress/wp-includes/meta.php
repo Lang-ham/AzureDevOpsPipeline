@@ -793,4 +793,363 @@ function update_meta_cache($meta_type, $object_ids) {
 
 	$table = _get_meta_table( $meta_type );
 	if ( ! $table ) {
-		return false
+		return false;
+	}
+
+	$column = sanitize_key($meta_type . '_id');
+
+	if ( !is_array($object_ids) ) {
+		$object_ids = preg_replace('|[^0-9,]|', '', $object_ids);
+		$object_ids = explode(',', $object_ids);
+	}
+
+	$object_ids = array_map('intval', $object_ids);
+
+	$cache_key = $meta_type . '_meta';
+	$ids = array();
+	$cache = array();
+	foreach ( $object_ids as $id ) {
+		$cached_object = wp_cache_get( $id, $cache_key );
+		if ( false === $cached_object )
+			$ids[] = $id;
+		else
+			$cache[$id] = $cached_object;
+	}
+
+	if ( empty( $ids ) )
+		return $cache;
+
+	// Get meta info
+	$id_list = join( ',', $ids );
+	$id_column = 'user' == $meta_type ? 'umeta_id' : 'meta_id';
+	$meta_list = $wpdb->get_results( "SELECT $column, meta_key, meta_value FROM $table WHERE $column IN ($id_list) ORDER BY $id_column ASC", ARRAY_A );
+
+	if ( !empty($meta_list) ) {
+		foreach ( $meta_list as $metarow) {
+			$mpid = intval($metarow[$column]);
+			$mkey = $metarow['meta_key'];
+			$mval = $metarow['meta_value'];
+
+			// Force subkeys to be array type:
+			if ( !isset($cache[$mpid]) || !is_array($cache[$mpid]) )
+				$cache[$mpid] = array();
+			if ( !isset($cache[$mpid][$mkey]) || !is_array($cache[$mpid][$mkey]) )
+				$cache[$mpid][$mkey] = array();
+
+			// Add a value to the current pid/key:
+			$cache[$mpid][$mkey][] = $mval;
+		}
+	}
+
+	foreach ( $ids as $id ) {
+		if ( ! isset($cache[$id]) )
+			$cache[$id] = array();
+		wp_cache_add( $id, $cache[$id], $cache_key );
+	}
+
+	return $cache;
+}
+
+/**
+ * Retrieves the queue for lazy-loading metadata.
+ *
+ * @since 4.5.0
+ *
+ * @return WP_Metadata_Lazyloader $lazyloader Metadata lazyloader queue.
+ */
+function wp_metadata_lazyloader() {
+	static $wp_metadata_lazyloader;
+
+	if ( null === $wp_metadata_lazyloader ) {
+		$wp_metadata_lazyloader = new WP_Metadata_Lazyloader();
+	}
+
+	return $wp_metadata_lazyloader;
+}
+
+/**
+ * Given a meta query, generates SQL clauses to be appended to a main query.
+ *
+ * @since 3.2.0
+ *
+ * @see WP_Meta_Query
+ *
+ * @param array $meta_query         A meta query.
+ * @param string $type              Type of meta.
+ * @param string $primary_table     Primary database table name.
+ * @param string $primary_id_column Primary ID column name.
+ * @param object $context           Optional. The main query object
+ * @return array Associative array of `JOIN` and `WHERE` SQL.
+ */
+function get_meta_sql( $meta_query, $type, $primary_table, $primary_id_column, $context = null ) {
+	$meta_query_obj = new WP_Meta_Query( $meta_query );
+	return $meta_query_obj->get_sql( $type, $primary_table, $primary_id_column, $context );
+}
+
+/**
+ * Retrieve the name of the metadata table for the specified object type.
+ *
+ * @since 2.9.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $type Type of object to get metadata table for (e.g., comment, post, or user)
+ * @return string|false Metadata table name, or false if no metadata table exists
+ */
+function _get_meta_table($type) {
+	global $wpdb;
+
+	$table_name = $type . 'meta';
+
+	if ( empty($wpdb->$table_name) )
+		return false;
+
+	return $wpdb->$table_name;
+}
+
+/**
+ * Determine whether a meta key is protected.
+ *
+ * @since 3.1.3
+ *
+ * @param string      $meta_key Meta key
+ * @param string|null $meta_type
+ * @return bool True if the key is protected, false otherwise.
+ */
+function is_protected_meta( $meta_key, $meta_type = null ) {
+	$protected = ( '_' == $meta_key[0] );
+
+	/**
+	 * Filters whether a meta key is protected.
+	 *
+	 * @since 3.2.0
+	 *
+	 * @param bool   $protected Whether the key is protected. Default false.
+	 * @param string $meta_key  Meta key.
+	 * @param string $meta_type Meta type.
+	 */
+	return apply_filters( 'is_protected_meta', $protected, $meta_key, $meta_type );
+}
+
+/**
+ * Sanitize meta value.
+ *
+ * @since 3.1.3
+ *
+ * @param string $meta_key       Meta key.
+ * @param mixed  $meta_value     Meta value to sanitize.
+ * @param string $object_type    Type of object the meta is registered to.
+ *
+ * @return mixed Sanitized $meta_value.
+ */
+function sanitize_meta( $meta_key, $meta_value, $object_type ) {
+	/**
+	 * Filters the sanitization of a specific meta key of a specific meta type.
+	 *
+	 * The dynamic portions of the hook name, `$meta_type`, and `$meta_key`,
+	 * refer to the metadata object type (comment, post, or user) and the meta
+	 * key value, respectively.
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param mixed  $meta_value      Meta value to sanitize.
+	 * @param string $meta_key        Meta key.
+	 * @param string $object_type     Object type.
+	 */
+	return apply_filters( "sanitize_{$object_type}_meta_{$meta_key}", $meta_value, $meta_key, $object_type );
+}
+
+/**
+ * Registers a meta key.
+ *
+ * @since 3.3.0
+ * @since 4.6.0 {@link https://core.trac.wordpress.org/ticket/35658 Modified
+ *              to support an array of data to attach to registered meta keys}. Previous arguments for
+ *              `$sanitize_callback` and `$auth_callback` have been folded into this array.
+ *
+ * @param string $object_type    Type of object this meta is registered to.
+ * @param string $meta_key       Meta key to register.
+ * @param array  $args {
+ *     Data used to describe the meta key when registered.
+ *
+ *     @type string $type              The type of data associated with this meta key.
+ *                                     Valid values are 'string', 'boolean', 'integer', and 'number'.
+ *     @type string $description       A description of the data attached to this meta key.
+ *     @type bool   $single            Whether the meta key has one value per object, or an array of values per object.
+ *     @type string $sanitize_callback A function or method to call when sanitizing `$meta_key` data.
+ *     @type string $auth_callback     Optional. A function or method to call when performing edit_post_meta, add_post_meta, and delete_post_meta capability checks.
+ *     @type bool   $show_in_rest      Whether data associated with this meta key can be considered public.
+ * }
+ * @param string|array $deprecated Deprecated. Use `$args` instead.
+ *
+ * @return bool True if the meta key was successfully registered in the global array, false if not.
+ *                       Registering a meta key with distinct sanitize and auth callbacks will fire those
+ *                       callbacks, but will not add to the global registry.
+ */
+function register_meta( $object_type, $meta_key, $args, $deprecated = null ) {
+	global $wp_meta_keys;
+
+	if ( ! is_array( $wp_meta_keys ) ) {
+		$wp_meta_keys = array();
+	}
+
+	$defaults = array(
+		'type'              => 'string',
+		'description'       => '',
+		'single'            => false,
+		'sanitize_callback' => null,
+		'auth_callback'     => null,
+		'show_in_rest'      => false,
+	);
+
+	// There used to be individual args for sanitize and auth callbacks
+	$has_old_sanitize_cb = false;
+	$has_old_auth_cb = false;
+
+	if ( is_callable( $args ) ) {
+		$args = array(
+			'sanitize_callback' => $args,
+		);
+
+		$has_old_sanitize_cb = true;
+	} else {
+		$args = (array) $args;
+	}
+
+	if ( is_callable( $deprecated ) ) {
+		$args['auth_callback'] = $deprecated;
+		$has_old_auth_cb = true;
+	}
+
+	/**
+	 * Filters the registration arguments when registering meta.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param array  $args        Array of meta registration arguments.
+	 * @param array  $defaults    Array of default arguments.
+	 * @param string $object_type Object type.
+	 * @param string $meta_key    Meta key.
+	 */
+	$args = apply_filters( 'register_meta_args', $args, $defaults, $object_type, $meta_key );
+	$args = wp_parse_args( $args, $defaults );
+
+	// If `auth_callback` is not provided, fall back to `is_protected_meta()`.
+	if ( empty( $args['auth_callback'] ) ) {
+		if ( is_protected_meta( $meta_key, $object_type ) ) {
+			$args['auth_callback'] = '__return_false';
+		} else {
+			$args['auth_callback'] = '__return_true';
+		}
+	}
+
+	// Back-compat: old sanitize and auth callbacks are applied to all of an object type.
+	if ( is_callable( $args['sanitize_callback'] ) ) {
+		add_filter( "sanitize_{$object_type}_meta_{$meta_key}", $args['sanitize_callback'], 10, 3 );
+	}
+
+	if ( is_callable( $args['auth_callback'] ) ) {
+		add_filter( "auth_{$object_type}_meta_{$meta_key}", $args['auth_callback'], 10, 6 );
+	}
+
+	// Global registry only contains meta keys registered with the array of arguments added in 4.6.0.
+	if ( ! $has_old_auth_cb && ! $has_old_sanitize_cb ) {
+		$wp_meta_keys[ $object_type ][ $meta_key ] = $args;
+
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Checks if a meta key is registered.
+ *
+ * @since 4.6.0
+ *
+ * @param string $object_type    The type of object.
+ * @param string $meta_key       The meta key.
+ *
+ * @return bool True if the meta key is registered to the object type. False if not.
+ */
+function registered_meta_key_exists( $object_type, $meta_key ) {
+	global $wp_meta_keys;
+
+	if ( ! is_array( $wp_meta_keys ) ) {
+		return false;
+	}
+
+	if ( ! isset( $wp_meta_keys[ $object_type ] ) ) {
+		return false;
+	}
+
+	if ( isset( $wp_meta_keys[ $object_type ][ $meta_key ] ) ) {
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Unregisters a meta key from the list of registered keys.
+ *
+ * @since 4.6.0
+ *
+ * @param string $object_type The type of object.
+ * @param string $meta_key    The meta key.
+ * @return bool True if successful. False if the meta key was not registered.
+ */
+function unregister_meta_key( $object_type, $meta_key ) {
+	global $wp_meta_keys;
+
+	if ( ! registered_meta_key_exists( $object_type, $meta_key ) ) {
+		return false;
+	}
+
+	$args = $wp_meta_keys[ $object_type ][ $meta_key ];
+
+	if ( isset( $args['sanitize_callback'] ) && is_callable( $args['sanitize_callback'] ) ) {
+		remove_filter( "sanitize_{$object_type}_meta_{$meta_key}", $args['sanitize_callback'] );
+	}
+
+	if ( isset( $args['auth_callback'] ) && is_callable( $args['auth_callback'] ) ) {
+		remove_filter( "auth_{$object_type}_meta_{$meta_key}", $args['auth_callback'] );
+	}
+
+	unset( $wp_meta_keys[ $object_type ][ $meta_key ] );
+
+	// Do some clean up
+	if ( empty( $wp_meta_keys[ $object_type ] ) ) {
+		unset( $wp_meta_keys[ $object_type ] );
+	}
+
+	return true;
+}
+
+/**
+ * Retrieves a list of registered meta keys for an object type.
+ *
+ * @since 4.6.0
+ *
+ * @param string $object_type The type of object. Post, comment, user, term.
+ * @return array List of registered meta keys.
+ */
+function get_registered_meta_keys( $object_type ) {
+	global $wp_meta_keys;
+
+	if ( ! is_array( $wp_meta_keys ) || ! isset( $wp_meta_keys[ $object_type ] ) ) {
+		return array();
+	}
+
+	return $wp_meta_keys[ $object_type ];
+}
+
+/**
+ * Retrieves registered metadata for a specified object.
+ *
+ * @since 4.6.0
+ *
+ * @param string $object_type Type of object to request metadata for. (e.g. comment, post, term, user)
+ * @param int    $object_id   ID of the object the metadata is for.
+ * @param string $meta_key    Optional. Registered metadata key. If not specified, retrieve all registered
+ *
