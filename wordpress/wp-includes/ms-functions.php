@@ -2453,3 +2453,293 @@ function get_space_allowed() {
 	 *
 	 * @param int $space_allowed Upload quota in megabytes for the current blog.
 	 */
+	return apply_filters( 'get_space_allowed', $space_allowed );
+}
+
+/**
+ * Determines if there is any upload space left in the current blog's quota.
+ *
+ * @since 3.0.0
+ *
+ * @return int of upload space available in bytes
+ */
+function get_upload_space_available() {
+	$allowed = get_space_allowed();
+	if ( $allowed < 0 ) {
+		$allowed = 0;
+	}
+	$space_allowed = $allowed * MB_IN_BYTES;
+	if ( get_site_option( 'upload_space_check_disabled' ) )
+		return $space_allowed;
+
+	$space_used = get_space_used() * MB_IN_BYTES;
+
+	if ( ( $space_allowed - $space_used ) <= 0 )
+		return 0;
+
+	return $space_allowed - $space_used;
+}
+
+/**
+ * Determines if there is any upload space left in the current blog's quota.
+ *
+ * @since 3.0.0
+ * @return bool True if space is available, false otherwise.
+ */
+function is_upload_space_available() {
+	if ( get_site_option( 'upload_space_check_disabled' ) )
+		return true;
+
+	return (bool) get_upload_space_available();
+}
+
+/**
+ * Filters the maximum upload file size allowed, in bytes.
+ *
+ * @since 3.0.0
+ *
+ * @param  int $size Upload size limit in bytes.
+ * @return int       Upload size limit in bytes.
+ */
+function upload_size_limit_filter( $size ) {
+	$fileupload_maxk = KB_IN_BYTES * get_site_option( 'fileupload_maxk', 1500 );
+	if ( get_site_option( 'upload_space_check_disabled' ) )
+		return min( $size, $fileupload_maxk );
+
+	return min( $size, $fileupload_maxk, get_upload_space_available() );
+}
+
+/**
+ * Whether or not we have a large network.
+ *
+ * The default criteria for a large network is either more than 10,000 users or more than 10,000 sites.
+ * Plugins can alter this criteria using the {@see 'wp_is_large_network'} filter.
+ *
+ * @since 3.3.0
+ * @since 4.8.0 The $network_id parameter has been added.
+ *
+ * @param string   $using      'sites or 'users'. Default is 'sites'.
+ * @param int|null $network_id ID of the network. Default is the current network.
+ * @return bool True if the network meets the criteria for large. False otherwise.
+ */
+function wp_is_large_network( $using = 'sites', $network_id = null ) {
+	$network_id = (int) $network_id;
+	if ( ! $network_id ) {
+		$network_id = get_current_network_id();
+	}
+
+	if ( 'users' == $using ) {
+		$count = get_user_count( $network_id );
+		/**
+		 * Filters whether the network is considered large.
+		 *
+		 * @since 3.3.0
+		 * @since 4.8.0 The $network_id parameter has been added.
+		 *
+		 * @param bool   $is_large_network Whether the network has more than 10000 users or sites.
+		 * @param string $component        The component to count. Accepts 'users', or 'sites'.
+		 * @param int    $count            The count of items for the component.
+		 * @param int    $network_id       The ID of the network being checked.
+		 */
+		return apply_filters( 'wp_is_large_network', $count > 10000, 'users', $count, $network_id );
+	}
+
+	$count = get_blog_count( $network_id );
+	/** This filter is documented in wp-includes/ms-functions.php */
+	return apply_filters( 'wp_is_large_network', $count > 10000, 'sites', $count, $network_id );
+}
+
+/**
+ * Retrieves a list of reserved site on a sub-directory Multisite installation.
+ *
+ * @since 4.4.0
+ *
+ * @return array $names Array of reserved subdirectory names.
+ */
+function get_subdirectory_reserved_names() {
+	$names = array(
+		'page', 'comments', 'blog', 'files', 'feed', 'wp-admin',
+		'wp-content', 'wp-includes', 'wp-json', 'embed'
+	);
+
+	/**
+	 * Filters reserved site names on a sub-directory Multisite installation.
+	 *
+	 * @since 3.0.0
+	 * @since 4.4.0 'wp-admin', 'wp-content', 'wp-includes', 'wp-json', and 'embed' were added
+	 *              to the reserved names list.
+	 *
+	 * @param array $subdirectory_reserved_names Array of reserved names.
+	 */
+	return apply_filters( 'subdirectory_reserved_names', $names );
+}
+
+/**
+ * Send a confirmation request email when a change of network admin email address is attempted.
+ *
+ * The new network admin address will not become active until confirmed.
+ *
+ * @since 4.9.0
+ *
+ * @param string $old_value The old network admin email address.
+ * @param string $value     The proposed new network admin email address.
+ */
+function update_network_option_new_admin_email( $old_value, $value ) {
+	if ( $value == get_site_option( 'admin_email' ) || ! is_email( $value ) ) {
+		return;
+	}
+
+	$hash = md5( $value . time() . mt_rand() );
+	$new_admin_email = array(
+		'hash'     => $hash,
+		'newemail' => $value,
+	);
+	update_site_option( 'network_admin_hash', $new_admin_email );
+
+	$switched_locale = switch_to_locale( get_user_locale() );
+
+	/* translators: Do not translate USERNAME, ADMIN_URL, EMAIL, SITENAME, SITEURL: those are placeholders. */
+	$email_text = __( 'Howdy ###USERNAME###,
+
+You recently requested to have the network admin email address on
+your network changed.
+
+If this is correct, please click on the following link to change it:
+###ADMIN_URL###
+
+You can safely ignore and delete this email if you do not want to
+take this action.
+
+This email has been sent to ###EMAIL###
+
+Regards,
+All at ###SITENAME###
+###SITEURL###' );
+
+	/**
+	 * Filters the text of the email sent when a change of network admin email address is attempted.
+	 *
+	 * The following strings have a special meaning and will get replaced dynamically:
+	 * ###USERNAME###  The current user's username.
+	 * ###ADMIN_URL### The link to click on to confirm the email change.
+	 * ###EMAIL###     The proposed new network admin email address.
+	 * ###SITENAME###  The name of the network.
+	 * ###SITEURL###   The URL to the network.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param string $email_text      Text in the email.
+	 * @param array  $new_admin_email {
+	 *     Data relating to the new network admin email address.
+	 *
+	 *     @type string $hash     The secure hash used in the confirmation link URL.
+	 *     @type string $newemail The proposed new network admin email address.
+	 * }
+	 */
+	$content = apply_filters( 'new_network_admin_email_content', $email_text, $new_admin_email );
+
+	$current_user = wp_get_current_user();
+	$content = str_replace( '###USERNAME###', $current_user->user_login, $content );
+	$content = str_replace( '###ADMIN_URL###', esc_url( network_admin_url( 'settings.php?network_admin_hash=' . $hash ) ), $content );
+	$content = str_replace( '###EMAIL###', $value, $content );
+	$content = str_replace( '###SITENAME###', wp_specialchars_decode( get_site_option( 'site_name' ), ENT_QUOTES ), $content );
+	$content = str_replace( '###SITEURL###', network_home_url(), $content );
+
+	wp_mail( $value, sprintf( __( '[%s] New Network Admin Email Address' ), wp_specialchars_decode( get_site_option( 'site_name' ), ENT_QUOTES ) ), $content );
+
+	if ( $switched_locale ) {
+		restore_previous_locale();
+	}
+}
+
+/**
+ * Send an email to the old network admin email address when the network admin email address changes.
+ *
+ * @since 4.9.0
+ *
+ * @param string $option_name The relevant database option name.
+ * @param string $new_email   The new network admin email address.
+ * @param string $old_email   The old network admin email address.
+ * @param int    $network_id  ID of the network.
+ */
+function wp_network_admin_email_change_notification( $option_name, $new_email, $old_email, $network_id ) {
+	$send = true;
+
+	// Don't send the notification to the default 'admin_email' value.
+	if ( 'you@example.com' === $old_email ) {
+		$send = false;
+	}
+
+	/**
+	 * Filters whether to send the network admin email change notification email.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param bool   $send       Whether to send the email notification.
+	 * @param string $old_email  The old network admin email address.
+	 * @param string $new_email  The new network admin email address.
+	 * @param int    $network_id ID of the network.
+	 */
+	$send = apply_filters( 'send_network_admin_email_change_email', $send, $old_email, $new_email, $network_id );
+
+	if ( ! $send ) {
+		return;
+	}
+
+	/* translators: Do not translate OLD_EMAIL, NEW_EMAIL, SITENAME, SITEURL: those are placeholders. */
+	$email_change_text = __( 'Hi,
+
+This notice confirms that the network admin email address was changed on ###SITENAME###.
+
+The new network admin email address is ###NEW_EMAIL###.
+
+This email has been sent to ###OLD_EMAIL###
+
+Regards,
+All at ###SITENAME###
+###SITEURL###' );
+
+	$email_change_email = array(
+		'to'      => $old_email,
+		/* translators: Network admin email change notification email subject. %s: Network title */
+		'subject' => __( '[%s] Notice of Network Admin Email Change' ),
+		'message' => $email_change_text,
+		'headers' => '',
+	);
+	// get network name
+	$network_name = wp_specialchars_decode( get_site_option( 'site_name' ), ENT_QUOTES );
+
+	/**
+	 * Filters the contents of the email notification sent when the network admin email address is changed.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param array $email_change_email {
+	 *            Used to build wp_mail().
+	 *
+	 *            @type string $to      The intended recipient.
+	 *            @type string $subject The subject of the email.
+	 *            @type string $message The content of the email.
+	 *                The following strings have a special meaning and will get replaced dynamically:
+	 *                - ###OLD_EMAIL### The old network admin email address.
+	 *                - ###NEW_EMAIL### The new network admin email address.
+	 *                - ###SITENAME###  The name of the network.
+	 *                - ###SITEURL###   The URL to the site.
+	 *            @type string $headers Headers.
+	 *        }
+	 * @param string $old_email  The old network admin email address.
+	 * @param string $new_email  The new network admin email address.
+	 * @param int    $network_id ID of the network.
+	 */
+	$email_change_email = apply_filters( 'network_admin_email_change_email', $email_change_email, $old_email, $new_email, $network_id );
+
+	$email_change_email['message'] = str_replace( '###OLD_EMAIL###', $old_email,    $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###NEW_EMAIL###', $new_email,    $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###SITENAME###',  $network_name, $email_change_email['message'] );
+	$email_change_email['message'] = str_replace( '###SITEURL###',   home_url(),    $email_change_email['message'] );
+
+	wp_mail( $email_change_email['to'], sprintf(
+		$email_change_email['subject'],
+		$network_name
+	), $email_change_email['message'], $email_change_email['headers'] );
+}
