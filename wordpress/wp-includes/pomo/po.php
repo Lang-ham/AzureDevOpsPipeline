@@ -448,4 +448,22 @@ class PO extends Gettext_Translations {
 		if ('#:' == $first_two) {
 			$entry->references = array_merge($entry->references, preg_split('/\s+/', $comment));
 		} elseif ('#.' == $first_two) {
-			$entry->ex
+			$entry->extracted_comments = trim($entry->extracted_comments . "\n" . $comment);
+		} elseif ('#,' == $first_two) {
+			$entry->flags = array_merge($entry->flags, preg_split('/,\s*/', $comment));
+		} else {
+			$entry->translator_comments = trim($entry->translator_comments . "\n" . $comment);
+		}
+	}
+
+	/**
+	 * @param string $s
+	 * @return sring
+	 */
+	public static function trim_quotes($s) {
+		if ( substr($s, 0, 1) == '"') $s = substr($s, 1);
+		if ( substr($s, -1, 1) == '"') $s = substr($s, 0, -1);
+		return $s;
+	}
+}
+endif;
