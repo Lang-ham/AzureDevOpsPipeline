@@ -676,4 +676,326 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 			return new WP_Error( 'rest_comment_invalid_type', __( 'Sorry, you are not allowed to change the comment type.' ), array( 'status' => 404 ) );
 		}
 
-		$prepared_args 
+		$prepared_args = $this->prepare_item_for_database( $request );
+
+		if ( is_wp_error( $prepared_args ) ) {
+			return $prepared_args;
+		}
+
+		if ( ! empty( $prepared_args['comment_post_ID'] ) ) {
+			$post = get_post( $prepared_args['comment_post_ID'] );
+			if ( empty( $post ) ) {
+				return new WP_Error( 'rest_comment_invalid_post_id', __( 'Invalid post ID.' ), array( 'status' => 403 ) );
+			}
+		}
+
+		if ( empty( $prepared_args ) && isset( $request['status'] ) ) {
+			// Only the comment status is being changed.
+			$change = $this->handle_status_param( $request['status'], $id );
+
+			if ( ! $change ) {
+				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment status failed.' ), array( 'status' => 500 ) );
+			}
+		} elseif ( ! empty( $prepared_args ) ) {
+			if ( is_wp_error( $prepared_args ) ) {
+				return $prepared_args;
+			}
+
+			if ( isset( $prepared_args['comment_content'] ) && empty( $prepared_args['comment_content'] ) ) {
+				return new WP_Error( 'rest_comment_content_invalid', __( 'Invalid comment content.' ), array( 'status' => 400 ) );
+			}
+
+			$prepared_args['comment_ID'] = $id;
+
+			$check_comment_lengths = wp_check_comment_data_max_lengths( $prepared_args );
+			if ( is_wp_error( $check_comment_lengths ) ) {
+				$error_code = $check_comment_lengths->get_error_code();
+				return new WP_Error( $error_code, __( 'Comment field exceeds maximum length allowed.' ), array( 'status' => 400 ) );
+			}
+
+			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
+
+			if ( false === $updated ) {
+				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
+			}
+
+			if ( isset( $request['status'] ) ) {
+				$this->handle_status_param( $request['status'], $id );
+			}
+		}
+
+		$comment = get_comment( $id );
+
+		/** This action is documented in wp-includes/rest-api/endpoints/class-wp-rest-comments-controller.php */
+		do_action( 'rest_insert_comment', $comment, $request, false );
+
+		$schema = $this->get_item_schema();
+
+		if ( ! empty( $schema['properties']['meta'] ) && isset( $request['meta'] ) ) {
+			$meta_update = $this->meta->update_value( $request['meta'], $id );
+
+			if ( is_wp_error( $meta_update ) ) {
+				return $meta_update;
+			}
+		}
+
+		$fields_update = $this->update_additional_fields_for_object( $comment, $request );
+
+		if ( is_wp_error( $fields_update ) ) {
+			return $fields_update;
+		}
+
+		$request->set_param( 'context', 'edit' );
+
+		$response = $this->prepare_item_for_response( $comment, $request );
+
+		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Checks if a given request has access to delete a comment.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_REST_Request $request Full details about the request.
+	 * @return WP_Error|bool True if the request has access to delete the item, error object otherwise.
+	 */
+	public function delete_item_permissions_check( $request ) {
+		$comment = $this->get_comment( $request['id'] );
+		if ( is_wp_error( $comment ) ) {
+			return $comment;
+		}
+
+		if ( ! $this->check_edit_permission( $comment ) ) {
+			return new WP_Error( 'rest_cannot_delete', __( 'Sorry, you are not allowed to delete this comment.' ), array( 'status' => rest_authorization_required_code() ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Deletes a comment.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_REST_Request $request Full details about the request.
+	 * @return WP_Error|WP_REST_Response Response object on success, or error object on failure.
+	 */
+	public function delete_item( $request ) {
+		$comment = $this->get_comment( $request['id'] );
+		if ( is_wp_error( $comment ) ) {
+			return $comment;
+		}
+
+		$force = isset( $request['force'] ) ? (bool) $request['force'] : false;
+
+		/**
+		 * Filters whether a comment can be trashed.
+		 *
+		 * Return false to disable trash support for the post.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param bool    $supports_trash Whether the post type support trashing.
+		 * @param WP_Post $comment        The comment object being considered for trashing support.
+		 */
+		$supports_trash = apply_filters( 'rest_comment_trashable', ( EMPTY_TRASH_DAYS > 0 ), $comment );
+
+		$request->set_param( 'context', 'edit' );
+
+		if ( $force ) {
+			$previous = $this->prepare_item_for_response( $comment, $request );
+			$result = wp_delete_comment( $comment->comment_ID, true );
+			$response = new WP_REST_Response();
+			$response->set_data( array( 'deleted' => true, 'previous' => $previous->get_data() ) );
+		} else {
+			// If this type doesn't support trashing, error out.
+			if ( ! $supports_trash ) {
+				/* translators: %s: force=true */
+				return new WP_Error( 'rest_trash_not_supported', sprintf( __( "The comment does not support trashing. Set '%s' to delete." ), 'force=true' ), array( 'status' => 501 ) );
+			}
+
+			if ( 'trash' === $comment->comment_approved ) {
+				return new WP_Error( 'rest_already_trashed', __( 'The comment has already been trashed.' ), array( 'status' => 410 ) );
+			}
+
+			$result = wp_trash_comment( $comment->comment_ID );
+			$comment = get_comment( $comment->comment_ID );
+			$response = $this->prepare_item_for_response( $comment, $request );
+		}
+
+		if ( ! $result ) {
+			return new WP_Error( 'rest_cannot_delete', __( 'The comment cannot be deleted.' ), array( 'status' => 500 ) );
+		}
+
+		/**
+		 * Fires after a comment is deleted via the REST API.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param WP_Comment       $comment  The deleted comment data.
+		 * @param WP_REST_Response $response The response returned from the API.
+		 * @param WP_REST_Request  $request  The request sent to the API.
+		 */
+		do_action( 'rest_delete_comment', $comment, $response, $request );
+
+		return $response;
+	}
+
+	/**
+	 * Prepares a single comment output for response.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Comment      $comment Comment object.
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response Response object.
+	 */
+	public function prepare_item_for_response( $comment, $request ) {
+		$data = array(
+			'id'                 => (int) $comment->comment_ID,
+			'post'               => (int) $comment->comment_post_ID,
+			'parent'             => (int) $comment->comment_parent,
+			'author'             => (int) $comment->user_id,
+			'author_name'        => $comment->comment_author,
+			'author_email'       => $comment->comment_author_email,
+			'author_url'         => $comment->comment_author_url,
+			'author_ip'          => $comment->comment_author_IP,
+			'author_user_agent'  => $comment->comment_agent,
+			'date'               => mysql_to_rfc3339( $comment->comment_date ),
+			'date_gmt'           => mysql_to_rfc3339( $comment->comment_date_gmt ),
+			'content'            => array(
+				/** This filter is documented in wp-includes/comment-template.php */
+				'rendered' => apply_filters( 'comment_text', $comment->comment_content, $comment ),
+				'raw'      => $comment->comment_content,
+			),
+			'link'               => get_comment_link( $comment ),
+			'status'             => $this->prepare_status_response( $comment->comment_approved ),
+			'type'               => get_comment_type( $comment->comment_ID ),
+		);
+
+		$schema = $this->get_item_schema();
+
+		if ( ! empty( $schema['properties']['author_avatar_urls'] ) ) {
+			$data['author_avatar_urls'] = rest_get_avatar_urls( $comment->comment_author_email );
+		}
+
+		if ( ! empty( $schema['properties']['meta'] ) ) {
+			$data['meta'] = $this->meta->get_value( $comment->comment_ID, $request );
+		}
+
+		$context = ! empty( $request['context'] ) ? $request['context'] : 'view';
+		$data    = $this->add_additional_fields_to_object( $data, $request );
+		$data    = $this->filter_response_by_context( $data, $context );
+
+		// Wrap the data in a response object.
+		$response = rest_ensure_response( $data );
+
+		$response->add_links( $this->prepare_links( $comment ) );
+
+		/**
+		 * Filters a comment returned from the API.
+		 *
+		 * Allows modification of the comment right before it is returned.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param WP_REST_Response  $response The response object.
+		 * @param WP_Comment        $comment  The original comment object.
+		 * @param WP_REST_Request   $request  Request used to generate the response.
+		 */
+		return apply_filters( 'rest_prepare_comment', $response, $comment, $request );
+	}
+
+	/**
+	 * Prepares links for the request.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Comment $comment Comment object.
+	 * @return array Links for the given comment.
+	 */
+	protected function prepare_links( $comment ) {
+		$links = array(
+			'self' => array(
+				'href' => rest_url( sprintf( '%s/%s/%d', $this->namespace, $this->rest_base, $comment->comment_ID ) ),
+			),
+			'collection' => array(
+				'href' => rest_url( sprintf( '%s/%s', $this->namespace, $this->rest_base ) ),
+			),
+		);
+
+		if ( 0 !== (int) $comment->user_id ) {
+			$links['author'] = array(
+				'href'       => rest_url( 'wp/v2/users/' . $comment->user_id ),
+				'embeddable' => true,
+			);
+		}
+
+		if ( 0 !== (int) $comment->comment_post_ID ) {
+			$post = get_post( $comment->comment_post_ID );
+
+			if ( ! empty( $post->ID ) ) {
+				$obj = get_post_type_object( $post->post_type );
+				$base = ! empty( $obj->rest_base ) ? $obj->rest_base : $obj->name;
+
+				$links['up'] = array(
+					'href'       => rest_url( 'wp/v2/' . $base . '/' . $comment->comment_post_ID ),
+					'embeddable' => true,
+					'post_type'  => $post->post_type,
+				);
+			}
+		}
+
+		if ( 0 !== (int) $comment->comment_parent ) {
+			$links['in-reply-to'] = array(
+				'href'       => rest_url( sprintf( '%s/%s/%d', $this->namespace, $this->rest_base, $comment->comment_parent ) ),
+				'embeddable' => true,
+			);
+		}
+
+		// Only grab one comment to verify the comment has children.
+		$comment_children = $comment->get_children( array(
+			'number' => 1,
+			'count'  => true
+		) );
+
+		if ( ! empty( $comment_children ) ) {
+			$args = array(
+				'parent' => $comment->comment_ID
+			);
+
+			$rest_url = add_query_arg( $args, rest_url( $this->namespace . '/' . $this->rest_base ) );
+
+			$links['children'] = array(
+				'href' => $rest_url,
+			);
+		}
+
+		return $links;
+	}
+
+	/**
+	 * Prepends internal property prefix to query parameters to match our response fields.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string $query_param Query parameter.
+	 * @return string The normalized query parameter.
+	 */
+	protected function normalize_query_param( $query_param ) {
+		$prefix = 'comment_';
+
+		switch ( $query_param ) {
+			case 'id':
+				$normalized = $prefix . 'ID';
+				break;
+			case 'post':
+				$normalized = $prefix . 'post_ID';
+				break;
+			case 'parent':
+				$normalized = $prefix . 'parent';
+				break;
+			case 'include':
+				$normalized = 'comment__in';
+				break;
+			defau
