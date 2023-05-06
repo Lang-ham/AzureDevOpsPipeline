@@ -998,4 +998,325 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 			case 'include':
 				$normalized = 'comment__in';
 				break;
-			defau
+			default:
+				$normalized = $prefix . $query_param;
+				break;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Checks comment_approved to set comment status for single comment output.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string|int $comment_approved comment status.
+	 * @return string Comment status.
+	 */
+	protected function prepare_status_response( $comment_approved ) {
+
+		switch ( $comment_approved ) {
+			case 'hold':
+			case '0':
+				$status = 'hold';
+				break;
+
+			case 'approve':
+			case '1':
+				$status = 'approved';
+				break;
+
+			case 'spam':
+			case 'trash':
+			default:
+				$status = $comment_approved;
+				break;
+		}
+
+		return $status;
+	}
+
+	/**
+	 * Prepares a single comment to be inserted into the database.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return array|WP_Error Prepared comment, otherwise WP_Error object.
+	 */
+	protected function prepare_item_for_database( $request ) {
+		$prepared_comment = array();
+
+		/*
+		 * Allow the comment_content to be set via the 'content' or
+		 * the 'content.raw' properties of the Request object.
+		 */
+		if ( isset( $request['content'] ) && is_string( $request['content'] ) ) {
+			$prepared_comment['comment_content'] = $request['content'];
+		} elseif ( isset( $request['content']['raw'] ) && is_string( $request['content']['raw'] ) ) {
+			$prepared_comment['comment_content'] = $request['content']['raw'];
+		}
+
+		if ( isset( $request['post'] ) ) {
+			$prepared_comment['comment_post_ID'] = (int) $request['post'];
+		}
+
+		if ( isset( $request['parent'] ) ) {
+			$prepared_comment['comment_parent'] = $request['parent'];
+		}
+
+		if ( isset( $request['author'] ) ) {
+			$user = new WP_User( $request['author'] );
+
+			if ( $user->exists() ) {
+				$prepared_comment['user_id'] = $user->ID;
+				$prepared_comment['comment_author'] = $user->display_name;
+				$prepared_comment['comment_author_email'] = $user->user_email;
+				$prepared_comment['comment_author_url'] = $user->user_url;
+			} else {
+				return new WP_Error( 'rest_comment_author_invalid', __( 'Invalid comment author ID.' ), array( 'status' => 400 ) );
+			}
+		}
+
+		if ( isset( $request['author_name'] ) ) {
+			$prepared_comment['comment_author'] = $request['author_name'];
+		}
+
+		if ( isset( $request['author_email'] ) ) {
+			$prepared_comment['comment_author_email'] = $request['author_email'];
+		}
+
+		if ( isset( $request['author_url'] ) ) {
+			$prepared_comment['comment_author_url'] = $request['author_url'];
+		}
+
+		if ( isset( $request['author_ip'] ) && current_user_can( 'moderate_comments' ) ) {
+			$prepared_comment['comment_author_IP'] = $request['author_ip'];
+		} elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) && rest_is_ip_address( $_SERVER['REMOTE_ADDR'] ) ) {
+			$prepared_comment['comment_author_IP'] = $_SERVER['REMOTE_ADDR'];
+		} else {
+			$prepared_comment['comment_author_IP'] = '127.0.0.1';
+		}
+
+		if ( ! empty( $request['author_user_agent'] ) ) {
+			$prepared_comment['comment_agent'] = $request['author_user_agent'];
+		} elseif ( $request->get_header( 'user_agent' ) ) {
+			$prepared_comment['comment_agent'] = $request->get_header( 'user_agent' );
+		}
+
+		if ( ! empty( $request['date'] ) ) {
+			$date_data = rest_get_date_with_gmt( $request['date'] );
+
+			if ( ! empty( $date_data ) ) {
+				list( $prepared_comment['comment_date'], $prepared_comment['comment_date_gmt'] ) = $date_data;
+			}
+		} elseif ( ! empty( $request['date_gmt'] ) ) {
+			$date_data = rest_get_date_with_gmt( $request['date_gmt'], true );
+
+			if ( ! empty( $date_data ) ) {
+				list( $prepared_comment['comment_date'], $prepared_comment['comment_date_gmt'] ) = $date_data;
+			}
+		}
+
+		/**
+		 * Filters a comment after it is prepared for the database.
+		 *
+		 * Allows modification of the comment right after it is prepared for the database.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param array           $prepared_comment The prepared comment data for `wp_insert_comment`.
+		 * @param WP_REST_Request $request          The current request.
+		 */
+		return apply_filters( 'rest_preprocess_comment', $prepared_comment, $request );
+	}
+
+	/**
+	 * Retrieves the comment's schema, conforming to JSON Schema.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return array
+	 */
+	public function get_item_schema() {
+		$schema = array(
+			'$schema'              => 'http://json-schema.org/draft-04/schema#',
+			'title'                => 'comment',
+			'type'                 => 'object',
+			'properties'           => array(
+				'id'               => array(
+					'description'  => __( 'Unique identifier for the object.' ),
+					'type'         => 'integer',
+					'context'      => array( 'view', 'edit', 'embed' ),
+					'readonly'     => true,
+				),
+				'author'           => array(
+					'description'  => __( 'The ID of the user object, if author was a user.' ),
+					'type'         => 'integer',
+					'context'      => array( 'view', 'edit', 'embed' ),
+				),
+				'author_email'     => array(
+					'description'  => __( 'Email address for the object author.' ),
+					'type'         => 'string',
+					'format'       => 'email',
+					'context'      => array( 'edit' ),
+					'arg_options'  => array(
+						'sanitize_callback' => array( $this, 'check_comment_author_email' ),
+						'validate_callback' => null, // skip built-in validation of 'email'.
+					),
+				),
+				'author_ip'     => array(
+					'description'  => __( 'IP address for the object author.' ),
+					'type'         => 'string',
+					'format'       => 'ip',
+					'context'      => array( 'edit' ),
+				),
+				'author_name'     => array(
+					'description'  => __( 'Display name for the object author.' ),
+					'type'         => 'string',
+					'context'      => array( 'view', 'edit', 'embed' ),
+					'arg_options'  => array(
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+				'author_url'       => array(
+					'description'  => __( 'URL for the object author.' ),
+					'type'         => 'string',
+					'format'       => 'uri',
+					'context'      => array( 'view', 'edit', 'embed' ),
+				),
+				'author_user_agent'     => array(
+					'description'  => __( 'User agent for the object author.' ),
+					'type'         => 'string',
+					'context'      => array( 'edit' ),
+					'arg_options'  => array(
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+				'content'          => array(
+					'description'     => __( 'The content for the object.' ),
+					'type'            => 'object',
+					'context'         => array( 'view', 'edit', 'embed' ),
+					'arg_options'     => array(
+						'sanitize_callback' => null, // Note: sanitization implemented in self::prepare_item_for_database()
+						'validate_callback' => null, // Note: validation implemented in self::prepare_item_for_database()
+					),
+					'properties'      => array(
+						'raw'         => array(
+							'description'     => __( 'Content for the object, as it exists in the database.' ),
+							'type'            => 'string',
+							'context'         => array( 'edit' ),
+						),
+						'rendered'    => array(
+							'description'     => __( 'HTML content for the object, transformed for display.' ),
+							'type'            => 'string',
+							'context'         => array( 'view', 'edit', 'embed' ),
+							'readonly'        => true,
+						),
+					),
+				),
+				'date'             => array(
+					'description'  => __( "The date the object was published, in the site's timezone." ),
+					'type'         => 'string',
+					'format'       => 'date-time',
+					'context'      => array( 'view', 'edit', 'embed' ),
+				),
+				'date_gmt'         => array(
+					'description'  => __( 'The date the object was published, as GMT.' ),
+					'type'         => 'string',
+					'format'       => 'date-time',
+					'context'      => array( 'view', 'edit' ),
+				),
+				'link'             => array(
+					'description'  => __( 'URL to the object.' ),
+					'type'         => 'string',
+					'format'       => 'uri',
+					'context'      => array( 'view', 'edit', 'embed' ),
+					'readonly'     => true,
+				),
+				'parent'           => array(
+					'description'  => __( 'The ID for the parent of the object.' ),
+					'type'         => 'integer',
+					'context'      => array( 'view', 'edit', 'embed' ),
+					'default'      => 0,
+				),
+				'post'             => array(
+					'description'  => __( 'The ID of the associated post object.' ),
+					'type'         => 'integer',
+					'context'      => array( 'view', 'edit' ),
+					'default'      => 0,
+				),
+				'status'           => array(
+					'description'  => __( 'State of the object.' ),
+					'type'         => 'string',
+					'context'      => array( 'view', 'edit' ),
+					'arg_options'  => array(
+						'sanitize_callback' => 'sanitize_key',
+					),
+				),
+				'type'             => array(
+					'description'  => __( 'Type of Comment for the object.' ),
+					'type'         => 'string',
+					'context'      => array( 'view', 'edit', 'embed' ),
+					'readonly'     => true,
+				),
+			),
+		);
+
+		if ( get_option( 'show_avatars' ) ) {
+			$avatar_properties = array();
+
+			$avatar_sizes = rest_get_avatar_sizes();
+			foreach ( $avatar_sizes as $size ) {
+				$avatar_properties[ $size ] = array(
+					/* translators: %d: avatar image size in pixels */
+					'description' => sprintf( __( 'Avatar URL with image size of %d pixels.' ), $size ),
+					'type'        => 'string',
+					'format'      => 'uri',
+					'context'     => array( 'embed', 'view', 'edit' ),
+				);
+			}
+
+			$schema['properties']['author_avatar_urls'] = array(
+				'description'   => __( 'Avatar URLs for the object author.' ),
+				'type'          => 'object',
+				'context'       => array( 'view', 'edit', 'embed' ),
+				'readonly'      => true,
+				'properties'    => $avatar_properties,
+			);
+		}
+
+		$schema['properties']['meta'] = $this->meta->get_field_schema();
+
+		return $this->add_additional_fields_schema( $schema );
+	}
+
+	/**
+	 * Retrieves the query params for collections.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return array Comments collection parameters.
+	 */
+	public function get_collection_params() {
+		$query_params = parent::get_collection_params();
+
+		$query_params['context']['default'] = 'view';
+
+		$query_params['after'] = array(
+			'description'       => __( 'Limit response to comments published after a given ISO8601 compliant date.' ),
+			'type'              => 'string',
+			'format'            => 'date-time',
+		);
+
+		$query_params['author'] = array(
+			'description'       => __( 'Limit result set to comments assigned to specific user IDs. Requires authorization.' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type'          => 'integer',
+			),
+		);
+
+		$query_params['author_exclude'] = array(
+			'description'       => __( 'Ensure result set excludes comments assigned to specific user 
