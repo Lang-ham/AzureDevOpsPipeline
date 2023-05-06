@@ -1319,4 +1319,301 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 		);
 
 		$query_params['author_exclude'] = array(
-			'description'       => __( 'Ensure result set excludes comments assigned to specific user 
+			'description'       => __( 'Ensure result set excludes comments assigned to specific user IDs. Requires authorization.' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type'          => 'integer',
+			),
+		);
+
+		$query_params['author_email'] = array(
+			'default'           => null,
+			'description'       => __( 'Limit result set to that from a specific author email. Requires authorization.' ),
+			'format'            => 'email',
+			'type'              => 'string',
+		);
+
+		$query_params['before'] = array(
+			'description'       => __( 'Limit response to comments published before a given ISO8601 compliant date.' ),
+			'type'              => 'string',
+			'format'            => 'date-time',
+		);
+
+		$query_params['exclude'] = array(
+			'description'        => __( 'Ensure result set excludes specific IDs.' ),
+			'type'               => 'array',
+			'items'              => array(
+				'type'           => 'integer',
+			),
+			'default'            => array(),
+		);
+
+		$query_params['include'] = array(
+			'description'        => __( 'Limit result set to specific IDs.' ),
+			'type'               => 'array',
+			'items'              => array(
+				'type'           => 'integer',
+			),
+			'default'            => array(),
+		);
+
+		$query_params['offset'] = array(
+			'description'        => __( 'Offset the result set by a specific number of items.' ),
+			'type'               => 'integer',
+		);
+
+		$query_params['order']      = array(
+			'description'           => __( 'Order sort attribute ascending or descending.' ),
+			'type'                  => 'string',
+			'default'               => 'desc',
+			'enum'                  => array(
+				'asc',
+				'desc',
+			),
+		);
+
+		$query_params['orderby']    = array(
+			'description'           => __( 'Sort collection by object attribute.' ),
+			'type'                  => 'string',
+			'default'               => 'date_gmt',
+			'enum'                  => array(
+				'date',
+				'date_gmt',
+				'id',
+				'include',
+				'post',
+				'parent',
+				'type',
+			),
+		);
+
+		$query_params['parent'] = array(
+			'default'           => array(),
+			'description'       => __( 'Limit result set to comments of specific parent IDs.' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type'          => 'integer',
+			),
+		);
+
+		$query_params['parent_exclude'] = array(
+			'default'           => array(),
+			'description'       => __( 'Ensure result set excludes specific parent IDs.' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type'          => 'integer',
+			),
+		);
+
+		$query_params['post']   = array(
+			'default'           => array(),
+			'description'       => __( 'Limit result set to comments assigned to specific post IDs.' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type'          => 'integer',
+			),
+		);
+
+		$query_params['status'] = array(
+			'default'           => 'approve',
+			'description'       => __( 'Limit result set to comments assigned a specific status. Requires authorization.' ),
+			'sanitize_callback' => 'sanitize_key',
+			'type'              => 'string',
+			'validate_callback' => 'rest_validate_request_arg',
+		);
+
+		$query_params['type'] = array(
+			'default'           => 'comment',
+			'description'       => __( 'Limit result set to comments assigned a specific type. Requires authorization.' ),
+			'sanitize_callback' => 'sanitize_key',
+			'type'              => 'string',
+			'validate_callback' => 'rest_validate_request_arg',
+		);
+
+		$query_params['password'] = array(
+			'description' => __( 'The password for the post if it is password protected.' ),
+			'type'        => 'string',
+		);
+
+		/**
+		 * Filter collection parameters for the comments controller.
+		 *
+		 * This filter registers the collection parameter, but does not map the
+		 * collection parameter to an internal WP_Comment_Query parameter. Use the
+		 * `rest_comment_query` filter to set WP_Comment_Query parameters.
+		 *
+		 * @since 4.7.0
+		 *
+		 * @param array $query_params JSON Schema-formatted collection parameters.
+		 */
+		return apply_filters( 'rest_comment_collection_params', $query_params );
+	}
+
+	/**
+	 * Sets the comment_status of a given comment object when creating or updating a comment.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string|int $new_status New comment status.
+	 * @param int        $comment_id Comment ID.
+	 * @return bool Whether the status was changed.
+	 */
+	protected function handle_status_param( $new_status, $comment_id ) {
+		$old_status = wp_get_comment_status( $comment_id );
+
+		if ( $new_status === $old_status ) {
+			return false;
+		}
+
+		switch ( $new_status ) {
+			case 'approved' :
+			case 'approve':
+			case '1':
+				$changed = wp_set_comment_status( $comment_id, 'approve' );
+				break;
+			case 'hold':
+			case '0':
+				$changed = wp_set_comment_status( $comment_id, 'hold' );
+				break;
+			case 'spam' :
+				$changed = wp_spam_comment( $comment_id );
+				break;
+			case 'unspam' :
+				$changed = wp_unspam_comment( $comment_id );
+				break;
+			case 'trash' :
+				$changed = wp_trash_comment( $comment_id );
+				break;
+			case 'untrash' :
+				$changed = wp_untrash_comment( $comment_id );
+				break;
+			default :
+				$changed = false;
+				break;
+		}
+
+		return $changed;
+	}
+
+	/**
+	 * Checks if the post can be read.
+	 *
+	 * Correctly handles posts with the inherit status.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Post         $post    Post object.
+	 * @param WP_REST_Request $request Request data to check.
+	 * @return bool Whether post can be read.
+	 */
+	protected function check_read_post_permission( $post, $request ) {
+		$posts_controller = new WP_REST_Posts_Controller( $post->post_type );
+		$post_type = get_post_type_object( $post->post_type );
+
+		$has_password_filter = false;
+
+		// Only check password if a specific post was queried for or a single comment
+		$requested_post = ! empty( $request['post'] ) && ( !is_array( $request['post'] ) || 1 === count( $request['post'] ) );
+		$requested_comment = ! empty( $request['id'] );
+		if ( ( $requested_post || $requested_comment ) && $posts_controller->can_access_password_content( $post, $request ) ) {
+			add_filter( 'post_password_required', '__return_false' );
+
+			$has_password_filter = true;
+		}
+
+		if ( post_password_required( $post ) ) {
+			$result = current_user_can( $post_type->cap->edit_post, $post->ID );
+		} else {
+			$result = $posts_controller->check_read_permission( $post );
+		}
+
+		if ( $has_password_filter ) {
+			remove_filter( 'post_password_required', '__return_false' );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Checks if the comment can be read.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WP_Comment      $comment Comment object.
+	 * @param WP_REST_Request $request Request data to check.
+	 * @return bool Whether the comment can be read.
+	 */
+	protected function check_read_permission( $comment, $request ) {
+		if ( ! empty( $comment->comment_post_ID ) ) {
+			$post = get_post( $comment->comment_post_ID );
+			if ( $post ) {
+				if ( $this->check_read_post_permission( $post, $request ) && 1 === (int) $comment->comment_approved ) {
+					return true;
+				}
+			}
+		}
+
+		if ( 0 === get_current_user_id() ) {
+			return false;
+		}
+
+		if ( empty( $comment->comment_post_ID ) && ! current_user_can( 'moderate_comments' ) ) {
+			return false;
+		}
+
+		if ( ! empty( $comment->user_id ) && get_current_user_id() === (int) $comment->user_id ) {
+			return true;
+		}
+
+		return current_user_can( 'edit_comment', $comment->comment_ID );
+	}
+
+	/**
+	 * Checks if a comment can be edited or deleted.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param object $comment Comment object.
+	 * @return bool Whether the comment can be edited or deleted.
+	 */
+	protected function check_edit_permission( $comment ) {
+		if ( 0 === (int) get_current_user_id() ) {
+			return false;
+		}
+
+		if ( ! current_user_can( 'moderate_comments' ) ) {
+			return false;
+		}
+
+		return current_user_can( 'edit_comment', $comment->comment_ID );
+	}
+
+	/**
+	 * Checks a comment author email for validity.
+	 *
+	 * Accepts either a valid email address or empty string as a valid comment
+	 * author email address. Setting the comment author email to an empty
+	 * string is allowed when a comment is being updated.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param string          $value   Author email value submitted.
+	 * @param WP_REST_Request $request Full details about the request.
+	 * @param string          $param   The parameter name.
+	 * @return WP_Error|string The sanitized email address, if valid,
+	 *                         otherwise an error.
+	 */
+	public function check_comment_author_email( $value, $request, $param ) {
+		$email = (string) $value;
+		if ( empty( $email ) ) {
+			return $email;
+		}
+
+		$check_email = rest_validate_request_arg( $email, $request, $param );
+		if ( is_wp_error( $check_email ) ) {
+			return $check_email;
+		}
+
+		return $email;
+	}
+}
