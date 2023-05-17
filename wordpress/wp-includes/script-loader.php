@@ -412,4 +412,172 @@ function wp_default_scripts( &$scripts ) {
 			'mejs.haitian-creole'      => __( 'Haitian Creole' ),
 			'mejs.hebrew'              => __( 'Hebrew' ),
 			'mejs.hindi'               => __( 'Hindi' ),
-		
+			'mejs.hungarian'           => __( 'Hungarian' ),
+			'mejs.icelandic'           => __( 'Icelandic' ),
+			'mejs.indonesian'          => __( 'Indonesian' ),
+			'mejs.irish'               => __( 'Irish' ),
+			'mejs.italian'             => __( 'Italian' ),
+			'mejs.japanese'            => __( 'Japanese' ),
+			'mejs.korean'              => __( 'Korean' ),
+			'mejs.latvian'             => __( 'Latvian' ),
+			'mejs.lithuanian'          => __( 'Lithuanian' ),
+			'mejs.macedonian'          => __( 'Macedonian' ),
+			'mejs.malay'               => __( 'Malay' ),
+			'mejs.maltese'             => __( 'Maltese' ),
+			'mejs.norwegian'           => __( 'Norwegian' ),
+			'mejs.persian'             => __( 'Persian' ),
+			'mejs.polish'              => __( 'Polish' ),
+			'mejs.portuguese'          => __( 'Portuguese' ),
+			'mejs.romanian'            => __( 'Romanian' ),
+			'mejs.russian'             => __( 'Russian' ),
+			'mejs.serbian'             => __( 'Serbian' ),
+			'mejs.slovak'              => __( 'Slovak' ),
+			'mejs.slovenian'           => __( 'Slovenian' ),
+			'mejs.spanish'             => __( 'Spanish' ),
+			'mejs.swahili'             => __( 'Swahili' ),
+			'mejs.swedish'             => __( 'Swedish' ),
+			'mejs.tagalog'             => __( 'Tagalog' ),
+			'mejs.thai'                => __( 'Thai' ),
+			'mejs.turkish'             => __( 'Turkish' ),
+			'mejs.ukrainian'           => __( 'Ukrainian' ),
+			'mejs.vietnamese'          => __( 'Vietnamese' ),
+			'mejs.welsh'               => __( 'Welsh' ),
+			'mejs.yiddish'             => __( 'Yiddish' ),
+			),
+		) ) ), 'before' );
+
+
+	$scripts->add( 'mediaelement-vimeo', "/wp-includes/js/mediaelement/renderers/vimeo.min.js", array('mediaelement'), '4.2.6-78496d1', 1 );
+	$scripts->add( 'wp-mediaelement', "/wp-includes/js/mediaelement/wp-mediaelement$suffix.js", array('mediaelement'), false, 1 );
+	$mejs_settings = array(
+		'pluginPath'    => includes_url( 'js/mediaelement/', 'relative' ),
+		'classPrefix'   => 'mejs-',
+		'stretching'    => 'responsive',
+	);
+	did_action( 'init' ) && $scripts->localize( 'mediaelement', '_wpmejsSettings',
+		/**
+		 * Filters the MediaElement configuration settings.
+		 *
+		 * @since 4.4.0
+		 *
+		 * @param array $mejs_settings MediaElement settings array.
+		 */
+		apply_filters( 'mejs_settings', $mejs_settings )
+	);
+
+	$scripts->add( 'wp-codemirror', '/wp-includes/js/codemirror/codemirror.min.js', array(), '5.29.1-alpha-ee20357' );
+	$scripts->add( 'csslint', '/wp-includes/js/codemirror/csslint.js', array(), '1.0.5' );
+	$scripts->add( 'jshint', '/wp-includes/js/codemirror/jshint.js', array(), '2.9.5.999' );
+	$scripts->add( 'jsonlint', '/wp-includes/js/codemirror/jsonlint.js', array(), '1.6.2' );
+	$scripts->add( 'htmlhint', '/wp-includes/js/codemirror/htmlhint.js', array(), '0.9.14-xwp' );
+	$scripts->add( 'htmlhint-kses', '/wp-includes/js/codemirror/htmlhint-kses.js', array( 'htmlhint' ) );
+	$scripts->add( 'code-editor', "/wp-admin/js/code-editor$suffix.js", array( 'jquery', 'wp-codemirror', 'underscore' ) );
+	$scripts->add( 'wp-theme-plugin-editor', "/wp-admin/js/theme-plugin-editor$suffix.js", array( 'wp-util', 'wp-sanitize', 'jquery', 'jquery-ui-core', 'wp-a11y', 'underscore' ) );
+	did_action( 'init' ) && $scripts->add_inline_script( 'wp-theme-plugin-editor', sprintf( 'wp.themePluginEditor.l10n = %s;', wp_json_encode( array(
+		'saveAlert' => __( 'The changes you made will be lost if you navigate away from this page.' ),
+		'saveError' => __( 'Something went wrong. Your change may not have been saved. Please try again. There is also a chance that you may need to manually fix and upload the file over FTP.' ),
+		'lintError' => array(
+			/* translators: %d: error count */
+			'singular' => _n( 'There is %d error which must be fixed before you can update this file.', 'There are %d errors which must be fixed before you can update this file.', 1 ),
+			/* translators: %d: error count */
+			'plural' => _n( 'There is %d error which must be fixed before you can update this file.', 'There are %d errors which must be fixed before you can update this file.', 2 ), // @todo This is lacking, as some languages have a dedicated dual form. For proper handling of plurals in JS, see #20491.
+		),
+	) ) ) );
+
+	$scripts->add( 'wp-playlist', "/wp-includes/js/mediaelement/wp-playlist$suffix.js", array( 'wp-util', 'backbone', 'mediaelement' ), false, 1 );
+
+	$scripts->add( 'zxcvbn-async', "/wp-includes/js/zxcvbn-async$suffix.js", array(), '1.0' );
+	did_action( 'init' ) && $scripts->localize( 'zxcvbn-async', '_zxcvbnSettings', array(
+		'src' => empty( $guessed_url ) ? includes_url( '/js/zxcvbn.min.js' ) : $scripts->base_url . '/wp-includes/js/zxcvbn.min.js',
+	) );
+
+	$scripts->add( 'password-strength-meter', "/wp-admin/js/password-strength-meter$suffix.js", array( 'jquery', 'zxcvbn-async' ), false, 1 );
+	did_action( 'init' ) && $scripts->localize( 'password-strength-meter', 'pwsL10n', array(
+		'unknown'  => _x( 'Password strength unknown', 'password strength' ),
+		'short'    => _x( 'Very weak', 'password strength' ),
+		'bad'      => _x( 'Weak', 'password strength' ),
+		'good'     => _x( 'Medium', 'password strength' ),
+		'strong'   => _x( 'Strong', 'password strength' ),
+		'mismatch' => _x( 'Mismatch', 'password mismatch' ),
+	) );
+
+	$scripts->add( 'user-profile', "/wp-admin/js/user-profile$suffix.js", array( 'jquery', 'password-strength-meter', 'wp-util' ), false, 1 );
+	did_action( 'init' ) && $scripts->localize( 'user-profile', 'userProfileL10n', array(
+		'warn'     => __( 'Your new password has not been saved.' ),
+		'warnWeak' => __( 'Confirm use of weak password' ),
+		'show'     => __( 'Show' ),
+		'hide'     => __( 'Hide' ),
+		'cancel'   => __( 'Cancel' ),
+		'ariaShow' => esc_attr__( 'Show password' ),
+		'ariaHide' => esc_attr__( 'Hide password' ),
+	) );
+
+	$scripts->add( 'language-chooser', "/wp-admin/js/language-chooser$suffix.js", array( 'jquery' ), false, 1 );
+
+	$scripts->add( 'user-suggest', "/wp-admin/js/user-suggest$suffix.js", array( 'jquery-ui-autocomplete' ), false, 1 );
+
+	$scripts->add( 'admin-bar', "/wp-includes/js/admin-bar$suffix.js", array(), false, 1 );
+
+	$scripts->add( 'wplink', "/wp-includes/js/wplink$suffix.js", array( 'jquery', 'wp-a11y' ), false, 1 );
+	did_action( 'init' ) && $scripts->localize( 'wplink', 'wpLinkL10n', array(
+		'title' => __('Insert/edit link'),
+		'update' => __('Update'),
+		'save' => __('Add Link'),
+		'noTitle' => __('(no title)'),
+		'noMatchesFound' => __('No results found.'),
+		'linkSelected' => __( 'Link selected.' ),
+		'linkInserted' => __( 'Link inserted.' ),
+	) );
+
+	$scripts->add( 'wpdialogs', "/wp-includes/js/wpdialog$suffix.js", array( 'jquery-ui-dialog' ), false, 1 );
+
+	$scripts->add( 'word-count', "/wp-admin/js/word-count$suffix.js", array(), false, 1 );
+
+	$scripts->add( 'media-upload', "/wp-admin/js/media-upload$suffix.js", array( 'thickbox', 'shortcode' ), false, 1 );
+
+	$scripts->add( 'hoverIntent', "/wp-includes/js/hoverIntent$suffix.js", array('jquery'), '1.8.1', 1 );
+
+	$scripts->add( 'customize-base',     "/wp-includes/js/customize-base$suffix.js",     array( 'jquery', 'json2', 'underscore' ), false, 1 );
+	$scripts->add( 'customize-loader',   "/wp-includes/js/customize-loader$suffix.js",   array( 'customize-base' ), false, 1 );
+	$scripts->add( 'customize-preview',  "/wp-includes/js/customize-preview$suffix.js",  array( 'wp-a11y', 'customize-base' ), false, 1 );
+	$scripts->add( 'customize-models',   "/wp-includes/js/customize-models.js", array( 'underscore', 'backbone' ), false, 1 );
+	$scripts->add( 'customize-views',    "/wp-includes/js/customize-views.js",  array( 'jquery', 'underscore', 'imgareaselect', 'customize-models', 'media-editor', 'media-views' ), false, 1 );
+	$scripts->add( 'customize-controls', "/wp-admin/js/customize-controls$suffix.js", array( 'customize-base', 'wp-a11y', 'wp-util', 'jquery-ui-core' ), false, 1 );
+	did_action( 'init' ) && $scripts->localize( 'customize-controls', '_wpCustomizeControlsL10n', array(
+		'activate'           => __( 'Activate &amp; Publish' ),
+		'save'               => __( 'Save &amp; Publish' ), // @todo Remove as not required.
+		'publish'            => __( 'Publish' ),
+		'published'          => __( 'Published' ),
+		'saveDraft'          => __( 'Save Draft' ),
+		'draftSaved'         => __( 'Draft Saved' ),
+		'updating'           => __( 'Updating' ),
+		'schedule'           => _x( 'Schedule', 'customizer changeset action/button label' ),
+		'scheduled'          => _x( 'Scheduled', 'customizer changeset status' ),
+		'invalid'            => __( 'Invalid' ),
+		'saveBeforeShare'    => __( 'Please save your changes in order to share the preview.' ),
+		'futureDateError'    => __( 'You must supply a future date to schedule.' ),
+		'saveAlert'          => __( 'The changes you made will be lost if you navigate away from this page.' ),
+		'saved'              => __( 'Saved' ),
+		'cancel'             => __( 'Cancel' ),
+		'close'              => __( 'Close' ),
+		'action'             => __( 'Action' ),
+		'discardChanges'     => __( 'Discard changes' ),
+		'cheatin'            => __( 'Cheatin&#8217; uh?' ),
+		'notAllowed'         => __( 'Sorry, you are not allowed to customize this site.' ),
+		'previewIframeTitle' => __( 'Site Preview' ),
+		'loginIframeTitle'   => __( 'Session expired' ),
+		'collapseSidebar'    => _x( 'Hide Controls', 'label for hide controls button without length constraints' ),
+		'expandSidebar'      => _x( 'Show Controls', 'label for hide controls button without length constraints' ),
+		'untitledBlogName'   => __( '(Untitled)' ),
+		'unknownRequestFail' => __( 'Looks like something&#8217;s gone wrong. Wait a couple seconds, and then try again.' ),
+		'themeDownloading'   => __( 'Downloading your new theme&hellip;' ),
+		'themePreviewWait'   => __( 'Setting up your live preview. This may take a bit.' ),
+		'revertingChanges'   => __( 'Reverting unpublished changes&hellip;' ),
+		'trashConfirm'       => __( 'Are you sure you&#8217;d like to discard your unpublished changes?' ),
+		/* translators: %s: Display name of the user who has taken over the changeset in customizer. */
+		'takenOverMessage'   => __( '%s has taken over and is currently customizing.' ),
+		/* translators: %s: URL to the Customizer to load the autosaved version */
+		'autosaveNotice'     => __( 'There is a more recent autosave of your changes than the one you are previewing. <a href="%s">Restore the autosave</a>' ),
+		'videoHeaderNotice'  => __( 'This theme doesn&#8217;t support video headers on this page. Navigate to the front page or another page that supports video headers.' ),
+		// Used for overriding the file types allowed in plupload.
+		'allowedFiles'       => __( '
