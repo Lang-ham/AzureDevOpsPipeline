@@ -927,4 +927,252 @@ function wp_default_styles( &$styles ) {
 	$styles->default_dirs = array('/wp-admin/', '/wp-includes/css/');
 
 	// Open Sans is no longer used by core, but may be relied upon by themes and plugins.
-	$open_sans_
+	$open_sans_font_url = '';
+
+	/* translators: If there are characters in your language that are not supported
+	 * by Open Sans, translate this to 'off'. Do not translate into your own language.
+	 */
+	if ( 'off' !== _x( 'on', 'Open Sans font: on or off' ) ) {
+		$subsets = 'latin,latin-ext';
+
+		/* translators: To add an additional Open Sans character subset specific to your language,
+		 * translate this to 'greek', 'cyrillic' or 'vietnamese'. Do not translate into your own language.
+		 */
+		$subset = _x( 'no-subset', 'Open Sans font: add new subset (greek, cyrillic, vietnamese)' );
+
+		if ( 'cyrillic' == $subset ) {
+			$subsets .= ',cyrillic,cyrillic-ext';
+		} elseif ( 'greek' == $subset ) {
+			$subsets .= ',greek,greek-ext';
+		} elseif ( 'vietnamese' == $subset ) {
+			$subsets .= ',vietnamese';
+		}
+
+		// Hotlink Open Sans, for now
+		$open_sans_font_url = "https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,300,400,600&subset=$subsets";
+	}
+
+	// Register a stylesheet for the selected admin color scheme.
+	$styles->add( 'colors', true, array( 'wp-admin', 'buttons' ) );
+
+	$suffix = SCRIPT_DEBUG ? '' : '.min';
+
+	// Admin CSS
+	$styles->add( 'common',              "/wp-admin/css/common$suffix.css" );
+	$styles->add( 'forms',               "/wp-admin/css/forms$suffix.css" );
+	$styles->add( 'admin-menu',          "/wp-admin/css/admin-menu$suffix.css" );
+	$styles->add( 'dashboard',           "/wp-admin/css/dashboard$suffix.css" );
+	$styles->add( 'list-tables',         "/wp-admin/css/list-tables$suffix.css" );
+	$styles->add( 'edit',                "/wp-admin/css/edit$suffix.css" );
+	$styles->add( 'revisions',           "/wp-admin/css/revisions$suffix.css" );
+	$styles->add( 'media',               "/wp-admin/css/media$suffix.css" );
+	$styles->add( 'themes',              "/wp-admin/css/themes$suffix.css" );
+	$styles->add( 'about',               "/wp-admin/css/about$suffix.css" );
+	$styles->add( 'nav-menus',           "/wp-admin/css/nav-menus$suffix.css" );
+	$styles->add( 'widgets',             "/wp-admin/css/widgets$suffix.css", array( 'wp-pointer' ) );
+	$styles->add( 'site-icon',           "/wp-admin/css/site-icon$suffix.css" );
+	$styles->add( 'l10n',                "/wp-admin/css/l10n$suffix.css" );
+	$styles->add( 'code-editor',         "/wp-admin/css/code-editor$suffix.css", array( 'wp-codemirror' ) );
+
+	$styles->add( 'wp-admin', false, array( 'dashicons', 'common', 'forms', 'admin-menu', 'dashboard', 'list-tables', 'edit', 'revisions', 'media', 'themes', 'about', 'nav-menus', 'widgets', 'site-icon', 'l10n' ) );
+
+	$styles->add( 'login',               "/wp-admin/css/login$suffix.css", array( 'dashicons', 'buttons', 'forms', 'l10n' ) );
+	$styles->add( 'install',             "/wp-admin/css/install$suffix.css", array( 'buttons' ) );
+	$styles->add( 'wp-color-picker',     "/wp-admin/css/color-picker$suffix.css" );
+	$styles->add( 'customize-controls',  "/wp-admin/css/customize-controls$suffix.css", array( 'wp-admin', 'colors', 'ie', 'imgareaselect' ) );
+	$styles->add( 'customize-widgets',   "/wp-admin/css/customize-widgets$suffix.css", array( 'wp-admin', 'colors' ) );
+	$styles->add( 'customize-nav-menus', "/wp-admin/css/customize-nav-menus$suffix.css", array( 'wp-admin', 'colors' ) );
+
+	$styles->add( 'ie', "/wp-admin/css/ie$suffix.css" );
+	$styles->add_data( 'ie', 'conditional', 'lte IE 7' );
+
+	// Common dependencies
+	$styles->add( 'buttons',   "/wp-includes/css/buttons$suffix.css" );
+	$styles->add( 'dashicons', "/wp-includes/css/dashicons$suffix.css" );
+
+	// Includes CSS
+	$styles->add( 'admin-bar',            "/wp-includes/css/admin-bar$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'wp-auth-check',        "/wp-includes/css/wp-auth-check$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'editor-buttons',       "/wp-includes/css/editor$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'media-views',          "/wp-includes/css/media-views$suffix.css", array( 'buttons', 'dashicons', 'wp-mediaelement' ) );
+	$styles->add( 'wp-pointer',           "/wp-includes/css/wp-pointer$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'customize-preview',    "/wp-includes/css/customize-preview$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'wp-embed-template-ie', "/wp-includes/css/wp-embed-template-ie$suffix.css" );
+	$styles->add_data( 'wp-embed-template-ie', 'conditional', 'lte IE 8' );
+
+	// External libraries and friends
+	$styles->add( 'imgareaselect',       '/wp-includes/js/imgareaselect/imgareaselect.css', array(), '0.9.8' );
+	$styles->add( 'wp-jquery-ui-dialog', "/wp-includes/css/jquery-ui-dialog$suffix.css", array( 'dashicons' ) );
+	$styles->add( 'mediaelement',        "/wp-includes/js/mediaelement/mediaelementplayer-legacy.min.css", array(), '4.2.6-78496d1' );
+	$styles->add( 'wp-mediaelement',     "/wp-includes/js/mediaelement/wp-mediaelement$suffix.css", array( 'mediaelement' ) );
+	$styles->add( 'thickbox',            '/wp-includes/js/thickbox/thickbox.css', array( 'dashicons' ) );
+	$styles->add( 'wp-codemirror',       '/wp-includes/js/codemirror/codemirror.min.css', array(), '5.29.1-alpha-ee20357' );
+
+	// Deprecated CSS
+	$styles->add( 'deprecated-media', "/wp-admin/css/deprecated-media$suffix.css" );
+	$styles->add( 'farbtastic',       "/wp-admin/css/farbtastic$suffix.css", array(), '1.3u1' );
+	$styles->add( 'jcrop',            "/wp-includes/js/jcrop/jquery.Jcrop.min.css", array(), '0.9.12' );
+	$styles->add( 'colors-fresh', false, array( 'wp-admin', 'buttons' ) ); // Old handle.
+	$styles->add( 'open-sans', $open_sans_font_url ); // No longer used in core as of 4.6
+
+	// RTL CSS
+	$rtl_styles = array(
+		// wp-admin
+		'common', 'forms', 'admin-menu', 'dashboard', 'list-tables', 'edit', 'revisions', 'media', 'themes', 'about', 'nav-menus',
+		'widgets', 'site-icon', 'l10n', 'install', 'wp-color-picker', 'customize-controls', 'customize-widgets', 'customize-nav-menus', 'customize-preview',
+		'ie', 'login',
+		// wp-includes
+		'buttons', 'admin-bar', 'wp-auth-check', 'editor-buttons', 'media-views', 'wp-pointer',
+		'wp-jquery-ui-dialog',
+		// deprecated
+		'deprecated-media', 'farbtastic',
+	);
+
+	foreach ( $rtl_styles as $rtl_style ) {
+		$styles->add_data( $rtl_style, 'rtl', 'replace' );
+		if ( $suffix ) {
+			$styles->add_data( $rtl_style, 'suffix', $suffix );
+		}
+	}
+}
+
+/**
+ * Reorder JavaScript scripts array to place prototype before jQuery.
+ *
+ * @since 2.3.1
+ *
+ * @param array $js_array JavaScript scripts array
+ * @return array Reordered array, if needed.
+ */
+function wp_prototype_before_jquery( $js_array ) {
+	if ( false === $prototype = array_search( 'prototype', $js_array, true ) )
+		return $js_array;
+
+	if ( false === $jquery = array_search( 'jquery', $js_array, true ) )
+		return $js_array;
+
+	if ( $prototype < $jquery )
+		return $js_array;
+
+	unset($js_array[$prototype]);
+
+	array_splice( $js_array, $jquery, 0, 'prototype' );
+
+	return $js_array;
+}
+
+/**
+ * Load localized data on print rather than initialization.
+ *
+ * These localizations require information that may not be loaded even by init.
+ *
+ * @since 2.5.0
+ */
+function wp_just_in_time_script_localization() {
+
+	wp_localize_script( 'autosave', 'autosaveL10n', array(
+		'autosaveInterval' => AUTOSAVE_INTERVAL,
+		'blog_id' => get_current_blog_id(),
+	) );
+
+	wp_localize_script( 'mce-view', 'mceViewL10n', array(
+		'shortcodes' => ! empty( $GLOBALS['shortcode_tags'] ) ? array_keys( $GLOBALS['shortcode_tags'] ) : array()
+	) );
+
+	wp_localize_script( 'word-count', 'wordCountL10n', array(
+		/*
+		 * translators: If your word count is based on single characters (e.g. East Asian characters),
+		 * enter 'characters_excluding_spaces' or 'characters_including_spaces'. Otherwise, enter 'words'.
+		 * Do not translate into your own language.
+		 */
+		'type' => _x( 'words', 'Word count type. Do not translate!' ),
+		'shortcodes' => ! empty( $GLOBALS['shortcode_tags'] ) ? array_keys( $GLOBALS['shortcode_tags'] ) : array()
+	) );
+}
+
+/**
+ * Localizes the jQuery UI datepicker.
+ *
+ * @since 4.6.0
+ *
+ * @link https://api.jqueryui.com/datepicker/#options
+ *
+ * @global WP_Locale $wp_locale The WordPress date and time locale object.
+ */
+function wp_localize_jquery_ui_datepicker() {
+	global $wp_locale;
+
+	if ( ! wp_script_is( 'jquery-ui-datepicker', 'enqueued' ) ) {
+		return;
+	}
+
+	// Convert the PHP date format into jQuery UI's format.
+	$datepicker_date_format = str_replace(
+		array(
+			'd', 'j', 'l', 'z', // Day.
+			'F', 'M', 'n', 'm', // Month.
+			'Y', 'y'            // Year.
+		),
+		array(
+			'dd', 'd', 'DD', 'o',
+			'MM', 'M', 'm', 'mm',
+			'yy', 'y'
+		),
+		get_option( 'date_format' )
+	);
+
+	$datepicker_defaults = wp_json_encode( array(
+		'closeText'       => __( 'Close' ),
+		'currentText'     => __( 'Today' ),
+		'monthNames'      => array_values( $wp_locale->month ),
+		'monthNamesShort' => array_values( $wp_locale->month_abbrev ),
+		'nextText'        => __( 'Next' ),
+		'prevText'        => __( 'Previous' ),
+		'dayNames'        => array_values( $wp_locale->weekday ),
+		'dayNamesShort'   => array_values( $wp_locale->weekday_abbrev ),
+		'dayNamesMin'     => array_values( $wp_locale->weekday_initial ),
+		'dateFormat'      => $datepicker_date_format,
+		'firstDay'        => absint( get_option( 'start_of_week' ) ),
+		'isRTL'           => $wp_locale->is_rtl(),
+	) );
+
+	wp_add_inline_script( 'jquery-ui-datepicker', "jQuery(document).ready(function(jQuery){jQuery.datepicker.setDefaults({$datepicker_defaults});});" );
+}
+
+/**
+ * Localizes community events data that needs to be passed to dashboard.js.
+ *
+ * @since 4.8.0
+ */
+function wp_localize_community_events() {
+	if ( ! wp_script_is( 'dashboard' ) ) {
+		return;
+	}
+
+	require_once( ABSPATH . 'wp-admin/includes/class-wp-community-events.php' );
+
+	$user_id            = get_current_user_id();
+	$saved_location     = get_user_option( 'community-events-location', $user_id );
+	$saved_ip_address   = isset( $saved_location['ip'] ) ? $saved_location['ip'] : false;
+	$current_ip_address = WP_Community_Events::get_unsafe_client_ip();
+
+	/*
+	 * If the user's location is based on their IP address, then update their
+	 * location when their IP address changes. This allows them to see events
+	 * in their current city when travelling. Otherwise, they would always be
+	 * shown events in the city where they were when they first loaded the
+	 * Dashboard, which could have been months or years ago.
+	 */
+	if ( $saved_ip_address && $current_ip_address && $current_ip_address !== $saved_ip_address ) {
+		$saved_location['ip'] = $current_ip_address;
+		update_user_option( $user_id, 'community-events-location', $saved_location, true );
+	}
+
+	$events_client = new WP_Community_Events( $user_id, $saved_location );
+
+	wp_localize_script( 'dashboard', 'communityEventsData', array(
+		'nonce' => wp_create_nonce( 'community_events' ),
+		'cache' => $events_client->get_cached_events(),
+
+		'l10n' => array(
+			'enter_closest_city' => __( 'Enter your closest city to find nearby
