@@ -744,4 +744,187 @@ function wp_default_scripts( &$scripts ) {
 			'saved'      => __( 'Changes saved.' ),
 		) );
 
-		$scripts->add( 'inline-edit-tax', "/wp-admin/js/inline-edit-tax$suffix.js"
+		$scripts->add( 'inline-edit-tax', "/wp-admin/js/inline-edit-tax$suffix.js", array( 'jquery', 'wp-a11y' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'inline-edit-tax', 'inlineEditL10n', array(
+			'error' => __( 'Error while saving the changes.' ),
+			'saved' => __( 'Changes saved.' ),
+		) );
+
+		$scripts->add( 'plugin-install', "/wp-admin/js/plugin-install$suffix.js", array( 'jquery', 'jquery-ui-core', 'thickbox' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'plugin-install', 'plugininstallL10n', array(
+			'plugin_information' => __( 'Plugin:' ),
+			'plugin_modal_label' => __( 'Plugin details' ),
+			'ays' => __('Are you sure you want to install this plugin?')
+		) );
+
+		$scripts->add( 'updates', "/wp-admin/js/updates$suffix.js", array( 'jquery', 'wp-util', 'wp-a11y' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'updates', '_wpUpdatesSettings', array(
+			'ajax_nonce' => wp_create_nonce( 'updates' ),
+			'l10n'       => array(
+				/* translators: %s: Search string */
+				'searchResults'              => __( 'Search results for &#8220;%s&#8221;' ),
+				'searchResultsLabel'         => __( 'Search Results' ),
+				'noPlugins'                  => __( 'You do not appear to have any plugins available at this time.' ),
+				'noItemsSelected'            => __( 'Please select at least one item to perform this action on.' ),
+				'updating'                   => __( 'Updating...' ), // No ellipsis.
+				'pluginUpdated'              => _x( 'Updated!', 'plugin' ),
+				'themeUpdated'               => _x( 'Updated!', 'theme' ),
+				'update'                     => __( 'Update' ),
+				'updateNow'                  => __( 'Update Now' ),
+				/* translators: %s: Plugin name and version */
+				'pluginUpdateNowLabel'       => _x( 'Update %s now', 'plugin' ),
+				'updateFailedShort'          => __( 'Update Failed!' ),
+				/* translators: %s: Error string for a failed update */
+				'updateFailed'               => __( 'Update Failed: %s' ),
+				/* translators: %s: Plugin name and version */
+				'pluginUpdatingLabel'        => _x( 'Updating %s...', 'plugin' ), // No ellipsis.
+				/* translators: %s: Plugin name and version */
+				'pluginUpdatedLabel'         => _x( '%s updated!', 'plugin' ),
+				/* translators: %s: Plugin name and version */
+				'pluginUpdateFailedLabel'    => _x( '%s update failed', 'plugin' ),
+				/* translators: Accessibility text */
+				'updatingMsg'                => __( 'Updating... please wait.' ), // No ellipsis.
+				/* translators: Accessibility text */
+				'updatedMsg'                 => __( 'Update completed successfully.' ),
+				/* translators: Accessibility text */
+				'updateCancel'               => __( 'Update canceled.' ),
+				'beforeunload'               => __( 'Updates may not complete if you navigate away from this page.' ),
+				'installNow'                 => __( 'Install Now' ),
+				/* translators: %s: Plugin name */
+				'pluginInstallNowLabel'      => _x( 'Install %s now', 'plugin' ),
+				'installing'                 => __( 'Installing...' ),
+				'pluginInstalled'            => _x( 'Installed!', 'plugin' ),
+				'themeInstalled'             => _x( 'Installed!', 'theme' ),
+				'installFailedShort'         => __( 'Installation Failed!' ),
+				/* translators: %s: Error string for a failed installation */
+				'installFailed'              => __( 'Installation failed: %s' ),
+				/* translators: %s: Plugin name and version */
+				'pluginInstallingLabel'      => _x( 'Installing %s...', 'plugin' ), // no ellipsis
+				/* translators: %s: Theme name and version */
+				'themeInstallingLabel'       => _x( 'Installing %s...', 'theme' ), // no ellipsis
+				/* translators: %s: Plugin name and version */
+				'pluginInstalledLabel'       => _x( '%s installed!', 'plugin' ),
+				/* translators: %s: Theme name and version */
+				'themeInstalledLabel'        => _x( '%s installed!', 'theme' ),
+				/* translators: %s: Plugin name and version */
+				'pluginInstallFailedLabel'   => _x( '%s installation failed', 'plugin' ),
+				/* translators: %s: Theme name and version */
+				'themeInstallFailedLabel'    => _x( '%s installation failed', 'theme' ),
+				'installingMsg'              => __( 'Installing... please wait.' ),
+				'installedMsg'               => __( 'Installation completed successfully.' ),
+				/* translators: %s: Activation URL */
+				'importerInstalledMsg'       => __( 'Importer installed successfully. <a href="%s">Run importer</a>' ),
+				/* translators: %s: Theme name */
+				'aysDelete'                  => __( 'Are you sure you want to delete %s?' ),
+				/* translators: %s: Plugin name */
+				'aysDeleteUninstall'         => __( 'Are you sure you want to delete %s and its data?' ),
+				'aysBulkDelete'              => __( 'Are you sure you want to delete the selected plugins and their data?' ),
+				'aysBulkDeleteThemes'        => __( 'Caution: These themes may be active on other sites in the network. Are you sure you want to proceed?' ),
+				'deleting'                   => __( 'Deleting...' ),
+				/* translators: %s: Error string for a failed deletion */
+				'deleteFailed'               => __( 'Deletion failed: %s' ),
+				'pluginDeleted'              => _x( 'Deleted!', 'plugin' ),
+				'themeDeleted'               => _x( 'Deleted!', 'theme' ),
+				'livePreview'                => __( 'Live Preview' ),
+				'activatePlugin'             => is_network_admin() ? __( 'Network Activate' ) : __( 'Activate' ),
+				'activateTheme'              => is_network_admin() ? __( 'Network Enable' ) : __( 'Activate' ),
+				/* translators: %s: Plugin name */
+				'activatePluginLabel'        => is_network_admin() ? _x( 'Network Activate %s', 'plugin' ) : _x( 'Activate %s', 'plugin' ),
+				/* translators: %s: Theme name */
+				'activateThemeLabel'         => is_network_admin() ? _x( 'Network Activate %s', 'theme' ) : _x( 'Activate %s', 'theme' ),
+				'activateImporter'           => __( 'Run Importer' ),
+				/* translators: %s: Importer name */
+				'activateImporterLabel'      => __( 'Run %s' ),
+				'unknownError'               => __( 'An unidentified error has occurred.' ),
+				'connectionError'            => __( 'Connection lost or the server is busy. Please try again later.' ),
+				'nonceError'                 => __( 'An error has occurred. Please reload the page and try again.' ),
+				'pluginsFound'               => __( 'Number of plugins found: %d' ),
+				'noPluginsFound'             => __( 'No plugins found. Try a different search.' ),
+			),
+		) );
+
+		$scripts->add( 'farbtastic', '/wp-admin/js/farbtastic.js', array('jquery'), '1.2' );
+
+		$scripts->add( 'iris', '/wp-admin/js/iris.min.js', array( 'jquery-ui-draggable', 'jquery-ui-slider', 'jquery-touch-punch' ), '1.0.7', 1 );
+		$scripts->add( 'wp-color-picker', "/wp-admin/js/color-picker$suffix.js", array( 'iris' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'wp-color-picker', 'wpColorPickerL10n', array(
+			'clear'            => __( 'Clear' ),
+			'clearAriaLabel'   => __( 'Clear color' ),
+			'defaultString'    => __( 'Default' ),
+			'defaultAriaLabel' => __( 'Select default color' ),
+			'pick'             => __( 'Select Color' ),
+			'defaultLabel'     => __( 'Color value' ),
+		) );
+
+		$scripts->add( 'dashboard', "/wp-admin/js/dashboard$suffix.js", array( 'jquery', 'admin-comments', 'postbox', 'wp-util', 'wp-a11y' ), false, 1 );
+
+		$scripts->add( 'list-revisions', "/wp-includes/js/wp-list-revisions$suffix.js" );
+
+		$scripts->add( 'media-grid', "/wp-includes/js/media-grid$suffix.js", array( 'media-editor' ), false, 1 );
+		$scripts->add( 'media', "/wp-admin/js/media$suffix.js", array( 'jquery' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'media', 'attachMediaBoxL10n', array(
+			'error' => __( 'An error has occurred. Please reload the page and try again.' ),
+		));
+
+		$scripts->add( 'image-edit', "/wp-admin/js/image-edit$suffix.js", array('jquery', 'json2', 'imgareaselect'), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'image-edit', 'imageEditL10n', array(
+			'error' => __( 'Could not load the preview image. Please reload the page and try again.' )
+		));
+
+		$scripts->add( 'set-post-thumbnail', "/wp-admin/js/set-post-thumbnail$suffix.js", array( 'jquery' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'set-post-thumbnail', 'setPostThumbnailL10n', array(
+			'setThumbnail' => __( 'Use as featured image' ),
+			'saving' => __( 'Saving...' ), // no ellipsis
+			'error' => __( 'Could not set that as the thumbnail image. Try a different attachment.' ),
+			'done' => __( 'Done' )
+		) );
+
+		// Navigation Menus
+		$scripts->add( 'nav-menu', "/wp-admin/js/nav-menu$suffix.js", array( 'jquery-ui-sortable', 'jquery-ui-draggable', 'jquery-ui-droppable', 'wp-lists', 'postbox', 'json2' ) );
+		did_action( 'init' ) && $scripts->localize( 'nav-menu', 'navMenuL10n', array(
+			'noResultsFound' => __( 'No results found.' ),
+			'warnDeleteMenu' => __( "You are about to permanently delete this menu. \n 'Cancel' to stop, 'OK' to delete." ),
+			'saveAlert' => __( 'The changes you made will be lost if you navigate away from this page.' ),
+			'untitled' => _x( '(no label)', 'missing menu item navigation label' )
+		) );
+
+		$scripts->add( 'custom-header', "/wp-admin/js/custom-header.js", array( 'jquery-masonry' ), false, 1 );
+		$scripts->add( 'custom-background', "/wp-admin/js/custom-background$suffix.js", array( 'wp-color-picker', 'media-views' ), false, 1 );
+		$scripts->add( 'media-gallery', "/wp-admin/js/media-gallery$suffix.js", array('jquery'), false, 1 );
+
+		$scripts->add( 'svg-painter', '/wp-admin/js/svg-painter.js', array( 'jquery' ), false, 1 );
+	}
+}
+
+/**
+ * Assign default styles to $styles object.
+ *
+ * Nothing is returned, because the $styles parameter is passed by reference.
+ * Meaning that whatever object is passed will be updated without having to
+ * reassign the variable that was passed back to the same value. This saves
+ * memory.
+ *
+ * Adding default styles is not the only task, it also assigns the base_url
+ * property, the default version, and text direction for the object.
+ *
+ * @since 2.6.0
+ *
+ * @param WP_Styles $styles
+ */
+function wp_default_styles( &$styles ) {
+	include( ABSPATH . WPINC . '/version.php' ); // include an unmodified $wp_version
+
+	if ( ! defined( 'SCRIPT_DEBUG' ) )
+		define( 'SCRIPT_DEBUG', false !== strpos( $wp_version, '-src' ) );
+
+	if ( ! $guessurl = site_url() )
+		$guessurl = wp_guess_url();
+
+	$styles->base_url = $guessurl;
+	$styles->content_url = defined('WP_CONTENT_URL')? WP_CONTENT_URL : '';
+	$styles->default_version = get_bloginfo( 'version' );
+	$styles->text_direction = function_exists( 'is_rtl' ) && is_rtl() ? 'rtl' : 'ltr';
+	$styles->default_dirs = array('/wp-admin/', '/wp-includes/css/');
+
+	// Open Sans is no longer used by core, but may be relied upon by themes and plugins.
+	$open_sans_
