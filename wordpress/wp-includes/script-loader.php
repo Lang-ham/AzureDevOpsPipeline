@@ -580,4 +580,168 @@ function wp_default_scripts( &$scripts ) {
 		'autosaveNotice'     => __( 'There is a more recent autosave of your changes than the one you are previewing. <a href="%s">Restore the autosave</a>' ),
 		'videoHeaderNotice'  => __( 'This theme doesn&#8217;t support video headers on this page. Navigate to the front page or another page that supports video headers.' ),
 		// Used for overriding the file types allowed in plupload.
-		'allowedFiles'       => __( '
+		'allowedFiles'       => __( 'Allowed Files' ),
+		'customCssError'     => array(
+			/* translators: %d: error count */
+			'singular' => _n( 'There is %d error which must be fixed before you can save.', 'There are %d errors which must be fixed before you can save.', 1 ),
+			/* translators: %d: error count */
+			'plural'   => _n( 'There is %d error which must be fixed before you can save.', 'There are %d errors which must be fixed before you can save.', 2 ), // @todo This is lacking, as some languages have a dedicated dual form. For proper handling of plurals in JS, see #20491.
+		),
+		'pageOnFrontError' => __( 'Homepage and posts page must be different.' ),
+		'saveBlockedError' => array(
+			/* translators: %s: number of invalid settings */
+			'singular' => _n( 'Unable to save due to %s invalid setting.', 'Unable to save due to %s invalid settings.', 1 ),
+			/* translators: %s: number of invalid settings */
+			'plural'   => _n( 'Unable to save due to %s invalid setting.', 'Unable to save due to %s invalid settings.', 2 ), // @todo This is lacking, as some languages have a dedicated dual form. For proper handling of plurals in JS, see #20491.
+		),
+		'scheduleDescription' => __( 'Schedule your customization changes to publish ("go live") at a future date.' ),
+		'themePreviewUnavailable' => __( 'Sorry, you can&#8217;t preview new themes when you have changes scheduled or saved as a draft. Please publish your changes, or wait until they publish to preview new themes.' ),
+		'themeInstallUnavailable' => sprintf(
+			/* translators: %s: URL to Add Themes admin screen */
+			__( 'You won&#8217;t be able to install new themes from here yet since your install requires SFTP credentials. For now, please <a href="%s">add themes in the admin</a>.' ),
+			esc_url( admin_url( 'theme-install.php' ) )
+		),
+		'publishSettings' => __( 'Publish Settings' ),
+		'invalidDate'     => __( 'Invalid date.' ),
+		'invalidValue'    => __( 'Invalid value.' ),
+	) );
+	$scripts->add( 'customize-selective-refresh', "/wp-includes/js/customize-selective-refresh$suffix.js", array( 'jquery', 'wp-util', 'customize-preview' ), false, 1 );
+
+	$scripts->add( 'customize-widgets', "/wp-admin/js/customize-widgets$suffix.js", array( 'jquery', 'jquery-ui-sortable', 'jquery-ui-droppable', 'wp-backbone', 'customize-controls' ), false, 1 );
+	$scripts->add( 'customize-preview-widgets', "/wp-includes/js/customize-preview-widgets$suffix.js", array( 'jquery', 'wp-util', 'customize-preview', 'customize-selective-refresh' ), false, 1 );
+
+	$scripts->add( 'customize-nav-menus', "/wp-admin/js/customize-nav-menus$suffix.js", array( 'jquery', 'wp-backbone', 'customize-controls', 'accordion', 'nav-menu' ), false, 1 );
+	$scripts->add( 'customize-preview-nav-menus', "/wp-includes/js/customize-preview-nav-menus$suffix.js", array( 'jquery', 'wp-util', 'customize-preview', 'customize-selective-refresh' ), false, 1 );
+
+	$scripts->add( 'wp-custom-header', "/wp-includes/js/wp-custom-header$suffix.js", array( 'wp-a11y' ), false, 1 );
+
+	$scripts->add( 'accordion', "/wp-admin/js/accordion$suffix.js", array( 'jquery' ), false, 1 );
+
+	$scripts->add( 'shortcode', "/wp-includes/js/shortcode$suffix.js", array( 'underscore' ), false, 1 );
+	$scripts->add( 'media-models', "/wp-includes/js/media-models$suffix.js", array( 'wp-backbone' ), false, 1 );
+	did_action( 'init' ) && $scripts->localize( 'media-models', '_wpMediaModelsL10n', array(
+		'settings' => array(
+			'ajaxurl' => admin_url( 'admin-ajax.php', 'relative' ),
+			'post' => array( 'id' => 0 ),
+		),
+	) );
+
+	$scripts->add( 'wp-embed', "/wp-includes/js/wp-embed$suffix.js" );
+
+	// To enqueue media-views or media-editor, call wp_enqueue_media().
+	// Both rely on numerous settings, styles, and templates to operate correctly.
+	$scripts->add( 'media-views',  "/wp-includes/js/media-views$suffix.js",  array( 'utils', 'media-models', 'wp-plupload', 'jquery-ui-sortable', 'wp-mediaelement', 'wp-api-request' ), false, 1 );
+	$scripts->add( 'media-editor', "/wp-includes/js/media-editor$suffix.js", array( 'shortcode', 'media-views' ), false, 1 );
+	$scripts->add( 'media-audiovideo', "/wp-includes/js/media-audiovideo$suffix.js", array( 'media-editor' ), false, 1 );
+	$scripts->add( 'mce-view', "/wp-includes/js/mce-view$suffix.js", array( 'shortcode', 'jquery', 'media-views', 'media-audiovideo' ), false, 1 );
+
+	$scripts->add( 'wp-api', "/wp-includes/js/wp-api$suffix.js", array( 'jquery', 'backbone', 'underscore', 'wp-api-request' ), false, 1 );
+
+	if ( is_admin() ) {
+		$scripts->add( 'admin-tags', "/wp-admin/js/tags$suffix.js", array( 'jquery', 'wp-ajax-response' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'admin-tags', 'tagsl10n', array(
+			'noPerm' => __('Sorry, you are not allowed to do that.'),
+			'broken' => __('An unidentified error has occurred.')
+		));
+
+		$scripts->add( 'admin-comments', "/wp-admin/js/edit-comments$suffix.js", array('wp-lists', 'quicktags', 'jquery-query'), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'admin-comments', 'adminCommentsL10n', array(
+			'hotkeys_highlight_first' => isset($_GET['hotkeys_highlight_first']),
+			'hotkeys_highlight_last' => isset($_GET['hotkeys_highlight_last']),
+			'replyApprove' => __( 'Approve and Reply' ),
+			'reply' => __( 'Reply' ),
+			'warnQuickEdit' => __( "Are you sure you want to edit this comment?\nThe changes you made will be lost." ),
+			'warnCommentChanges' => __( "Are you sure you want to do this?\nThe comment changes you made will be lost." ),
+			'docTitleComments' => __( 'Comments' ),
+			/* translators: %s: comments count */
+			'docTitleCommentsCount' => __( 'Comments (%s)' ),
+		) );
+
+		$scripts->add( 'xfn', "/wp-admin/js/xfn$suffix.js", array('jquery'), false, 1 );
+
+		$scripts->add( 'postbox', "/wp-admin/js/postbox$suffix.js", array('jquery-ui-sortable'), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'postbox', 'postBoxL10n', array(
+			'postBoxEmptyString' => __( 'Drag boxes here' ),
+		) );
+
+		$scripts->add( 'tags-box', "/wp-admin/js/tags-box$suffix.js", array( 'jquery', 'tags-suggest' ), false, 1 );
+
+		$scripts->add( 'tags-suggest', "/wp-admin/js/tags-suggest$suffix.js", array( 'jquery-ui-autocomplete', 'wp-a11y' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'tags-suggest', 'tagsSuggestL10n', array(
+			'tagDelimiter' => _x( ',', 'tag delimiter' ),
+			'removeTerm'   => __( 'Remove term:' ),
+			'termSelected' => __( 'Term selected.' ),
+			'termAdded'    => __( 'Term added.' ),
+			'termRemoved'  => __( 'Term removed.' ),
+		) );
+
+		$scripts->add( 'post', "/wp-admin/js/post$suffix.js", array( 'suggest', 'wp-lists', 'postbox', 'tags-box', 'underscore', 'word-count', 'wp-a11y' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'post', 'postL10n', array(
+			'ok' => __('OK'),
+			'cancel' => __('Cancel'),
+			'publishOn' => __('Publish on:'),
+			'publishOnFuture' =>  __('Schedule for:'),
+			'publishOnPast' => __('Published on:'),
+			/* translators: 1: month, 2: day, 3: year, 4: hour, 5: minute */
+			'dateFormat' => __('%1$s %2$s, %3$s @ %4$s:%5$s'),
+			'showcomm' => __('Show more comments'),
+			'endcomm' => __('No more comments found.'),
+			'publish' => __('Publish'),
+			'schedule' => _x('Schedule', 'post action/button label'),
+			'update' => __('Update'),
+			'savePending' => __('Save as Pending'),
+			'saveDraft' => __('Save Draft'),
+			'private' => __('Private'),
+			'public' => __('Public'),
+			'publicSticky' => __('Public, Sticky'),
+			'password' => __('Password Protected'),
+			'privatelyPublished' => __('Privately Published'),
+			'published' => __('Published'),
+			'saveAlert' => __('The changes you made will be lost if you navigate away from this page.'),
+			'savingText' => __('Saving Draft&#8230;'),
+			'permalinkSaved' => __( 'Permalink saved' ),
+		) );
+
+		$scripts->add( 'editor-expand', "/wp-admin/js/editor-expand$suffix.js", array( 'jquery', 'underscore' ), false, 1 );
+
+		$scripts->add( 'link', "/wp-admin/js/link$suffix.js", array( 'wp-lists', 'postbox' ), false, 1 );
+
+		$scripts->add( 'comment', "/wp-admin/js/comment$suffix.js", array( 'jquery', 'postbox' ) );
+		$scripts->add_data( 'comment', 'group', 1 );
+		did_action( 'init' ) && $scripts->localize( 'comment', 'commentL10n', array(
+			'submittedOn' => __( 'Submitted on:' ),
+			/* translators: 1: month, 2: day, 3: year, 4: hour, 5: minute */
+			'dateFormat' => __( '%1$s %2$s, %3$s @ %4$s:%5$s' )
+		) );
+
+		$scripts->add( 'admin-gallery', "/wp-admin/js/gallery$suffix.js", array( 'jquery-ui-sortable' ) );
+
+		$scripts->add( 'admin-widgets', "/wp-admin/js/widgets$suffix.js", array( 'jquery-ui-sortable', 'jquery-ui-draggable', 'jquery-ui-droppable' ), false, 1 );
+		did_action( 'init' ) && $scripts->add_inline_script( 'admin-widgets', sprintf( 'wpWidgets.l10n = %s;', wp_json_encode( array(
+			'save' => __( 'Save' ),
+			'saved' => __( 'Saved' ),
+			'saveAlert' => __( 'The changes you made will be lost if you navigate away from this page.' ),
+		) ) ) );
+
+		$scripts->add( 'media-widgets', "/wp-admin/js/widgets/media-widgets$suffix.js", array( 'jquery', 'media-models', 'media-views', 'wp-api-request' ) );
+		$scripts->add_inline_script( 'media-widgets', 'wp.mediaWidgets.init();', 'after' );
+
+		$scripts->add( 'media-audio-widget', "/wp-admin/js/widgets/media-audio-widget$suffix.js", array( 'media-widgets', 'media-audiovideo' ) );
+		$scripts->add( 'media-image-widget', "/wp-admin/js/widgets/media-image-widget$suffix.js", array( 'media-widgets' ) );
+		$scripts->add( 'media-gallery-widget', "/wp-admin/js/widgets/media-gallery-widget$suffix.js", array( 'media-widgets' ) );
+		$scripts->add( 'media-video-widget', "/wp-admin/js/widgets/media-video-widget$suffix.js", array( 'media-widgets', 'media-audiovideo', 'wp-api-request' ) );
+		$scripts->add( 'text-widgets', "/wp-admin/js/widgets/text-widgets$suffix.js", array( 'jquery', 'backbone', 'editor', 'wp-util', 'wp-a11y' ) );
+		$scripts->add( 'custom-html-widgets', "/wp-admin/js/widgets/custom-html-widgets$suffix.js", array( 'jquery', 'backbone', 'wp-util', 'jquery-ui-core', 'wp-a11y' ) );
+
+		$scripts->add( 'theme', "/wp-admin/js/theme$suffix.js", array( 'wp-backbone', 'wp-a11y', 'customize-base' ), false, 1 );
+
+		$scripts->add( 'inline-edit-post', "/wp-admin/js/inline-edit-post$suffix.js", array( 'jquery', 'tags-suggest', 'wp-a11y' ), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'inline-edit-post', 'inlineEditL10n', array(
+			'error'      => __( 'Error while saving the changes.' ),
+			'ntdeltitle' => __( 'Remove From Bulk Edit' ),
+			'notitle'    => __( '(no title)' ),
+			'comma'      => trim( _x( ',', 'tag delimiter' ) ),
+			'saved'      => __( 'Changes saved.' ),
+		) );
+
+		$scripts->add( 'inline-edit-tax', "/wp-admin/js/inline-edit-tax$suffix.js"
