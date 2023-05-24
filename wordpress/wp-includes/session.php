@@ -7,4 +7,5 @@
 
 _deprecated_file( basename( __FILE__ ), '4.7.0' );
 
-require_once( ABSPAT
+require_once( ABSPATH . WPINC . '/class-wp-session-tokens.php' );
+require_once( ABSPATH . WPINC . '/class-wp-user-meta-session-tokens.php' );
