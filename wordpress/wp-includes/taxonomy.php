@@ -749,4 +749,322 @@ function get_term( $term, $taxonomy = '', $output = OBJECT, $filter = 'raw' ) {
 	}
 
 	if ( $taxonomy && ! taxonomy_exists( $taxonomy ) ) {
-		return new WP_
+		return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+	}
+
+	if ( $term instanceof WP_Term ) {
+		$_term = $term;
+	} elseif ( is_object( $term ) ) {
+		if ( empty( $term->filter ) || 'raw' === $term->filter ) {
+			$_term = sanitize_term( $term, $taxonomy, 'raw' );
+			$_term = new WP_Term( $_term );
+		} else {
+			$_term = WP_Term::get_instance( $term->term_id );
+		}
+	} else {
+		$_term = WP_Term::get_instance( $term, $taxonomy );
+	}
+
+	if ( is_wp_error( $_term ) ) {
+		return $_term;
+	} elseif ( ! $_term ) {
+		return null;
+	}
+
+	/**
+	 * Filters a term.
+	 *
+	 * @since 2.3.0
+	 * @since 4.4.0 `$_term` can now also be a WP_Term object.
+	 *
+	 * @param int|WP_Term $_term    Term object or ID.
+	 * @param string      $taxonomy The taxonomy slug.
+	 */
+	$_term = apply_filters( 'get_term', $_term, $taxonomy );
+
+	/**
+	 * Filters a taxonomy.
+	 *
+	 * The dynamic portion of the filter name, `$taxonomy`, refers
+	 * to the taxonomy slug.
+	 *
+	 * @since 2.3.0
+	 * @since 4.4.0 `$_term` can now also be a WP_Term object.
+	 *
+	 * @param int|WP_Term $_term    Term object or ID.
+	 * @param string      $taxonomy The taxonomy slug.
+	 */
+	$_term = apply_filters( "get_{$taxonomy}", $_term, $taxonomy );
+
+	// Bail if a filter callback has changed the type of the `$_term` object.
+	if ( ! ( $_term instanceof WP_Term ) ) {
+		return $_term;
+	}
+
+	// Sanitize term, according to the specified filter.
+	$_term->filter( $filter );
+
+	if ( $output == ARRAY_A ) {
+		return $_term->to_array();
+	} elseif ( $output == ARRAY_N ) {
+		return array_values( $_term->to_array() );
+	}
+
+	return $_term;
+}
+
+/**
+ * Get all Term data from database by Term field and data.
+ *
+ * Warning: $value is not escaped for 'name' $field. You must do it yourself, if
+ * required.
+ *
+ * The default $field is 'id', therefore it is possible to also use null for
+ * field, but not recommended that you do so.
+ *
+ * If $value does not exist, the return value will be false. If $taxonomy exists
+ * and $field and $value combinations exist, the Term will be returned.
+ *
+ * This function will always return the first term that matches the `$field`-
+ * `$value`-`$taxonomy` combination specified in the parameters. If your query
+ * is likely to match more than one term (as is likely to be the case when
+ * `$field` is 'name', for example), consider using get_terms() instead; that
+ * way, you will get all matching terms, and can provide your own logic for
+ * deciding which one was intended.
+ *
+ * @todo Better formatting for DocBlock.
+ *
+ * @since 2.3.0
+ * @since 4.4.0 `$taxonomy` is optional if `$field` is 'term_taxonomy_id'. Converted to return
+ *              a WP_Term object if `$output` is `OBJECT`.
+ *
+ * @see sanitize_term_field() The $context param lists the available values for get_term_by() $filter param.
+ *
+ * @param string     $field    Either 'slug', 'name', 'id' (term_id), or 'term_taxonomy_id'
+ * @param string|int $value    Search for this term value
+ * @param string     $taxonomy Taxonomy name. Optional, if `$field` is 'term_taxonomy_id'.
+ * @param string     $output   Optional. The required return type. One of OBJECT, ARRAY_A, or ARRAY_N, which correspond to
+ *                             a WP_Term object, an associative array, or a numeric array, respectively. Default OBJECT.
+ * @param string     $filter   Optional, default is raw or no WordPress defined filter will applied.
+ * @return WP_Term|array|false WP_Term instance (or array) on success. Will return false if `$taxonomy` does not exist
+ *                             or `$term` was not found.
+ */
+function get_term_by( $field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw' ) {
+
+	// 'term_taxonomy_id' lookups don't require taxonomy checks.
+	if ( 'term_taxonomy_id' !== $field && ! taxonomy_exists( $taxonomy ) ) {
+		return false;
+	}
+
+	// No need to perform a query for empty 'slug' or 'name'.
+	if ( 'slug' === $field || 'name' === $field ) {
+		$value = (string) $value;
+
+		if ( 0 === strlen( $value ) ) {
+			return false;
+		}
+	}
+
+	if ( 'id' === $field || 'term_id' === $field ) {
+		$term = get_term( (int) $value, $taxonomy, $output, $filter );
+		if ( is_wp_error( $term ) || null === $term ) {
+			$term = false;
+		}
+		return $term;
+	}
+
+	$args = array(
+		'get'                    => 'all',
+		'number'                 => 1,
+		'taxonomy'               => $taxonomy,
+		'update_term_meta_cache' => false,
+		'orderby'                => 'none',
+		'suppress_filter'        => true,
+	);
+
+	switch ( $field ) {
+		case 'slug' :
+			$args['slug'] = $value;
+			break;
+		case 'name' :
+			$args['name'] = $value;
+			break;
+		case 'term_taxonomy_id' :
+			$args['term_taxonomy_id'] = $value;
+			unset( $args[ 'taxonomy' ] );
+			break;
+		default :
+			return false;
+	}
+
+	$terms = get_terms( $args );
+	if ( is_wp_error( $terms ) || empty( $terms ) ) {
+		return false;
+	}
+
+	$term = array_shift( $terms );
+
+	// In the case of 'term_taxonomy_id', override the provided `$taxonomy` with whatever we find in the db.
+	if ( 'term_taxonomy_id' === $field ) {
+		$taxonomy = $term->taxonomy;
+	}
+
+	return get_term( $term, $taxonomy, $output, $filter );
+}
+
+/**
+ * Merge all term children into a single array of their IDs.
+ *
+ * This recursive function will merge all of the children of $term into the same
+ * array of term IDs. Only useful for taxonomies which are hierarchical.
+ *
+ * Will return an empty array if $term does not exist in $taxonomy.
+ *
+ * @since 2.3.0
+ *
+ * @param int    $term_id  ID of Term to get children.
+ * @param string $taxonomy Taxonomy Name.
+ * @return array|WP_Error List of Term IDs. WP_Error returned if `$taxonomy` does not exist.
+ */
+function get_term_children( $term_id, $taxonomy ) {
+	if ( ! taxonomy_exists( $taxonomy ) ) {
+		return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+	}
+
+	$term_id = intval( $term_id );
+
+	$terms = _get_term_hierarchy($taxonomy);
+
+	if ( ! isset($terms[$term_id]) )
+		return array();
+
+	$children = $terms[$term_id];
+
+	foreach ( (array) $terms[$term_id] as $child ) {
+		if ( $term_id == $child ) {
+			continue;
+		}
+
+		if ( isset($terms[$child]) )
+			$children = array_merge($children, get_term_children($child, $taxonomy));
+	}
+
+	return $children;
+}
+
+/**
+ * Get sanitized Term field.
+ *
+ * The function is for contextual reasons and for simplicity of usage.
+ *
+ * @since 2.3.0
+ * @since 4.4.0 The `$taxonomy` parameter was made optional. `$term` can also now accept a WP_Term object.
+ *
+ * @see sanitize_term_field()
+ *
+ * @param string      $field    Term field to fetch.
+ * @param int|WP_Term $term     Term ID or object.
+ * @param string      $taxonomy Optional. Taxonomy Name. Default empty.
+ * @param string      $context  Optional, default is display. Look at sanitize_term_field() for available options.
+ * @return string|int|null|WP_Error Will return an empty string if $term is not an object or if $field is not set in $term.
+ */
+function get_term_field( $field, $term, $taxonomy = '', $context = 'display' ) {
+	$term = get_term( $term, $taxonomy );
+	if ( is_wp_error($term) )
+		return $term;
+
+	if ( !is_object($term) )
+		return '';
+
+	if ( !isset($term->$field) )
+		return '';
+
+	return sanitize_term_field( $field, $term->$field, $term->term_id, $term->taxonomy, $context );
+}
+
+/**
+ * Sanitizes Term for editing.
+ *
+ * Return value is sanitize_term() and usage is for sanitizing the term for
+ * editing. Function is for contextual and simplicity.
+ *
+ * @since 2.3.0
+ *
+ * @param int|object $id       Term ID or object.
+ * @param string     $taxonomy Taxonomy name.
+ * @return string|int|null|WP_Error Will return empty string if $term is not an object.
+ */
+function get_term_to_edit( $id, $taxonomy ) {
+	$term = get_term( $id, $taxonomy );
+
+	if ( is_wp_error($term) )
+		return $term;
+
+	if ( !is_object($term) )
+		return '';
+
+	return sanitize_term($term, $taxonomy, 'edit');
+}
+
+/**
+ * Retrieve the terms in a given taxonomy or list of taxonomies.
+ *
+ * You can fully inject any customizations to the query before it is sent, as
+ * well as control the output with a filter.
+ *
+ * The {@see 'get_terms'} filter will be called when the cache has the term and will
+ * pass the found term along with the array of $taxonomies and array of $args.
+ * This filter is also called before the array of terms is passed and will pass
+ * the array of terms, along with the $taxonomies and $args.
+ *
+ * The {@see 'list_terms_exclusions'} filter passes the compiled exclusions along with
+ * the $args.
+ *
+ * The {@see 'get_terms_orderby'} filter passes the `ORDER BY` clause for the query
+ * along with the $args array.
+ *
+ * Prior to 4.5.0, the first parameter of `get_terms()` was a taxonomy or list of taxonomies:
+ *
+ *     $terms = get_terms( 'post_tag', array(
+ *         'hide_empty' => false,
+ *     ) );
+ *
+ * Since 4.5.0, taxonomies should be passed via the 'taxonomy' argument in the `$args` array:
+ *
+ *     $terms = get_terms( array(
+ *         'taxonomy' => 'post_tag',
+ *         'hide_empty' => false,
+ *     ) );
+ *
+ * @since 2.3.0
+ * @since 4.2.0 Introduced 'name' and 'childless' parameters.
+ * @since 4.4.0 Introduced the ability to pass 'term_id' as an alias of 'id' for the `orderby` parameter.
+ *              Introduced the 'meta_query' and 'update_term_meta_cache' parameters. Converted to return
+ *              a list of WP_Term objects.
+ * @since 4.5.0 Changed the function signature so that the `$args` array can be provided as the first parameter.
+ *              Introduced 'meta_key' and 'meta_value' parameters. Introduced the ability to order results by metadata.
+ * @since 4.8.0 Introduced 'suppress_filter' parameter.
+ *
+ * @internal The `$deprecated` parameter is parsed for backward compatibility only.
+ *
+ * @param string|array $args       Optional. Array or string of arguments. See WP_Term_Query::__construct()
+ *                                 for information on accepted arguments. Default empty.
+ * @param array        $deprecated Argument array, when using the legacy function parameter format. If present, this
+ *                                 parameter will be interpreted as `$args`, and the first function parameter will
+ *                                 be parsed as a taxonomy or array of taxonomies.
+ * @return array|int|WP_Error List of WP_Term instances and their children. Will return WP_Error, if any of $taxonomies
+ *                            do not exist.
+ */
+function get_terms( $args = array(), $deprecated = '' ) {
+	$term_query = new WP_Term_Query();
+
+	$defaults = array(
+		'suppress_filter' => false,
+	);
+
+	/*
+	 * Legacy argument format ($taxonomy, $args) takes precedence.
+	 *
+	 * We detect legacy argument format by checking if
+	 * (a) a second non-empty parameter is passed, or
+	 * (b) the first parameter shares no keys with the default array 
