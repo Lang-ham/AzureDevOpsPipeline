@@ -487,4 +487,266 @@ function unregister_taxonomy( $taxonomy ) {
  *     @type string $no_terms                   Default 'No tags'/'No categories', used in the posts and media
  *                                              list tables.
  *     @type string $items_list_navigation      Label for the table pagination hidden heading.
- *     @type string $items_li
+ *     @type string $items_list                 Label for the table hidden heading.
+ *     @type string $most_used                  Title for the Most Used tab. Default 'Most Used'.
+ *     @type string $back_to_items              Label displayed after a term has been updated.
+ * }
+ */
+function get_taxonomy_labels( $tax ) {
+	$tax->labels = (array) $tax->labels;
+
+	if ( isset( $tax->helps ) && empty( $tax->labels['separate_items_with_commas'] ) )
+		$tax->labels['separate_items_with_commas'] = $tax->helps;
+
+	if ( isset( $tax->no_tagcloud ) && empty( $tax->labels['not_found'] ) )
+		$tax->labels['not_found'] = $tax->no_tagcloud;
+
+	$nohier_vs_hier_defaults = array(
+		'name' => array( _x( 'Tags', 'taxonomy general name' ), _x( 'Categories', 'taxonomy general name' ) ),
+		'singular_name' => array( _x( 'Tag', 'taxonomy singular name' ), _x( 'Category', 'taxonomy singular name' ) ),
+		'search_items' => array( __( 'Search Tags' ), __( 'Search Categories' ) ),
+		'popular_items' => array( __( 'Popular Tags' ), null ),
+		'all_items' => array( __( 'All Tags' ), __( 'All Categories' ) ),
+		'parent_item' => array( null, __( 'Parent Category' ) ),
+		'parent_item_colon' => array( null, __( 'Parent Category:' ) ),
+		'edit_item' => array( __( 'Edit Tag' ), __( 'Edit Category' ) ),
+		'view_item' => array( __( 'View Tag' ), __( 'View Category' ) ),
+		'update_item' => array( __( 'Update Tag' ), __( 'Update Category' ) ),
+		'add_new_item' => array( __( 'Add New Tag' ), __( 'Add New Category' ) ),
+		'new_item_name' => array( __( 'New Tag Name' ), __( 'New Category Name' ) ),
+		'separate_items_with_commas' => array( __( 'Separate tags with commas' ), null ),
+		'add_or_remove_items' => array( __( 'Add or remove tags' ), null ),
+		'choose_from_most_used' => array( __( 'Choose from the most used tags' ), null ),
+		'not_found' => array( __( 'No tags found.' ), __( 'No categories found.' ) ),
+		'no_terms' => array( __( 'No tags' ), __( 'No categories' ) ),
+		'items_list_navigation' => array( __( 'Tags list navigation' ), __( 'Categories list navigation' ) ),
+		'items_list' => array( __( 'Tags list' ), __( 'Categories list' ) ),
+		/* translators: Tab heading when selecting from the most used terms */
+		'most_used' => array( _x( 'Most Used', 'tags' ), _x( 'Most Used', 'categories' ) ),
+		'back_to_items' => array( __( '&larr; Back to Tags' ), __( '&larr; Back to Categories' ) ),
+	);
+	$nohier_vs_hier_defaults['menu_name'] = $nohier_vs_hier_defaults['name'];
+
+	$labels = _get_custom_object_labels( $tax, $nohier_vs_hier_defaults );
+
+	$taxonomy = $tax->name;
+
+	$default_labels = clone $labels;
+
+	/**
+	 * Filters the labels of a specific taxonomy.
+	 *
+	 * The dynamic portion of the hook name, `$taxonomy`, refers to the taxonomy slug.
+	 *
+	 * @since 4.4.0
+	 *
+	 * @see get_taxonomy_labels() for the full list of taxonomy labels.
+	 *
+	 * @param object $labels Object with labels for the taxonomy as member variables.
+	 */
+	$labels = apply_filters( "taxonomy_labels_{$taxonomy}", $labels );
+
+	// Ensure that the filtered labels contain all required default values.
+	$labels = (object) array_merge( (array) $default_labels, (array) $labels );
+
+	return $labels;
+}
+
+/**
+ * Add an already registered taxonomy to an object type.
+ *
+ * @since 3.0.0
+ *
+ * @global array $wp_taxonomies The registered taxonomies.
+ *
+ * @param string $taxonomy    Name of taxonomy object.
+ * @param string $object_type Name of the object type.
+ * @return bool True if successful, false if not.
+ */
+function register_taxonomy_for_object_type( $taxonomy, $object_type) {
+	global $wp_taxonomies;
+
+	if ( !isset($wp_taxonomies[$taxonomy]) )
+		return false;
+
+	if ( ! get_post_type_object($object_type) )
+		return false;
+
+	if ( ! in_array( $object_type, $wp_taxonomies[$taxonomy]->object_type ) )
+		$wp_taxonomies[$taxonomy]->object_type[] = $object_type;
+
+	// Filter out empties.
+	$wp_taxonomies[ $taxonomy ]->object_type = array_filter( $wp_taxonomies[ $taxonomy ]->object_type );
+
+	return true;
+}
+
+/**
+ * Remove an already registered taxonomy from an object type.
+ *
+ * @since 3.7.0
+ *
+ * @global array $wp_taxonomies The registered taxonomies.
+ *
+ * @param string $taxonomy    Name of taxonomy object.
+ * @param string $object_type Name of the object type.
+ * @return bool True if successful, false if not.
+ */
+function unregister_taxonomy_for_object_type( $taxonomy, $object_type ) {
+	global $wp_taxonomies;
+
+	if ( ! isset( $wp_taxonomies[ $taxonomy ] ) )
+		return false;
+
+	if ( ! get_post_type_object( $object_type ) )
+		return false;
+
+	$key = array_search( $object_type, $wp_taxonomies[ $taxonomy ]->object_type, true );
+	if ( false === $key )
+		return false;
+
+	unset( $wp_taxonomies[ $taxonomy ]->object_type[ $key ] );
+	return true;
+}
+
+//
+// Term API
+//
+
+/**
+ * Retrieve object_ids of valid taxonomy and term.
+ *
+ * The strings of $taxonomies must exist before this function will continue. On
+ * failure of finding a valid taxonomy, it will return an WP_Error class, kind
+ * of like Exceptions in PHP 5, except you can't catch them. Even so, you can
+ * still test for the WP_Error class and get the error message.
+ *
+ * The $terms aren't checked the same as $taxonomies, but still need to exist
+ * for $object_ids to be returned.
+ *
+ * It is possible to change the order that object_ids is returned by either
+ * using PHP sort family functions or using the database by using $args with
+ * either ASC or DESC array. The value should be in the key named 'order'.
+ *
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int|array    $term_ids   Term id or array of term ids of terms that will be used.
+ * @param string|array $taxonomies String of taxonomy name or Array of string values of taxonomy names.
+ * @param array|string $args       Change the order of the object_ids, either ASC or DESC.
+ * @return WP_Error|array If the taxonomy does not exist, then WP_Error will be returned. On success.
+ *	the array can be empty meaning that there are no $object_ids found or it will return the $object_ids found.
+ */
+function get_objects_in_term( $term_ids, $taxonomies, $args = array() ) {
+	global $wpdb;
+
+	if ( ! is_array( $term_ids ) ) {
+		$term_ids = array( $term_ids );
+	}
+	if ( ! is_array( $taxonomies ) ) {
+		$taxonomies = array( $taxonomies );
+	}
+	foreach ( (array) $taxonomies as $taxonomy ) {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+		}
+	}
+
+	$defaults = array( 'order' => 'ASC' );
+	$args = wp_parse_args( $args, $defaults );
+
+	$order = ( 'desc' == strtolower( $args['order'] ) ) ? 'DESC' : 'ASC';
+
+	$term_ids = array_map('intval', $term_ids );
+
+	$taxonomies = "'" . implode( "', '", array_map( 'esc_sql', $taxonomies ) ) . "'";
+	$term_ids = "'" . implode( "', '", $term_ids ) . "'";
+
+	$sql = "SELECT tr.object_id FROM $wpdb->term_relationships AS tr INNER JOIN $wpdb->term_taxonomy AS tt ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy IN ($taxonomies) AND tt.term_id IN ($term_ids) ORDER BY tr.object_id $order";
+
+	$last_changed = wp_cache_get_last_changed( 'terms' );
+	$cache_key = 'get_objects_in_term:' . md5( $sql ) . ":$last_changed";
+	$cache = wp_cache_get( $cache_key, 'terms' );
+	if ( false === $cache ) {
+		$object_ids = $wpdb->get_col( $sql );
+		wp_cache_set( $cache_key, $object_ids, 'terms' );
+	} else {
+		$object_ids = (array) $cache;
+	}
+
+	if ( ! $object_ids ){
+		return array();
+	}
+	return $object_ids;
+}
+
+/**
+ * Given a taxonomy query, generates SQL to be appended to a main query.
+ *
+ * @since 3.1.0
+ *
+ * @see WP_Tax_Query
+ *
+ * @param array  $tax_query         A compact tax query
+ * @param string $primary_table
+ * @param string $primary_id_column
+ * @return array
+ */
+function get_tax_sql( $tax_query, $primary_table, $primary_id_column ) {
+	$tax_query_obj = new WP_Tax_Query( $tax_query );
+	return $tax_query_obj->get_sql( $primary_table, $primary_id_column );
+}
+
+/**
+ * Get all Term data from database by Term ID.
+ *
+ * The usage of the get_term function is to apply filters to a term object. It
+ * is possible to get a term object from the database before applying the
+ * filters.
+ *
+ * $term ID must be part of $taxonomy, to get from the database. Failure, might
+ * be able to be captured by the hooks. Failure would be the same value as $wpdb
+ * returns for the get_row method.
+ *
+ * There are two hooks, one is specifically for each term, named 'get_term', and
+ * the second is for the taxonomy name, 'term_$taxonomy'. Both hooks gets the
+ * term object, and the taxonomy name as parameters. Both hooks are expected to
+ * return a Term object.
+ *
+ * {@see 'get_term'} hook - Takes two parameters the term Object and the taxonomy name.
+ * Must return term object. Used in get_term() as a catch-all filter for every
+ * $term.
+ *
+ * {@see 'get_$taxonomy'} hook - Takes two parameters the term Object and the taxonomy
+ * name. Must return term object. $taxonomy will be the taxonomy name, so for
+ * example, if 'category', it would be 'get_category' as the filter name. Useful
+ * for custom taxonomies or plugging into default taxonomies.
+ *
+ * @todo Better formatting for DocBlock
+ *
+ * @since 2.3.0
+ * @since 4.4.0 Converted to return a WP_Term object if `$output` is `OBJECT`.
+ *              The `$taxonomy` parameter was made optional.
+ *
+ * @see sanitize_term_field() The $context param lists the available values for get_term_by() $filter param.
+ *
+ * @param int|WP_Term|object $term If integer, term data will be fetched from the database, or from the cache if
+ *                                 available. If stdClass object (as in the results of a database query), will apply
+ *                                 filters and return a `WP_Term` object corresponding to the `$term` data. If `WP_Term`,
+ *                                 will return `$term`.
+ * @param string     $taxonomy Optional. Taxonomy name that $term is part of.
+ * @param string     $output   Optional. The required return type. One of OBJECT, ARRAY_A, or ARRAY_N, which correspond to
+ *                             a WP_Term object, an associative array, or a numeric array, respectively. Default OBJECT.
+ * @param string     $filter   Optional, default is raw or no WordPress defined filter will applied.
+ * @return array|WP_Term|WP_Error|null Object of the type specified by `$output` on success. When `$output` is 'OBJECT',
+ *                                     a WP_Term instance is returned. If taxonomy does not exist, a WP_Error is
+ *                                     returned. Returns null for miscellaneous failure.
+ */
+function get_term( $term, $taxonomy = '', $output = OBJECT, $filter = 'raw' ) {
+	if ( empty( $term ) ) {
+		return new WP_Error( 'invalid_term', __( 'Empty Term.' ) );
+	}
+
+	if ( $taxonomy && ! taxonomy_exists( $taxonomy ) ) {
+		return new WP_
