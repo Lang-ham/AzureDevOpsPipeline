@@ -1383,4 +1383,351 @@ function term_is_ancestor_of( $term1, $term2, $taxonomy ) {
  * @param array|object $term     The term to check.
  * @param string       $taxonomy The taxonomy name to use.
  * @param string       $context  Optional. Context in which to sanitize the term. Accepts 'edit', 'db',
- *                               'display', 'attribute', or 'js'
+ *                               'display', 'attribute', or 'js'. Default 'display'.
+ * @return array|object Term with all fields sanitized.
+ */
+function sanitize_term($term, $taxonomy, $context = 'display') {
+	$fields = array( 'term_id', 'name', 'description', 'slug', 'count', 'parent', 'term_group', 'term_taxonomy_id', 'object_id' );
+
+	$do_object = is_object( $term );
+
+	$term_id = $do_object ? $term->term_id : (isset($term['term_id']) ? $term['term_id'] : 0);
+
+	foreach ( (array) $fields as $field ) {
+		if ( $do_object ) {
+			if ( isset($term->$field) )
+				$term->$field = sanitize_term_field($field, $term->$field, $term_id, $taxonomy, $context);
+		} else {
+			if ( isset($term[$field]) )
+				$term[$field] = sanitize_term_field($field, $term[$field], $term_id, $taxonomy, $context);
+		}
+	}
+
+	if ( $do_object )
+		$term->filter = $context;
+	else
+		$term['filter'] = $context;
+
+	return $term;
+}
+
+/**
+ * Cleanse the field value in the term based on the context.
+ *
+ * Passing a term field value through the function should be assumed to have
+ * cleansed the value for whatever context the term field is going to be used.
+ *
+ * If no context or an unsupported context is given, then default filters will
+ * be applied.
+ *
+ * There are enough filters for each context to support a custom filtering
+ * without creating your own filter function. Simply create a function that
+ * hooks into the filter you need.
+ *
+ * @since 2.3.0
+ *
+ * @param string $field    Term field to sanitize.
+ * @param string $value    Search for this term value.
+ * @param int    $term_id  Term ID.
+ * @param string $taxonomy Taxonomy Name.
+ * @param string $context  Context in which to sanitize the term field. Accepts 'edit', 'db', 'display',
+ *                         'attribute', or 'js'.
+ * @return mixed Sanitized field.
+ */
+function sanitize_term_field($field, $value, $term_id, $taxonomy, $context) {
+	$int_fields = array( 'parent', 'term_id', 'count', 'term_group', 'term_taxonomy_id', 'object_id' );
+	if ( in_array( $field, $int_fields ) ) {
+		$value = (int) $value;
+		if ( $value < 0 )
+			$value = 0;
+	}
+
+	if ( 'raw' == $context )
+		return $value;
+
+	if ( 'edit' == $context ) {
+
+		/**
+		 * Filters a term field to edit before it is sanitized.
+		 *
+		 * The dynamic portion of the filter name, `$field`, refers to the term field.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed $value     Value of the term field.
+		 * @param int   $term_id   Term ID.
+		 * @param string $taxonomy Taxonomy slug.
+		 */
+		$value = apply_filters( "edit_term_{$field}", $value, $term_id, $taxonomy );
+
+		/**
+		 * Filters the taxonomy field to edit before it is sanitized.
+		 *
+		 * The dynamic portions of the filter name, `$taxonomy` and `$field`, refer
+		 * to the taxonomy slug and taxonomy field, respectively.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed $value   Value of the taxonomy field to edit.
+		 * @param int   $term_id Term ID.
+		 */
+		$value = apply_filters( "edit_{$taxonomy}_{$field}", $value, $term_id );
+
+		if ( 'description' == $field )
+			$value = esc_html($value); // textarea_escaped
+		else
+			$value = esc_attr($value);
+	} elseif ( 'db' == $context ) {
+
+		/**
+		 * Filters a term field value before it is sanitized.
+		 *
+		 * The dynamic portion of the filter name, `$field`, refers to the term field.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed  $value    Value of the term field.
+		 * @param string $taxonomy Taxonomy slug.
+		 */
+		$value = apply_filters( "pre_term_{$field}", $value, $taxonomy );
+
+		/**
+		 * Filters a taxonomy field before it is sanitized.
+		 *
+		 * The dynamic portions of the filter name, `$taxonomy` and `$field`, refer
+		 * to the taxonomy slug and field name, respectively.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed $value Value of the taxonomy field.
+		 */
+		$value = apply_filters( "pre_{$taxonomy}_{$field}", $value );
+
+		// Back compat filters
+		if ( 'slug' == $field ) {
+			/**
+			 * Filters the category nicename before it is sanitized.
+			 *
+			 * Use the {@see 'pre_$taxonomy_$field'} hook instead.
+			 *
+			 * @since 2.0.3
+			 *
+			 * @param string $value The category nicename.
+			 */
+			$value = apply_filters( 'pre_category_nicename', $value );
+		}
+
+	} elseif ( 'rss' == $context ) {
+
+		/**
+		 * Filters the term field for use in RSS.
+		 *
+		 * The dynamic portion of the filter name, `$field`, refers to the term field.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed  $value    Value of the term field.
+		 * @param string $taxonomy Taxonomy slug.
+		 */
+		$value = apply_filters( "term_{$field}_rss", $value, $taxonomy );
+
+		/**
+		 * Filters the taxonomy field for use in RSS.
+		 *
+		 * The dynamic portions of the hook name, `$taxonomy`, and `$field`, refer
+		 * to the taxonomy slug and field name, respectively.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed $value Value of the taxonomy field.
+		 */
+		$value = apply_filters( "{$taxonomy}_{$field}_rss", $value );
+	} else {
+		// Use display filters by default.
+
+		/**
+		 * Filters the term field sanitized for display.
+		 *
+		 * The dynamic portion of the filter name, `$field`, refers to the term field name.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed  $value    Value of the term field.
+		 * @param int    $term_id  Term ID.
+		 * @param string $taxonomy Taxonomy slug.
+		 * @param string $context  Context to retrieve the term field value.
+		 */
+		$value = apply_filters( "term_{$field}", $value, $term_id, $taxonomy, $context );
+
+		/**
+		 * Filters the taxonomy field sanitized for display.
+		 *
+		 * The dynamic portions of the filter name, `$taxonomy`, and `$field`, refer
+		 * to the taxonomy slug and taxonomy field, respectively.
+		 *
+		 * @since 2.3.0
+		 *
+		 * @param mixed  $value   Value of the taxonomy field.
+		 * @param int    $term_id Term ID.
+		 * @param string $context Context to retrieve the taxonomy field value.
+		 */
+		$value = apply_filters( "{$taxonomy}_{$field}", $value, $term_id, $context );
+	}
+
+	if ( 'attribute' == $context ) {
+		$value = esc_attr($value);
+	} elseif ( 'js' == $context ) {
+		$value = esc_js($value);
+	}
+	return $value;
+}
+
+/**
+ * Count how many terms are in Taxonomy.
+ *
+ * Default $args is 'hide_empty' which can be 'hide_empty=true' or array('hide_empty' => true).
+ *
+ * @since 2.3.0
+ *
+ * @param string       $taxonomy Taxonomy name.
+ * @param array|string $args     Optional. Array of arguments that get passed to get_terms().
+ *                               Default empty array.
+ * @return array|int|WP_Error Number of terms in that taxonomy or WP_Error if the taxonomy does not exist.
+ */
+function wp_count_terms( $taxonomy, $args = array() ) {
+	$defaults = array('hide_empty' => false);
+	$args = wp_parse_args($args, $defaults);
+
+	// backward compatibility
+	if ( isset($args['ignore_empty']) ) {
+		$args['hide_empty'] = $args['ignore_empty'];
+		unset($args['ignore_empty']);
+	}
+
+	$args['fields'] = 'count';
+
+	return get_terms($taxonomy, $args);
+}
+
+/**
+ * Will unlink the object from the taxonomy or taxonomies.
+ *
+ * Will remove all relationships between the object and any terms in
+ * a particular taxonomy or taxonomies. Does not remove the term or
+ * taxonomy itself.
+ *
+ * @since 2.3.0
+ *
+ * @param int          $object_id  The term Object Id that refers to the term.
+ * @param string|array $taxonomies List of Taxonomy Names or single Taxonomy name.
+ */
+function wp_delete_object_term_relationships( $object_id, $taxonomies ) {
+	$object_id = (int) $object_id;
+
+	if ( !is_array($taxonomies) )
+		$taxonomies = array($taxonomies);
+
+	foreach ( (array) $taxonomies as $taxonomy ) {
+		$term_ids = wp_get_object_terms( $object_id, $taxonomy, array( 'fields' => 'ids' ) );
+		$term_ids = array_map( 'intval', $term_ids );
+		wp_remove_object_terms( $object_id, $term_ids, $taxonomy );
+	}
+}
+
+/**
+ * Removes a term from the database.
+ *
+ * If the term is a parent of other terms, then the children will be updated to
+ * that term's parent.
+ *
+ * Metadata associated with the term will be deleted.
+ *
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int          $term     Term ID.
+ * @param string       $taxonomy Taxonomy Name.
+ * @param array|string $args {
+ *     Optional. Array of arguments to override the default term ID. Default empty array.
+ *
+ *     @type int  $default       The term ID to make the default term. This will only override
+ *                               the terms found if there is only one term found. Any other and
+ *                               the found terms are used.
+ *     @type bool $force_default Optional. Whether to force the supplied term as default to be
+ *                               assigned even if the object was not going to be term-less.
+ *                               Default false.
+ * }
+ * @return bool|int|WP_Error True on success, false if term does not exist. Zero on attempted
+ *                           deletion of default Category. WP_Error if the taxonomy does not exist.
+ */
+function wp_delete_term( $term, $taxonomy, $args = array() ) {
+	global $wpdb;
+
+	$term = (int) $term;
+
+	if ( ! $ids = term_exists($term, $taxonomy) )
+		return false;
+	if ( is_wp_error( $ids ) )
+		return $ids;
+
+	$tt_id = $ids['term_taxonomy_id'];
+
+	$defaults = array();
+
+	if ( 'category' == $taxonomy ) {
+		$defaults['default'] = get_option( 'default_category' );
+		if ( $defaults['default'] == $term )
+			return 0; // Don't delete the default category
+	}
+
+	$args = wp_parse_args($args, $defaults);
+
+	if ( isset( $args['default'] ) ) {
+		$default = (int) $args['default'];
+		if ( ! term_exists( $default, $taxonomy ) ) {
+			unset( $default );
+		}
+	}
+
+	if ( isset( $args['force_default'] ) ) {
+		$force_default = $args['force_default'];
+	}
+
+	/**
+	 * Fires when deleting a term, before any modifications are made to posts or terms.
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param int    $term     Term ID.
+	 * @param string $taxonomy Taxonomy Name.
+	 */
+	do_action( 'pre_delete_term', $term, $taxonomy );
+
+	// Update children to point to new parent
+	if ( is_taxonomy_hierarchical($taxonomy) ) {
+		$term_obj = get_term($term, $taxonomy);
+		if ( is_wp_error( $term_obj ) )
+			return $term_obj;
+		$parent = $term_obj->parent;
+
+		$edit_ids = $wpdb->get_results( "SELECT term_id, term_taxonomy_id FROM $wpdb->term_taxonomy WHERE `parent` = " . (int)$term_obj->term_id );
+		$edit_tt_ids = wp_list_pluck( $edit_ids, 'term_taxonomy_id' );
+
+		/**
+		 * Fires immediately before a term to delete's children are reassigned a parent.
+		 *
+		 * @since 2.9.0
+		 *
+		 * @param array $edit_tt_ids An array of term taxonomy IDs for the given term.
+		 */
+		do_action( 'edit_term_taxonomies', $edit_tt_ids );
+
+		$wpdb->update( $wpdb->term_taxonomy, compact( 'parent' ), array( 'parent' => $term_obj->term_id) + compact( 'taxonomy' ) );
+
+		// Clean the cache for all child terms.
+		$edit_term_ids = wp_list_pluck( $edit_ids, 'term_id' );
+		clean_term_cache( $edit_term_ids, $taxonomy );
+
+		/**
+		 * Fires 
