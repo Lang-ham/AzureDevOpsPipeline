@@ -1067,4 +1067,320 @@ function get_terms( $args = array(), $deprecated = '' ) {
 	 *
 	 * We detect legacy argument format by checking if
 	 * (a) a second non-empty parameter is passed, or
-	 * (b) the first parameter shares no keys with the default array 
+	 * (b) the first parameter shares no keys with the default array (ie, it's a list of taxonomies)
+	 */
+	$_args = wp_parse_args( $args );
+	$key_intersect  = array_intersect_key( $term_query->query_var_defaults, (array) $_args );
+	$do_legacy_args = $deprecated || empty( $key_intersect );
+
+	if ( $do_legacy_args ) {
+		$taxonomies = (array) $args;
+		$args = wp_parse_args( $deprecated, $defaults );
+		$args['taxonomy'] = $taxonomies;
+	} else {
+		$args = wp_parse_args( $args, $defaults );
+		if ( isset( $args['taxonomy'] ) && null !== $args['taxonomy'] ) {
+			$args['taxonomy'] = (array) $args['taxonomy'];
+		}
+	}
+
+	if ( ! empty( $args['taxonomy'] ) ) {
+		foreach ( $args['taxonomy'] as $taxonomy ) {
+			if ( ! taxonomy_exists( $taxonomy ) ) {
+				return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+			}
+		}
+	}
+
+	// Don't pass suppress_filter to WP_Term_Query.
+	$suppress_filter = $args['suppress_filter'];
+	unset( $args['suppress_filter'] );
+
+	$terms = $term_query->query( $args );
+
+	// Count queries are not filtered, for legacy reasons.
+	if ( ! is_array( $terms ) ) {
+		return $terms;
+	}
+
+	if ( $suppress_filter ) {
+		return $terms;
+	}
+
+	/**
+	 * Filters the found terms.
+	 *
+	 * @since 2.3.0
+	 * @since 4.6.0 Added the `$term_query` parameter.
+	 *
+	 * @param array         $terms      Array of found terms.
+	 * @param array         $taxonomies An array of taxonomies.
+	 * @param array         $args       An array of get_terms() arguments.
+	 * @param WP_Term_Query $term_query The WP_Term_Query object.
+	 */
+	return apply_filters( 'get_terms', $terms, $term_query->query_vars['taxonomy'], $term_query->query_vars, $term_query );
+}
+
+/**
+ * Adds metadata to a term.
+ *
+ * @since 4.4.0
+ *
+ * @param int    $term_id    Term ID.
+ * @param string $meta_key   Metadata name.
+ * @param mixed  $meta_value Metadata value.
+ * @param bool   $unique     Optional. Whether to bail if an entry with the same key is found for the term.
+ *                           Default false.
+ * @return int|WP_Error|bool Meta ID on success. WP_Error when term_id is ambiguous between taxonomies.
+ *                           False on failure.
+ */
+function add_term_meta( $term_id, $meta_key, $meta_value, $unique = false ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return false;
+	}
+
+	if ( wp_term_is_shared( $term_id ) ) {
+		return new WP_Error( 'ambiguous_term_id', __( 'Term meta cannot be added to terms that are shared between taxonomies.'), $term_id );
+	}
+
+	$added = add_metadata( 'term', $term_id, $meta_key, $meta_value, $unique );
+
+	// Bust term query cache.
+	if ( $added ) {
+		wp_cache_set( 'last_changed', microtime(), 'terms' );
+	}
+
+	return $added;
+}
+
+/**
+ * Removes metadata matching criteria from a term.
+ *
+ * @since 4.4.0
+ *
+ * @param int    $term_id    Term ID.
+ * @param string $meta_key   Metadata name.
+ * @param mixed  $meta_value Optional. Metadata value. If provided, rows will only be removed that match the value.
+ * @return bool True on success, false on failure.
+ */
+function delete_term_meta( $term_id, $meta_key, $meta_value = '' ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return false;
+	}
+
+	$deleted = delete_metadata( 'term', $term_id, $meta_key, $meta_value );
+
+	// Bust term query cache.
+	if ( $deleted ) {
+		wp_cache_set( 'last_changed', microtime(), 'terms' );
+	}
+
+	return $deleted;
+}
+
+/**
+ * Retrieves metadata for a term.
+ *
+ * @since 4.4.0
+ *
+ * @param int    $term_id Term ID.
+ * @param string $key     Optional. The meta key to retrieve. If no key is provided, fetches all metadata for the term.
+ * @param bool   $single  Whether to return a single value. If false, an array of all values matching the
+ *                        `$term_id`/`$key` pair will be returned. Default: false.
+ * @return mixed If `$single` is false, an array of metadata values. If `$single` is true, a single metadata value.
+ */
+function get_term_meta( $term_id, $key = '', $single = false ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return false;
+	}
+
+	return get_metadata( 'term', $term_id, $key, $single );
+}
+
+/**
+ * Updates term metadata.
+ *
+ * Use the `$prev_value` parameter to differentiate between meta fields with the same key and term ID.
+ *
+ * If the meta field for the term does not exist, it will be added.
+ *
+ * @since 4.4.0
+ *
+ * @param int    $term_id    Term ID.
+ * @param string $meta_key   Metadata key.
+ * @param mixed  $meta_value Metadata value.
+ * @param mixed  $prev_value Optional. Previous value to check before removing.
+ * @return int|WP_Error|bool Meta ID if the key didn't previously exist. True on successful update.
+ *                           WP_Error when term_id is ambiguous between taxonomies. False on failure.
+ */
+function update_term_meta( $term_id, $meta_key, $meta_value, $prev_value = '' ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return false;
+	}
+
+	if ( wp_term_is_shared( $term_id ) ) {
+		return new WP_Error( 'ambiguous_term_id', __( 'Term meta cannot be added to terms that are shared between taxonomies.'), $term_id );
+	}
+
+	$updated = update_metadata( 'term', $term_id, $meta_key, $meta_value, $prev_value );
+
+	// Bust term query cache.
+	if ( $updated ) {
+		wp_cache_set( 'last_changed', microtime(), 'terms' );
+	}
+
+	return $updated;
+}
+
+/**
+ * Updates metadata cache for list of term IDs.
+ *
+ * Performs SQL query to retrieve all metadata for the terms matching `$term_ids` and stores them in the cache.
+ * Subsequent calls to `get_term_meta()` will not need to query the database.
+ *
+ * @since 4.4.0
+ *
+ * @param array $term_ids List of term IDs.
+ * @return array|false Returns false if there is nothing to update. Returns an array of metadata on success.
+ */
+function update_termmeta_cache( $term_ids ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return;
+	}
+
+	return update_meta_cache( 'term', $term_ids );
+}
+
+/**
+ * Get all meta data, including meta IDs, for the given term ID.
+ *
+ * @since 4.9.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int $term_id Term ID.
+ * @return array|false Array with meta data, or false when the meta table is not installed.
+ */
+function has_term_meta( $term_id ) {
+	// Bail if term meta table is not installed.
+	if ( get_option( 'db_version' ) < 34370 ) {
+		return false;
+	}
+
+	global $wpdb;
+
+	return $wpdb->get_results( $wpdb->prepare( "SELECT meta_key, meta_value, meta_id, term_id FROM $wpdb->termmeta WHERE term_id = %d ORDER BY meta_key,meta_id", $term_id ), ARRAY_A );
+}
+
+/**
+ * Check if Term exists.
+ *
+ * Formerly is_term(), introduced in 2.3.0.
+ *
+ * @since 3.0.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int|string $term     The term to check. Accepts term ID, slug, or name.
+ * @param string     $taxonomy The taxonomy name to use
+ * @param int        $parent   Optional. ID of parent term under which to confine the exists search.
+ * @return mixed Returns null if the term does not exist. Returns the term ID
+ *               if no taxonomy is specified and the term ID exists. Returns
+ *               an array of the term ID and the term taxonomy ID the taxonomy
+ *               is specified and the pairing exists.
+ */
+function term_exists( $term, $taxonomy = '', $parent = null ) {
+	global $wpdb;
+
+	$select = "SELECT term_id FROM $wpdb->terms as t WHERE ";
+	$tax_select = "SELECT tt.term_id, tt.term_taxonomy_id FROM $wpdb->terms AS t INNER JOIN $wpdb->term_taxonomy as tt ON tt.term_id = t.term_id WHERE ";
+
+	if ( is_int($term) ) {
+		if ( 0 == $term )
+			return 0;
+		$where = 't.term_id = %d';
+		if ( !empty($taxonomy) )
+			return $wpdb->get_row( $wpdb->prepare( $tax_select . $where . " AND tt.taxonomy = %s", $term, $taxonomy ), ARRAY_A );
+		else
+			return $wpdb->get_var( $wpdb->prepare( $select . $where, $term ) );
+	}
+
+	$term = trim( wp_unslash( $term ) );
+	$slug = sanitize_title( $term );
+
+	$where = 't.slug = %s';
+	$else_where = 't.name = %s';
+	$where_fields = array($slug);
+	$else_where_fields = array($term);
+	$orderby = 'ORDER BY t.term_id ASC';
+	$limit = 'LIMIT 1';
+	if ( !empty($taxonomy) ) {
+		if ( is_numeric( $parent ) ) {
+			$parent = (int) $parent;
+			$where_fields[] = $parent;
+			$else_where_fields[] = $parent;
+			$where .= ' AND tt.parent = %d';
+			$else_where .= ' AND tt.parent = %d';
+		}
+
+		$where_fields[] = $taxonomy;
+		$else_where_fields[] = $taxonomy;
+
+		if ( $result = $wpdb->get_row( $wpdb->prepare("SELECT tt.term_id, tt.term_taxonomy_id FROM $wpdb->terms AS t INNER JOIN $wpdb->term_taxonomy as tt ON tt.term_id = t.term_id WHERE $where AND tt.taxonomy = %s $orderby $limit", $where_fields), ARRAY_A) )
+			return $result;
+
+		return $wpdb->get_row( $wpdb->prepare("SELECT tt.term_id, tt.term_taxonomy_id FROM $wpdb->terms AS t INNER JOIN $wpdb->term_taxonomy as tt ON tt.term_id = t.term_id WHERE $else_where AND tt.taxonomy = %s $orderby $limit", $else_where_fields), ARRAY_A);
+	}
+
+	if ( $result = $wpdb->get_var( $wpdb->prepare("SELECT term_id FROM $wpdb->terms as t WHERE $where $orderby $limit", $where_fields) ) )
+		return $result;
+
+	return $wpdb->get_var( $wpdb->prepare("SELECT term_id FROM $wpdb->terms as t WHERE $else_where $orderby $limit", $else_where_fields) );
+}
+
+/**
+ * Check if a term is an ancestor of another term.
+ *
+ * You can use either an id or the term object for both parameters.
+ *
+ * @since 3.4.0
+ *
+ * @param int|object $term1    ID or object to check if this is the parent term.
+ * @param int|object $term2    The child term.
+ * @param string     $taxonomy Taxonomy name that $term1 and `$term2` belong to.
+ * @return bool Whether `$term2` is a child of `$term1`.
+ */
+function term_is_ancestor_of( $term1, $term2, $taxonomy ) {
+	if ( ! isset( $term1->term_id ) )
+		$term1 = get_term( $term1, $taxonomy );
+	if ( ! isset( $term2->parent ) )
+		$term2 = get_term( $term2, $taxonomy );
+
+	if ( empty( $term1->term_id ) || empty( $term2->parent ) )
+		return false;
+	if ( $term2->parent == $term1->term_id )
+		return true;
+
+	return term_is_ancestor_of( $term1, get_term( $term2->parent, $taxonomy ), $taxonomy );
+}
+
+/**
+ * Sanitize Term all fields.
+ *
+ * Relies on sanitize_term_field() to sanitize the term. The difference is that
+ * this function will sanitize <strong>all</strong> fields. The context is based
+ * on sanitize_term_field().
+ *
+ * The $term is expected to be either an array or an object.
+ *
+ * @since 2.3.0
+ *
+ * @param array|object $term     The term to check.
+ * @param string       $taxonomy The taxonomy name to use.
+ * @param string       $context  Optional. Context in which to sanitize the term. Accepts 'edit', 'db',
+ *                               'display', 'attribute', or 'js'
