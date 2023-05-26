@@ -2319,4 +2319,333 @@ function wp_set_object_terms( $object_id, $terms, $taxonomy, $append = false ) {
 		 *
 		 * @param int    $object_id Object ID.
 		 * @param int    $tt_id     Term taxonomy ID.
-		 * @param string $taxonomy
+		 * @param string $taxonomy  Taxonomy slug.
+		 */
+		do_action( 'added_term_relationship', $object_id, $tt_id, $taxonomy );
+		$new_tt_ids[] = $tt_id;
+	}
+
+	if ( $new_tt_ids )
+		wp_update_term_count( $new_tt_ids, $taxonomy );
+
+	if ( ! $append ) {
+		$delete_tt_ids = array_diff( $old_tt_ids, $tt_ids );
+
+		if ( $delete_tt_ids ) {
+			$in_delete_tt_ids = "'" . implode( "', '", $delete_tt_ids ) . "'";
+			$delete_term_ids = $wpdb->get_col( $wpdb->prepare( "SELECT tt.term_id FROM $wpdb->term_taxonomy AS tt WHERE tt.taxonomy = %s AND tt.term_taxonomy_id IN ($in_delete_tt_ids)", $taxonomy ) );
+			$delete_term_ids = array_map( 'intval', $delete_term_ids );
+
+			$remove = wp_remove_object_terms( $object_id, $delete_term_ids, $taxonomy );
+			if ( is_wp_error( $remove ) ) {
+				return $remove;
+			}
+		}
+	}
+
+	$t = get_taxonomy($taxonomy);
+	if ( ! $append && isset($t->sort) && $t->sort ) {
+		$values = array();
+		$term_order = 0;
+		$final_tt_ids = wp_get_object_terms($object_id, $taxonomy, array('fields' => 'tt_ids'));
+		foreach ( $tt_ids as $tt_id )
+			if ( in_array($tt_id, $final_tt_ids) )
+				$values[] = $wpdb->prepare( "(%d, %d, %d)", $object_id, $tt_id, ++$term_order);
+		if ( $values )
+			if ( false === $wpdb->query( "INSERT INTO $wpdb->term_relationships (object_id, term_taxonomy_id, term_order) VALUES " . join( ',', $values ) . " ON DUPLICATE KEY UPDATE term_order = VALUES(term_order)" ) )
+				return new WP_Error( 'db_insert_error', __( 'Could not insert term relationship into the database.' ), $wpdb->last_error );
+	}
+
+	wp_cache_delete( $object_id, $taxonomy . '_relationships' );
+	wp_cache_delete( 'last_changed', 'terms' );
+
+	/**
+	 * Fires after an object's terms have been set.
+	 *
+	 * @since 2.8.0
+	 *
+	 * @param int    $object_id  Object ID.
+	 * @param array  $terms      An array of object terms.
+	 * @param array  $tt_ids     An array of term taxonomy IDs.
+	 * @param string $taxonomy   Taxonomy slug.
+	 * @param bool   $append     Whether to append new terms to the old terms.
+	 * @param array  $old_tt_ids Old array of term taxonomy IDs.
+	 */
+	do_action( 'set_object_terms', $object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids );
+	return $tt_ids;
+}
+
+/**
+ * Add term(s) associated with a given object.
+ *
+ * @since 3.6.0
+ *
+ * @param int              $object_id The ID of the object to which the terms will be added.
+ * @param string|int|array $terms     The slug(s) or ID(s) of the term(s) to add.
+ * @param array|string     $taxonomy  Taxonomy name.
+ * @return array|WP_Error Term taxonomy IDs of the affected terms.
+ */
+function wp_add_object_terms( $object_id, $terms, $taxonomy ) {
+	return wp_set_object_terms( $object_id, $terms, $taxonomy, true );
+}
+
+/**
+ * Remove term(s) associated with a given object.
+ *
+ * @since 3.6.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int              $object_id The ID of the object from which the terms will be removed.
+ * @param string|int|array $terms     The slug(s) or ID(s) of the term(s) to remove.
+ * @param array|string     $taxonomy  Taxonomy name.
+ * @return bool|WP_Error True on success, false or WP_Error on failure.
+ */
+function wp_remove_object_terms( $object_id, $terms, $taxonomy ) {
+	global $wpdb;
+
+	$object_id = (int) $object_id;
+
+	if ( ! taxonomy_exists( $taxonomy ) ) {
+		return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+	}
+
+	if ( ! is_array( $terms ) ) {
+		$terms = array( $terms );
+	}
+
+	$tt_ids = array();
+
+	foreach ( (array) $terms as $term ) {
+		if ( ! strlen( trim( $term ) ) ) {
+			continue;
+		}
+
+		if ( ! $term_info = term_exists( $term, $taxonomy ) ) {
+			// Skip if a non-existent term ID is passed.
+			if ( is_int( $term ) ) {
+				continue;
+			}
+		}
+
+		if ( is_wp_error( $term_info ) ) {
+			return $term_info;
+		}
+
+		$tt_ids[] = $term_info['term_taxonomy_id'];
+	}
+
+	if ( $tt_ids ) {
+		$in_tt_ids = "'" . implode( "', '", $tt_ids ) . "'";
+
+		/**
+		 * Fires immediately before an object-term relationship is deleted.
+		 *
+		 * @since 2.9.0
+		 * @since 4.7.0 Added the `$taxonomy` parameter.
+		 *
+		 * @param int   $object_id Object ID.
+		 * @param array $tt_ids    An array of term taxonomy IDs.
+		 * @param string $taxonomy  Taxonomy slug.
+		 */
+		do_action( 'delete_term_relationships', $object_id, $tt_ids, $taxonomy );
+		$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM $wpdb->term_relationships WHERE object_id = %d AND term_taxonomy_id IN ($in_tt_ids)", $object_id ) );
+
+		wp_cache_delete( $object_id, $taxonomy . '_relationships' );
+		wp_cache_delete( 'last_changed', 'terms' );
+
+		/**
+		 * Fires immediately after an object-term relationship is deleted.
+		 *
+		 * @since 2.9.0
+		 * @since 4.7.0 Added the `$taxonomy` parameter.
+		 *
+		 * @param int    $object_id Object ID.
+		 * @param array  $tt_ids    An array of term taxonomy IDs.
+		 * @param string $taxonomy  Taxonomy slug.
+		 */
+		do_action( 'deleted_term_relationships', $object_id, $tt_ids, $taxonomy );
+
+		wp_update_term_count( $tt_ids, $taxonomy );
+
+		return (bool) $deleted;
+	}
+
+	return false;
+}
+
+/**
+ * Will make slug unique, if it isn't already.
+ *
+ * The `$slug` has to be unique global to every taxonomy, meaning that one
+ * taxonomy term can't have a matching slug with another taxonomy term. Each
+ * slug has to be globally unique for every taxonomy.
+ *
+ * The way this works is that if the taxonomy that the term belongs to is
+ * hierarchical and has a parent, it will append that parent to the $slug.
+ *
+ * If that still doesn't return an unique slug, then it try to append a number
+ * until it finds a number that is truly unique.
+ *
+ * The only purpose for `$term` is for appending a parent, if one exists.
+ *
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param string $slug The string that will be tried for a unique slug.
+ * @param object $term The term object that the `$slug` will belong to.
+ * @return string Will return a true unique slug.
+ */
+function wp_unique_term_slug( $slug, $term ) {
+	global $wpdb;
+
+	$needs_suffix = true;
+	$original_slug = $slug;
+
+	// As of 4.1, duplicate slugs are allowed as long as they're in different taxonomies.
+	if ( ! term_exists( $slug ) || get_option( 'db_version' ) >= 30133 && ! get_term_by( 'slug', $slug, $term->taxonomy ) ) {
+		$needs_suffix = false;
+	}
+
+	/*
+	 * If the taxonomy supports hierarchy and the term has a parent, make the slug unique
+	 * by incorporating parent slugs.
+	 */
+	$parent_suffix = '';
+	if ( $needs_suffix && is_taxonomy_hierarchical( $term->taxonomy ) && ! empty( $term->parent ) ) {
+		$the_parent = $term->parent;
+		while ( ! empty($the_parent) ) {
+			$parent_term = get_term($the_parent, $term->taxonomy);
+			if ( is_wp_error($parent_term) || empty($parent_term) )
+				break;
+			$parent_suffix .= '-' . $parent_term->slug;
+			if ( ! term_exists( $slug . $parent_suffix ) ) {
+				break;
+			}
+
+			if ( empty($parent_term->parent) )
+				break;
+			$the_parent = $parent_term->parent;
+		}
+	}
+
+	// If we didn't get a unique slug, try appending a number to make it unique.
+
+	/**
+	 * Filters whether the proposed unique term slug is bad.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param bool   $needs_suffix Whether the slug needs to be made unique with a suffix.
+	 * @param string $slug         The slug.
+	 * @param object $term         Term object.
+	 */
+	if ( apply_filters( 'wp_unique_term_slug_is_bad_slug', $needs_suffix, $slug, $term ) ) {
+		if ( $parent_suffix ) {
+			$slug .= $parent_suffix;
+		} else {
+			if ( ! empty( $term->term_id ) )
+				$query = $wpdb->prepare( "SELECT slug FROM $wpdb->terms WHERE slug = %s AND term_id != %d", $slug, $term->term_id );
+			else
+				$query = $wpdb->prepare( "SELECT slug FROM $wpdb->terms WHERE slug = %s", $slug );
+
+			if ( $wpdb->get_var( $query ) ) {
+				$num = 2;
+				do {
+					$alt_slug = $slug . "-$num";
+					$num++;
+					$slug_check = $wpdb->get_var( $wpdb->prepare( "SELECT slug FROM $wpdb->terms WHERE slug = %s", $alt_slug ) );
+				} while ( $slug_check );
+				$slug = $alt_slug;
+			}
+		}
+	}
+
+	/**
+	 * Filters the unique term slug.
+	 *
+	 * @since 4.3.0
+	 *
+	 * @param string $slug          Unique term slug.
+	 * @param object $term          Term object.
+	 * @param string $original_slug Slug originally passed to the function for testing.
+	 */
+	return apply_filters( 'wp_unique_term_slug', $slug, $term, $original_slug );
+}
+
+/**
+ * Update term based on arguments provided.
+ *
+ * The $args will indiscriminately override all values with the same field name.
+ * Care must be taken to not override important information need to update or
+ * update will fail (or perhaps create a new term, neither would be acceptable).
+ *
+ * Defaults will set 'alias_of', 'description', 'parent', and 'slug' if not
+ * defined in $args already.
+ *
+ * 'alias_of' will create a term group, if it doesn't already exist, and update
+ * it for the $term.
+ *
+ * If the 'slug' argument in $args is missing, then the 'name' in $args will be
+ * used. It should also be noted that if you set 'slug' and it isn't unique then
+ * a WP_Error will be passed back. If you don't pass any slug, then a unique one
+ * will be created for you.
+ *
+ * For what can be overrode in `$args`, check the term scheme can contain and stay
+ * away from the term keys.
+ *
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param int          $term_id  The ID of the term
+ * @param string       $taxonomy The context in which to relate the term to the object.
+ * @param array|string $args     Optional. Array of get_terms() arguments. Default empty array.
+ * @return array|WP_Error Returns Term ID and Taxonomy Term ID
+ */
+function wp_update_term( $term_id, $taxonomy, $args = array() ) {
+	global $wpdb;
+
+	if ( ! taxonomy_exists( $taxonomy ) ) {
+		return new WP_Error( 'invalid_taxonomy', __( 'Invalid taxonomy.' ) );
+	}
+
+	$term_id = (int) $term_id;
+
+	// First, get all of the original args
+	$term = get_term( $term_id, $taxonomy );
+
+	if ( is_wp_error( $term ) ) {
+		return $term;
+	}
+
+	if ( ! $term ) {
+		return new WP_Error( 'invalid_term', __( 'Empty Term.' ) );
+	}
+
+	$term = (array) $term->data;
+
+	// Escape data pulled from DB.
+	$term = wp_slash( $term );
+
+	// Merge old and new args with new args overwriting old ones.
+	$args = array_merge($term, $args);
+
+	$defaults = array( 'alias_of' => '', 'description' => '', 'parent' => 0, 'slug' => '');
+	$args = wp_parse_args($args, $defaults);
+	$args = sanitize_term($args, $taxonomy, 'db');
+	$parsed_args = $args;
+
+	// expected_slashed ($name)
+	$name = wp_unslash( $args['name'] );
+	$description = wp_unslash( $args['description'] );
+
+	$parsed_args['name'] = $name;
+	$parsed_args['description'] = $description;
+
+	if ( '' == trim( $name ) ) {
+		return new WP_Error( 'empty_term_name', __( 'A name is required for this term.' ) );
+	}
+
+	if ( $parsed_args['parent'] > 0 &&
