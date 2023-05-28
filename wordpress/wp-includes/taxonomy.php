@@ -2648,4 +2648,371 @@ function wp_update_term( $term_id, $taxonomy, $args = array() ) {
 		return new WP_Error( 'empty_term_name', __( 'A name is required for this term.' ) );
 	}
 
-	if ( $parsed_args['parent'] > 0 &&
+	if ( $parsed_args['parent'] > 0 && ! term_exists( (int) $parsed_args['parent'] ) ) {
+		return new WP_Error( 'missing_parent', __( 'Parent term does not exist.' ) );
+	}
+
+	$empty_slug = false;
+	if ( empty( $args['slug'] ) ) {
+		$empty_slug = true;
+		$slug = sanitize_title($name);
+	} else {
+		$slug = $args['slug'];
+	}
+
+	$parsed_args['slug'] = $slug;
+
+	$term_group = isset( $parsed_args['term_group'] ) ? $parsed_args['term_group'] : 0;
+	if ( $args['alias_of'] ) {
+		$alias = get_term_by( 'slug', $args['alias_of'], $taxonomy );
+		if ( ! empty( $alias->term_group ) ) {
+			// The alias we want is already in a group, so let's use that one.
+			$term_group = $alias->term_group;
+		} elseif ( ! empty( $alias->term_id ) ) {
+			/*
+			 * The alias is not in a group, so we create a new one
+			 * and add the alias to it.
+			 */
+			$term_group = $wpdb->get_var("SELECT MAX(term_group) FROM $wpdb->terms") + 1;
+
+			wp_update_term( $alias->term_id, $taxonomy, array(
+				'term_group' => $term_group,
+			) );
+		}
+
+		$parsed_args['term_group'] = $term_group;
+	}
+
+	/**
+	 * Filters the term parent.
+	 *
+	 * Hook to this filter to see if it will cause a hierarchy loop.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param int    $parent      ID of the parent term.
+	 * @param int    $term_id     Term ID.
+	 * @param string $taxonomy    Taxonomy slug.
+	 * @param array  $parsed_args An array of potentially altered update arguments for the given term.
+	 * @param array  $args        An array of update arguments for the given term.
+	 */
+	$parent = apply_filters( 'wp_update_term_parent', $args['parent'], $term_id, $taxonomy, $parsed_args, $args );
+
+	// Check for duplicate slug
+	$duplicate = get_term_by( 'slug', $slug, $taxonomy );
+	if ( $duplicate && $duplicate->term_id != $term_id ) {
+		// If an empty slug was passed or the parent changed, reset the slug to something unique.
+		// Otherwise, bail.
+		if ( $empty_slug || ( $parent != $term['parent']) ) {
+			$slug = wp_unique_term_slug($slug, (object) $args);
+		} else {
+			/* translators: 1: Taxonomy term slug */
+			return new WP_Error( 'duplicate_term_slug', sprintf( __( 'The slug &#8220;%s&#8221; is already in use by another term.' ), $slug ) );
+		}
+	}
+
+	$tt_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT tt.term_taxonomy_id FROM $wpdb->term_taxonomy AS tt INNER JOIN $wpdb->terms AS t ON tt.term_id = t.term_id WHERE tt.taxonomy = %s AND t.term_id = %d", $taxonomy, $term_id) );
+
+	// Check whether this is a shared term that needs splitting.
+	$_term_id = _split_shared_term( $term_id, $tt_id );
+	if ( ! is_wp_error( $_term_id ) ) {
+		$term_id = $_term_id;
+	}
+
+	/**
+	 * Fires immediately before the given terms are edited.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( 'edit_terms', $term_id, $taxonomy );
+
+	$data = compact( 'name', 'slug', 'term_group' );
+
+	/**
+	 * Filters term data before it is updated in the database.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array  $data     Term data to be updated.
+	 * @param int    $term_id  Term ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 * @param array  $args     Arguments passed to wp_update_term().
+	 */
+	$data = apply_filters( 'wp_update_term_data', $data, $term_id, $taxonomy, $args );
+
+	$wpdb->update( $wpdb->terms, $data, compact( 'term_id' ) );
+	if ( empty($slug) ) {
+		$slug = sanitize_title($name, $term_id);
+		$wpdb->update( $wpdb->terms, compact( 'slug' ), compact( 'term_id' ) );
+	}
+
+	/**
+	 * Fires immediately after the given terms are edited.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param int    $term_id  Term ID
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( 'edited_terms', $term_id, $taxonomy );
+
+	/**
+	 * Fires immediate before a term-taxonomy relationship is updated.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( 'edit_term_taxonomy', $tt_id, $taxonomy );
+
+	$wpdb->update( $wpdb->term_taxonomy, compact( 'term_id', 'taxonomy', 'description', 'parent' ), array( 'term_taxonomy_id' => $tt_id ) );
+
+	/**
+	 * Fires immediately after a term-taxonomy relationship is updated.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( 'edited_term_taxonomy', $tt_id, $taxonomy );
+
+	/**
+	 * Fires after a term has been updated, but before the term cache has been cleaned.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( "edit_term", $term_id, $tt_id, $taxonomy );
+
+	/**
+	 * Fires after a term in a specific taxonomy has been updated, but before the term
+	 * cache has been cleaned.
+	 *
+	 * The dynamic portion of the hook name, `$taxonomy`, refers to the taxonomy slug.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param int $term_id Term ID.
+	 * @param int $tt_id   Term taxonomy ID.
+	 */
+	do_action( "edit_{$taxonomy}", $term_id, $tt_id );
+
+	/** This filter is documented in wp-includes/taxonomy.php */
+	$term_id = apply_filters( 'term_id_filter', $term_id, $tt_id );
+
+	clean_term_cache($term_id, $taxonomy);
+
+	/**
+	 * Fires after a term has been updated, and the term cache has been cleaned.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( "edited_term", $term_id, $tt_id, $taxonomy );
+
+	/**
+	 * Fires after a term for a specific taxonomy has been updated, and the term
+	 * cache has been cleaned.
+	 *
+	 * The dynamic portion of the hook name, `$taxonomy`, refers to the taxonomy slug.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param int $term_id Term ID.
+	 * @param int $tt_id   Term taxonomy ID.
+	 */
+	do_action( "edited_{$taxonomy}", $term_id, $tt_id );
+
+	return array('term_id' => $term_id, 'term_taxonomy_id' => $tt_id);
+}
+
+/**
+ * Enable or disable term counting.
+ *
+ * @since 2.5.0
+ *
+ * @staticvar bool $_defer
+ *
+ * @param bool $defer Optional. Enable if true, disable if false.
+ * @return bool Whether term counting is enabled or disabled.
+ */
+function wp_defer_term_counting($defer=null) {
+	static $_defer = false;
+
+	if ( is_bool($defer) ) {
+		$_defer = $defer;
+		// flush any deferred counts
+		if ( !$defer )
+			wp_update_term_count( null, null, true );
+	}
+
+	return $_defer;
+}
+
+/**
+ * Updates the amount of terms in taxonomy.
+ *
+ * If there is a taxonomy callback applied, then it will be called for updating
+ * the count.
+ *
+ * The default action is to count what the amount of terms have the relationship
+ * of term ID. Once that is done, then update the database.
+ *
+ * @since 2.3.0
+ *
+ * @staticvar array $_deferred
+ *
+ * @param int|array $terms       The term_taxonomy_id of the terms.
+ * @param string    $taxonomy    The context of the term.
+ * @param bool      $do_deferred Whether to flush the deferred term counts too. Default false.
+ * @return bool If no terms will return false, and if successful will return true.
+ */
+function wp_update_term_count( $terms, $taxonomy, $do_deferred = false ) {
+	static $_deferred = array();
+
+	if ( $do_deferred ) {
+		foreach ( (array) array_keys($_deferred) as $tax ) {
+			wp_update_term_count_now( $_deferred[$tax], $tax );
+			unset( $_deferred[$tax] );
+		}
+	}
+
+	if ( empty($terms) )
+		return false;
+
+	if ( !is_array($terms) )
+		$terms = array($terms);
+
+	if ( wp_defer_term_counting() ) {
+		if ( !isset($_deferred[$taxonomy]) )
+			$_deferred[$taxonomy] = array();
+		$_deferred[$taxonomy] = array_unique( array_merge($_deferred[$taxonomy], $terms) );
+		return true;
+	}
+
+	return wp_update_term_count_now( $terms, $taxonomy );
+}
+
+/**
+ * Perform term count update immediately.
+ *
+ * @since 2.5.0
+ *
+ * @param array  $terms    The term_taxonomy_id of terms to update.
+ * @param string $taxonomy The context of the term.
+ * @return true Always true when complete.
+ */
+function wp_update_term_count_now( $terms, $taxonomy ) {
+	$terms = array_map('intval', $terms);
+
+	$taxonomy = get_taxonomy($taxonomy);
+	if ( !empty($taxonomy->update_count_callback) ) {
+		call_user_func($taxonomy->update_count_callback, $terms, $taxonomy);
+	} else {
+		$object_types = (array) $taxonomy->object_type;
+		foreach ( $object_types as &$object_type ) {
+			if ( 0 === strpos( $object_type, 'attachment:' ) )
+				list( $object_type ) = explode( ':', $object_type );
+		}
+
+		if ( $object_types == array_filter( $object_types, 'post_type_exists' ) ) {
+			// Only post types are attached to this taxonomy
+			_update_post_term_count( $terms, $taxonomy );
+		} else {
+			// Default count updater
+			_update_generic_term_count( $terms, $taxonomy );
+		}
+	}
+
+	clean_term_cache($terms, '', false);
+
+	return true;
+}
+
+//
+// Cache
+//
+
+/**
+ * Removes the taxonomy relationship to terms from the cache.
+ *
+ * Will remove the entire taxonomy relationship containing term `$object_id`. The
+ * term IDs have to exist within the taxonomy `$object_type` for the deletion to
+ * take place.
+ *
+ * @since 2.3.0
+ *
+ * @global bool $_wp_suspend_cache_invalidation
+ *
+ * @see get_object_taxonomies() for more on $object_type.
+ *
+ * @param int|array    $object_ids  Single or list of term object ID(s).
+ * @param array|string $object_type The taxonomy object type.
+ */
+function clean_object_term_cache($object_ids, $object_type) {
+	global $_wp_suspend_cache_invalidation;
+
+	if ( ! empty( $_wp_suspend_cache_invalidation ) ) {
+		return;
+	}
+
+	if ( !is_array($object_ids) )
+		$object_ids = array($object_ids);
+
+	$taxonomies = get_object_taxonomies( $object_type );
+
+	foreach ( $object_ids as $id ) {
+		foreach ( $taxonomies as $taxonomy ) {
+			wp_cache_delete($id, "{$taxonomy}_relationships");
+		}
+	}
+
+	/**
+	 * Fires after the object term cache has been cleaned.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param array  $object_ids An array of object IDs.
+	 * @param string $object_type Object type.
+	 */
+	do_action( 'clean_object_term_cache', $object_ids, $object_type );
+}
+
+/**
+ * Will remove all of the term ids from the cache.
+ *
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ * @global bool $_wp_suspend_cache_invalidation
+ *
+ * @param int|array $ids            Single or list of Term IDs.
+ * @param string    $taxonomy       Optional. Can be empty and will assume `tt_ids`, else will use for context.
+ *                                  Default empty.
+ * @param bool      $clean_taxonomy Optional. Whether to clean taxonomy wide caches (true), or just individual
+ *                                  term object caches (false). Default true.
+ */
+function clean_term_cache($ids, $taxonomy = '', $clean_taxonomy = true) {
+	global $wpdb, $_wp_suspend_cache_invalidation;
+
+	if ( ! empty( $_wp_suspend_cache_invalidation ) ) {
+		return;
+	}
+
+	if ( !is_array($ids) )
+		$ids = array($ids);
+
+	$taxonomies = array();
+	// If no taxonomy, assume tt_ids.
+	if ( empty($taxonomy) 
