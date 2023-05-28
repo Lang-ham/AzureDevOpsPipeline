@@ -3015,4 +3015,356 @@ function clean_term_cache($ids, $taxonomy = '', $clean_taxonomy = true) {
 
 	$taxonomies = array();
 	// If no taxonomy, assume tt_ids.
-	if ( empty($taxonomy) 
+	if ( empty($taxonomy) ) {
+		$tt_ids = array_map('intval', $ids);
+		$tt_ids = implode(', ', $tt_ids);
+		$terms = $wpdb->get_results("SELECT term_id, taxonomy FROM $wpdb->term_taxonomy WHERE term_taxonomy_id IN ($tt_ids)");
+		$ids = array();
+		foreach ( (array) $terms as $term ) {
+			$taxonomies[] = $term->taxonomy;
+			$ids[] = $term->term_id;
+			wp_cache_delete( $term->term_id, 'terms' );
+		}
+		$taxonomies = array_unique($taxonomies);
+	} else {
+		$taxonomies = array($taxonomy);
+		foreach ( $taxonomies as $taxonomy ) {
+			foreach ( $ids as $id ) {
+				wp_cache_delete( $id, 'terms' );
+			}
+		}
+	}
+
+	foreach ( $taxonomies as $taxonomy ) {
+		if ( $clean_taxonomy ) {
+			clean_taxonomy_cache( $taxonomy );
+		}
+
+		/**
+		 * Fires once after each taxonomy's term cache has been cleaned.
+		 *
+		 * @since 2.5.0
+		 * @since 4.5.0 Added the `$clean_taxonomy` parameter.
+		 *
+		 * @param array  $ids            An array of term IDs.
+		 * @param string $taxonomy       Taxonomy slug.
+		 * @param bool   $clean_taxonomy Whether or not to clean taxonomy-wide caches
+		 */
+		do_action( 'clean_term_cache', $ids, $taxonomy, $clean_taxonomy );
+	}
+
+	wp_cache_set( 'last_changed', microtime(), 'terms' );
+}
+
+/**
+ * Clean the caches for a taxonomy.
+ *
+ * @since 4.9.0
+ *
+ * @param string $taxonomy Taxonomy slug.
+ */
+function clean_taxonomy_cache( $taxonomy ) {
+	wp_cache_delete( 'all_ids', $taxonomy );
+	wp_cache_delete( 'get', $taxonomy );
+
+	// Regenerate cached hierarchy.
+	delete_option( "{$taxonomy}_children" );
+	_get_term_hierarchy( $taxonomy );
+
+	/**
+	 * Fires after a taxonomy's caches have been cleaned.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	do_action( 'clean_taxonomy_cache', $taxonomy );
+}
+
+/**
+ * Retrieves the taxonomy relationship to the term object id.
+ *
+ * Upstream functions (like get_the_terms() and is_object_in_term()) are
+ * responsible for populating the object-term relationship cache. The current
+ * function only fetches relationship data that is already in the cache.
+ *
+ * @since 2.3.0
+ * @since 4.7.0 Returns a WP_Error object if get_term() returns an error for
+ *              any of the matched terms.
+ *
+ * @param int    $id       Term object ID.
+ * @param string $taxonomy Taxonomy name.
+ * @return bool|array|WP_Error Array of `WP_Term` objects, if cached.
+ *                             False if cache is empty for `$taxonomy` and `$id`.
+ *                             WP_Error if get_term() returns an error object for any term.
+ */
+function get_object_term_cache( $id, $taxonomy ) {
+	$_term_ids = wp_cache_get( $id, "{$taxonomy}_relationships" );
+
+	// We leave the priming of relationship caches to upstream functions.
+	if ( false === $_term_ids ) {
+		return false;
+	}
+
+	// Backward compatibility for if a plugin is putting objects into the cache, rather than IDs.
+	$term_ids = array();
+	foreach ( $_term_ids as $term_id ) {
+		if ( is_numeric( $term_id ) ) {
+			$term_ids[] = intval( $term_id );
+		} elseif ( isset( $term_id->term_id ) ) {
+			$term_ids[] = intval( $term_id->term_id );
+		}
+	}
+
+	// Fill the term objects.
+	_prime_term_caches( $term_ids );
+
+	$terms = array();
+	foreach ( $term_ids as $term_id ) {
+		$term = get_term( $term_id, $taxonomy );
+		if ( is_wp_error( $term ) ) {
+			return $term;
+		}
+
+		$terms[] = $term;
+	}
+
+	return $terms;
+}
+
+/**
+ * Updates the cache for the given term object ID(s).
+ *
+ * Note: Due to performance concerns, great care should be taken to only update
+ * term caches when necessary. Processing time can increase exponentially depending
+ * on both the number of passed term IDs and the number of taxonomies those terms
+ * belong to.
+ *
+ * Caches will only be updated for terms not already cached.
+ *
+ * @since 2.3.0
+ *
+ * @param string|array $object_ids  Comma-separated list or array of term object IDs.
+ * @param array|string $object_type The taxonomy object type.
+ * @return void|false False if all of the terms in `$object_ids` are already cached.
+ */
+function update_object_term_cache($object_ids, $object_type) {
+	if ( empty($object_ids) )
+		return;
+
+	if ( !is_array($object_ids) )
+		$object_ids = explode(',', $object_ids);
+
+	$object_ids = array_map('intval', $object_ids);
+
+	$taxonomies = get_object_taxonomies($object_type);
+
+	$ids = array();
+	foreach ( (array) $object_ids as $id ) {
+		foreach ( $taxonomies as $taxonomy ) {
+			if ( false === wp_cache_get($id, "{$taxonomy}_relationships") ) {
+				$ids[] = $id;
+				break;
+			}
+		}
+	}
+
+	if ( empty( $ids ) )
+		return false;
+
+	$terms = wp_get_object_terms( $ids, $taxonomies, array(
+		'fields' => 'all_with_object_id',
+		'orderby' => 'name',
+		'update_term_meta_cache' => false,
+	) );
+
+	$object_terms = array();
+	foreach ( (array) $terms as $term ) {
+		$object_terms[ $term->object_id ][ $term->taxonomy ][] = $term->term_id;
+	}
+
+	foreach ( $ids as $id ) {
+		foreach ( $taxonomies as $taxonomy ) {
+			if ( ! isset($object_terms[$id][$taxonomy]) ) {
+				if ( !isset($object_terms[$id]) )
+					$object_terms[$id] = array();
+				$object_terms[$id][$taxonomy] = array();
+			}
+		}
+	}
+
+	foreach ( $object_terms as $id => $value ) {
+		foreach ( $value as $taxonomy => $terms ) {
+			wp_cache_add( $id, $terms, "{$taxonomy}_relationships" );
+		}
+	}
+}
+
+/**
+ * Updates Terms to Taxonomy in cache.
+ *
+ * @since 2.3.0
+ *
+ * @param array  $terms    List of term objects to change.
+ * @param string $taxonomy Optional. Update Term to this taxonomy in cache. Default empty.
+ */
+function update_term_cache( $terms, $taxonomy = '' ) {
+	foreach ( (array) $terms as $term ) {
+		// Create a copy in case the array was passed by reference.
+		$_term = clone $term;
+
+		// Object ID should not be cached.
+		unset( $_term->object_id );
+
+		wp_cache_add( $term->term_id, $_term, 'terms' );
+	}
+}
+
+//
+// Private
+//
+
+/**
+ * Retrieves children of taxonomy as Term IDs.
+ *
+ * @ignore
+ * @since 2.3.0
+ *
+ * @param string $taxonomy Taxonomy name.
+ * @return array Empty if $taxonomy isn't hierarchical or returns children as Term IDs.
+ */
+function _get_term_hierarchy( $taxonomy ) {
+	if ( !is_taxonomy_hierarchical($taxonomy) )
+		return array();
+	$children = get_option("{$taxonomy}_children");
+
+	if ( is_array($children) )
+		return $children;
+	$children = array();
+	$terms = get_terms($taxonomy, array('get' => 'all', 'orderby' => 'id', 'fields' => 'id=>parent'));
+	foreach ( $terms as $term_id => $parent ) {
+		if ( $parent > 0 )
+			$children[$parent][] = $term_id;
+	}
+	update_option("{$taxonomy}_children", $children);
+
+	return $children;
+}
+
+/**
+ * Get the subset of $terms that are descendants of $term_id.
+ *
+ * If `$terms` is an array of objects, then _get_term_children() returns an array of objects.
+ * If `$terms` is an array of IDs, then _get_term_children() returns an array of IDs.
+ *
+ * @access private
+ * @since 2.3.0
+ *
+ * @param int    $term_id   The ancestor term: all returned terms should be descendants of `$term_id`.
+ * @param array  $terms     The set of terms - either an array of term objects or term IDs - from which those that
+ *                          are descendants of $term_id will be chosen.
+ * @param string $taxonomy  The taxonomy which determines the hierarchy of the terms.
+ * @param array  $ancestors Optional. Term ancestors that have already been identified. Passed by reference, to keep
+ *                          track of found terms when recursing the hierarchy. The array of located ancestors is used
+ *                          to prevent infinite recursion loops. For performance, `term_ids` are used as array keys,
+ *                          with 1 as value. Default empty array.
+ * @return array|WP_Error The subset of $terms that are descendants of $term_id.
+ */
+function _get_term_children( $term_id, $terms, $taxonomy, &$ancestors = array() ) {
+	$empty_array = array();
+	if ( empty($terms) )
+		return $empty_array;
+
+	$term_list = array();
+	$has_children = _get_term_hierarchy($taxonomy);
+
+	if  ( ( 0 != $term_id ) && ! isset($has_children[$term_id]) )
+		return $empty_array;
+
+	// Include the term itself in the ancestors array, so we can properly detect when a loop has occurred.
+	if ( empty( $ancestors ) ) {
+		$ancestors[ $term_id ] = 1;
+	}
+
+	foreach ( (array) $terms as $term ) {
+		$use_id = false;
+		if ( !is_object($term) ) {
+			$term = get_term($term, $taxonomy);
+			if ( is_wp_error( $term ) )
+				return $term;
+			$use_id = true;
+		}
+
+		// Don't recurse if we've already identified the term as a child - this indicates a loop.
+		if ( isset( $ancestors[ $term->term_id ] ) ) {
+			continue;
+		}
+
+		if ( $term->parent == $term_id ) {
+			if ( $use_id )
+				$term_list[] = $term->term_id;
+			else
+				$term_list[] = $term;
+
+			if ( !isset($has_children[$term->term_id]) )
+				continue;
+
+			$ancestors[ $term->term_id ] = 1;
+
+			if ( $children = _get_term_children( $term->term_id, $terms, $taxonomy, $ancestors) )
+				$term_list = array_merge($term_list, $children);
+		}
+	}
+
+	return $term_list;
+}
+
+/**
+ * Add count of children to parent count.
+ *
+ * Recalculates term counts by including items from child terms. Assumes all
+ * relevant children are already in the $terms argument.
+ *
+ * @access private
+ * @since 2.3.0
+ *
+ * @global wpdb $wpdb WordPress database abstraction object.
+ *
+ * @param array  $terms    List of term objects (passed by reference).
+ * @param string $taxonomy Term context.
+ */
+function _pad_term_counts( &$terms, $taxonomy ) {
+	global $wpdb;
+
+	// This function only works for hierarchical taxonomies like post categories.
+	if ( !is_taxonomy_hierarchical( $taxonomy ) )
+		return;
+
+	$term_hier = _get_term_hierarchy($taxonomy);
+
+	if ( empty($term_hier) )
+		return;
+
+	$term_items = array();
+	$terms_by_id = array();
+	$term_ids = array();
+
+	foreach ( (array) $terms as $key => $term ) {
+		$terms_by_id[$term->term_id] = & $terms[$key];
+		$term_ids[$term->term_taxonomy_id] = $term->term_id;
+	}
+
+	// Get the object and term ids and stick them in a lookup table.
+	$tax_obj = get_taxonomy($taxonomy);
+	$object_types = esc_sql($tax_obj->object_type);
+	$results = $wpdb->get_results("SELECT object_id, term_taxonomy_id FROM $wpdb->term_relationships INNER JOIN $wpdb->posts ON object_id = ID WHERE term_taxonomy_id IN (" . implode(',', array_keys($term_ids)) . ") AND post_type IN ('" . implode("', '", $object_types) . "') AND post_status = 'publish'");
+	foreach ( $results as $row ) {
+		$id = $term_ids[$row->term_taxonomy_id];
+		$term_items[$id][$row->object_id] = isset($term_items[$id][$row->object_id]) ? ++$term_items[$id][$row->object_id] : 1;
+	}
+
+	// Touch every ancestor's lookup row for each post in each term.
+	foreach ( $term_ids as $term_id ) {
+		$child = $term_id;
+		$ancestors = array();
+		
