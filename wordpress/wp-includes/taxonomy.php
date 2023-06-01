@@ -3966,4 +3966,345 @@ function get_term_link( $term, $taxonomy = '' ) {
 		} else {
 			$termlink = str_replace("%$taxonomy%", $slug, $termlink);
 		}
-		$termlin
+		$termlink = home_url( user_trailingslashit($termlink, 'category') );
+	}
+	// Back Compat filters.
+	if ( 'post_tag' == $taxonomy ) {
+
+		/**
+		 * Filters the tag link.
+		 *
+		 * @since 2.3.0
+		 * @deprecated 2.5.0 Use 'term_link' instead.
+		 *
+		 * @param string $termlink Tag link URL.
+		 * @param int    $term_id  Term ID.
+		 */
+		$termlink = apply_filters( 'tag_link', $termlink, $term->term_id );
+	} elseif ( 'category' == $taxonomy ) {
+
+		/**
+		 * Filters the category link.
+		 *
+		 * @since 1.5.0
+		 * @deprecated 2.5.0 Use 'term_link' instead.
+		 *
+		 * @param string $termlink Category link URL.
+		 * @param int    $term_id  Term ID.
+		 */
+		$termlink = apply_filters( 'category_link', $termlink, $term->term_id );
+	}
+
+	/**
+	 * Filters the term link.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @param string $termlink Term link URL.
+	 * @param object $term     Term object.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	return apply_filters( 'term_link', $termlink, $term, $taxonomy );
+}
+
+/**
+ * Display the taxonomies of a post with available options.
+ *
+ * This function can be used within the loop to display the taxonomies for a
+ * post without specifying the Post ID. You can also use it outside the Loop to
+ * display the taxonomies for a specific post.
+ *
+ * @since 2.5.0
+ *
+ * @param array $args {
+ *     Arguments about which post to use and how to format the output. Shares all of the arguments
+ *     supported by get_the_taxonomies(), in addition to the following.
+ *
+ *     @type  int|WP_Post $post   Post ID or object to get taxonomies of. Default current post.
+ *     @type  string      $before Displays before the taxonomies. Default empty string.
+ *     @type  string      $sep    Separates each taxonomy. Default is a space.
+ *     @type  string      $after  Displays after the taxonomies. Default empty string.
+ * }
+ */
+function the_taxonomies( $args = array() ) {
+	$defaults = array(
+		'post' => 0,
+		'before' => '',
+		'sep' => ' ',
+		'after' => '',
+	);
+
+	$r = wp_parse_args( $args, $defaults );
+
+	echo $r['before'] . join( $r['sep'], get_the_taxonomies( $r['post'], $r ) ) . $r['after'];
+}
+
+/**
+ * Retrieve all taxonomies associated with a post.
+ *
+ * This function can be used within the loop. It will also return an array of
+ * the taxonomies with links to the taxonomy and name.
+ *
+ * @since 2.5.0
+ *
+ * @param int|WP_Post $post Optional. Post ID or WP_Post object. Default is global $post.
+ * @param array $args {
+ *     Optional. Arguments about how to format the list of taxonomies. Default empty array.
+ *
+ *     @type string $template      Template for displaying a taxonomy label and list of terms.
+ *                                 Default is "Label: Terms."
+ *     @type string $term_template Template for displaying a single term in the list. Default is the term name
+ *                                 linked to its archive.
+ * }
+ * @return array List of taxonomies.
+ */
+function get_the_taxonomies( $post = 0, $args = array() ) {
+	$post = get_post( $post );
+
+	$args = wp_parse_args( $args, array(
+		/* translators: %s: taxonomy label, %l: list of terms formatted as per $term_template */
+		'template' => __( '%s: %l.' ),
+		'term_template' => '<a href="%1$s">%2$s</a>',
+	) );
+
+	$taxonomies = array();
+
+	if ( ! $post ) {
+		return $taxonomies;
+	}
+
+	foreach ( get_object_taxonomies( $post ) as $taxonomy ) {
+		$t = (array) get_taxonomy( $taxonomy );
+		if ( empty( $t['label'] ) ) {
+			$t['label'] = $taxonomy;
+		}
+		if ( empty( $t['args'] ) ) {
+			$t['args'] = array();
+		}
+		if ( empty( $t['template'] ) ) {
+			$t['template'] = $args['template'];
+		}
+		if ( empty( $t['term_template'] ) ) {
+			$t['term_template'] = $args['term_template'];
+		}
+
+		$terms = get_object_term_cache( $post->ID, $taxonomy );
+		if ( false === $terms ) {
+			$terms = wp_get_object_terms( $post->ID, $taxonomy, $t['args'] );
+		}
+		$links = array();
+
+		foreach ( $terms as $term ) {
+			$links[] = wp_sprintf( $t['term_template'], esc_attr( get_term_link( $term ) ), $term->name );
+		}
+		if ( $links ) {
+			$taxonomies[$taxonomy] = wp_sprintf( $t['template'], $t['label'], $links, $terms );
+		}
+	}
+	return $taxonomies;
+}
+
+/**
+ * Retrieve all taxonomies of a post with just the names.
+ *
+ * @since 2.5.0
+ *
+ * @param int|WP_Post $post Optional. Post ID or WP_Post object. Default is global $post.
+ * @return array An array of all taxonomy names for the given post.
+ */
+function get_post_taxonomies( $post = 0 ) {
+	$post = get_post( $post );
+
+	return get_object_taxonomies($post);
+}
+
+/**
+ * Determine if the given object is associated with any of the given terms.
+ *
+ * The given terms are checked against the object's terms' term_ids, names and slugs.
+ * Terms given as integers will only be checked against the object's terms' term_ids.
+ * If no terms are given, determines if object is associated with any terms in the given taxonomy.
+ *
+ * @since 2.7.0
+ *
+ * @param int              $object_id ID of the object (post ID, link ID, ...).
+ * @param string           $taxonomy  Single taxonomy name.
+ * @param int|string|array $terms     Optional. Term term_id, name, slug or array of said. Default null.
+ * @return bool|WP_Error WP_Error on input error.
+ */
+function is_object_in_term( $object_id, $taxonomy, $terms = null ) {
+	if ( !$object_id = (int) $object_id )
+		return new WP_Error( 'invalid_object', __( 'Invalid object ID.' ) );
+
+	$object_terms = get_object_term_cache( $object_id, $taxonomy );
+	if ( false === $object_terms ) {
+		$object_terms = wp_get_object_terms( $object_id, $taxonomy, array( 'update_term_meta_cache' => false ) );
+		if ( is_wp_error( $object_terms ) ) {
+			return $object_terms;
+		}
+
+		wp_cache_set( $object_id, wp_list_pluck( $object_terms, 'term_id' ), "{$taxonomy}_relationships" );
+	}
+
+	if ( is_wp_error( $object_terms ) )
+		return $object_terms;
+	if ( empty( $object_terms ) )
+		return false;
+	if ( empty( $terms ) )
+		return ( !empty( $object_terms ) );
+
+	$terms = (array) $terms;
+
+	if ( $ints = array_filter( $terms, 'is_int' ) )
+		$strs = array_diff( $terms, $ints );
+	else
+		$strs =& $terms;
+
+	foreach ( $object_terms as $object_term ) {
+		// If term is an int, check against term_ids only.
+		if ( $ints && in_array( $object_term->term_id, $ints ) ) {
+			return true;
+		}
+
+		if ( $strs ) {
+			// Only check numeric strings against term_id, to avoid false matches due to type juggling.
+			$numeric_strs = array_map( 'intval', array_filter( $strs, 'is_numeric' ) );
+			if ( in_array( $object_term->term_id, $numeric_strs, true ) ) {
+				return true;
+			}
+
+			if ( in_array( $object_term->name, $strs ) ) return true;
+			if ( in_array( $object_term->slug, $strs ) ) return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Determine if the given object type is associated with the given taxonomy.
+ *
+ * @since 3.0.0
+ *
+ * @param string $object_type Object type string.
+ * @param string $taxonomy    Single taxonomy name.
+ * @return bool True if object is associated with the taxonomy, otherwise false.
+ */
+function is_object_in_taxonomy( $object_type, $taxonomy ) {
+	$taxonomies = get_object_taxonomies( $object_type );
+	if ( empty( $taxonomies ) ) {
+		return false;
+	}
+	return in_array( $taxonomy, $taxonomies );
+}
+
+/**
+ * Get an array of ancestor IDs for a given object.
+ *
+ * @since 3.1.0
+ * @since 4.1.0 Introduced the `$resource_type` argument.
+ *
+ * @param int    $object_id     Optional. The ID of the object. Default 0.
+ * @param string $object_type   Optional. The type of object for which we'll be retrieving
+ *                              ancestors. Accepts a post type or a taxonomy name. Default empty.
+ * @param string $resource_type Optional. Type of resource $object_type is. Accepts 'post_type'
+ *                              or 'taxonomy'. Default empty.
+ * @return array An array of ancestors from lowest to highest in the hierarchy.
+ */
+function get_ancestors( $object_id = 0, $object_type = '', $resource_type = '' ) {
+	$object_id = (int) $object_id;
+
+	$ancestors = array();
+
+	if ( empty( $object_id ) ) {
+
+		/** This filter is documented in wp-includes/taxonomy.php */
+		return apply_filters( 'get_ancestors', $ancestors, $object_id, $object_type, $resource_type );
+	}
+
+	if ( ! $resource_type ) {
+		if ( is_taxonomy_hierarchical( $object_type ) ) {
+			$resource_type = 'taxonomy';
+		} elseif ( post_type_exists( $object_type ) ) {
+			$resource_type = 'post_type';
+		}
+	}
+
+	if ( 'taxonomy' === $resource_type ) {
+		$term = get_term($object_id, $object_type);
+		while ( ! is_wp_error($term) && ! empty( $term->parent ) && ! in_array( $term->parent, $ancestors ) ) {
+			$ancestors[] = (int) $term->parent;
+			$term = get_term($term->parent, $object_type);
+		}
+	} elseif ( 'post_type' === $resource_type ) {
+		$ancestors = get_post_ancestors($object_id);
+	}
+
+	/**
+	 * Filters a given object's ancestors.
+	 *
+	 * @since 3.1.0
+	 * @since 4.1.1 Introduced the `$resource_type` parameter.
+	 *
+	 * @param array  $ancestors     An array of object ancestors.
+	 * @param int    $object_id     Object ID.
+	 * @param string $object_type   Type of object.
+	 * @param string $resource_type Type of resource $object_type is.
+	 */
+	return apply_filters( 'get_ancestors', $ancestors, $object_id, $object_type, $resource_type );
+}
+
+/**
+ * Returns the term's parent's term_ID.
+ *
+ * @since 3.1.0
+ *
+ * @param int    $term_id  Term ID.
+ * @param string $taxonomy Taxonomy name.
+ * @return int|false False on error.
+ */
+function wp_get_term_taxonomy_parent_id( $term_id, $taxonomy ) {
+	$term = get_term( $term_id, $taxonomy );
+	if ( ! $term || is_wp_error( $term ) ) {
+		return false;
+	}
+	return (int) $term->parent;
+}
+
+/**
+ * Checks the given subset of the term hierarchy for hierarchy loops.
+ * Prevents loops from forming and breaks those that it finds.
+ *
+ * Attached to the {@see 'wp_update_term_parent'} filter.
+ *
+ * @since 3.1.0
+ *
+ * @param int    $parent   `term_id` of the parent for the term we're checking.
+ * @param int    $term_id  The term we're checking.
+ * @param string $taxonomy The taxonomy of the term we're checking.
+ *
+ * @return int The new parent for the term.
+ */
+function wp_check_term_hierarchy_for_loops( $parent, $term_id, $taxonomy ) {
+	// Nothing fancy here - bail
+	if ( !$parent )
+		return 0;
+
+	// Can't be its own parent.
+	if ( $parent == $term_id )
+		return 0;
+
+	// Now look for larger loops.
+	if ( !$loop = wp_find_hierarchy_loop( 'wp_get_term_taxonomy_parent_id', $term_id, $parent, array( $taxonomy ) ) )
+		return $parent; // No loop
+
+	// Setting $parent to the given value causes a loop.
+	if ( isset( $loop[$term_id] ) )
+		return 0;
+
+	// There's a loop, but it doesn't contain $term_id. Break the loop.
+	foreach ( array_keys( $loop ) as $loop_member )
+		wp_update_term( $loop_member, $taxonomy, array( 'parent' => 0 ) );
+
+	return $parent;
+}
