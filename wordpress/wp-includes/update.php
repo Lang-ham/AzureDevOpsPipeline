@@ -591,3 +591,172 @@ function wp_get_translation_updates() {
  *
  * @return array
  */
+function wp_get_update_data() {
+	$counts = array( 'plugins' => 0, 'themes' => 0, 'wordpress' => 0, 'translations' => 0 );
+
+	if ( $plugins = current_user_can( 'update_plugins' ) ) {
+		$update_plugins = get_site_transient( 'update_plugins' );
+		if ( ! empty( $update_plugins->response ) )
+			$counts['plugins'] = count( $update_plugins->response );
+	}
+
+	if ( $themes = current_user_can( 'update_themes' ) ) {
+		$update_themes = get_site_transient( 'update_themes' );
+		if ( ! empty( $update_themes->response ) )
+			$counts['themes'] = count( $update_themes->response );
+	}
+
+	if ( ( $core = current_user_can( 'update_core' ) ) && function_exists( 'get_core_updates' ) ) {
+		$update_wordpress = get_core_updates( array('dismissed' => false) );
+		if ( ! empty( $update_wordpress ) && ! in_array( $update_wordpress[0]->response, array('development', 'latest') ) && current_user_can('update_core') )
+			$counts['wordpress'] = 1;
+	}
+
+	if ( ( $core || $plugins || $themes ) && wp_get_translation_updates() )
+		$counts['translations'] = 1;
+
+	$counts['total'] = $counts['plugins'] + $counts['themes'] + $counts['wordpress'] + $counts['translations'];
+	$titles = array();
+	if ( $counts['wordpress'] ) {
+		/* translators: 1: Number of updates available to WordPress */
+		$titles['wordpress'] = sprintf( __( '%d WordPress Update'), $counts['wordpress'] );
+	}
+	if ( $counts['plugins'] ) {
+		/* translators: 1: Number of updates available to plugins */
+		$titles['plugins'] = sprintf( _n( '%d Plugin Update', '%d Plugin Updates', $counts['plugins'] ), $counts['plugins'] );
+	}
+	if ( $counts['themes'] ) {
+		/* translators: 1: Number of updates available to themes */
+		$titles['themes'] = sprintf( _n( '%d Theme Update', '%d Theme Updates', $counts['themes'] ), $counts['themes'] );
+	}
+	if ( $counts['translations'] ) {
+		$titles['translations'] = __( 'Translation Updates' );
+	}
+
+	$update_title = $titles ? esc_attr( implode( ', ', $titles ) ) : '';
+
+	$update_data = array( 'counts' => $counts, 'title' => $update_title );
+	/**
+	 * Filters the returned array of update data for plugins, themes, and WordPress core.
+	 *
+	 * @since 3.5.0
+	 *
+	 * @param array $update_data {
+	 *     Fetched update data.
+	 *
+	 *     @type array   $counts       An array of counts for available plugin, theme, and WordPress updates.
+	 *     @type string  $update_title Titles of available updates.
+	 * }
+	 * @param array $titles An array of update counts and UI strings for available updates.
+	 */
+	return apply_filters( 'wp_get_update_data', $update_data, $titles );
+}
+
+/**
+ * Determines whether core should be updated.
+ *
+ * @since 2.8.0
+ *
+ * @global string $wp_version
+ */
+function _maybe_update_core() {
+	// include an unmodified $wp_version
+	include( ABSPATH . WPINC . '/version.php' );
+
+	$current = get_site_transient( 'update_core' );
+
+	if ( isset( $current->last_checked, $current->version_checked ) &&
+		12 * HOUR_IN_SECONDS > ( time() - $current->last_checked ) &&
+		$current->version_checked == $wp_version ) {
+		return;
+	}
+	wp_version_check();
+}
+/**
+ * Check the last time plugins were run before checking plugin versions.
+ *
+ * This might have been backported to WordPress 2.6.1 for performance reasons.
+ * This is used for the wp-admin to check only so often instead of every page
+ * load.
+ *
+ * @since 2.7.0
+ * @access private
+ */
+function _maybe_update_plugins() {
+	$current = get_site_transient( 'update_plugins' );
+	if ( isset( $current->last_checked ) && 12 * HOUR_IN_SECONDS > ( time() - $current->last_checked ) )
+		return;
+	wp_update_plugins();
+}
+
+/**
+ * Check themes versions only after a duration of time.
+ *
+ * This is for performance reasons to make sure that on the theme version
+ * checker is not run on every page load.
+ *
+ * @since 2.7.0
+ * @access private
+ */
+function _maybe_update_themes() {
+	$current = get_site_transient( 'update_themes' );
+	if ( isset( $current->last_checked ) && 12 * HOUR_IN_SECONDS > ( time() - $current->last_checked ) )
+		return;
+	wp_update_themes();
+}
+
+/**
+ * Schedule core, theme, and plugin update checks.
+ *
+ * @since 3.1.0
+ */
+function wp_schedule_update_checks() {
+	if ( ! wp_next_scheduled( 'wp_version_check' ) && ! wp_installing() )
+		wp_schedule_event(time(), 'twicedaily', 'wp_version_check');
+
+	if ( ! wp_next_scheduled( 'wp_update_plugins' ) && ! wp_installing() )
+		wp_schedule_event(time(), 'twicedaily', 'wp_update_plugins');
+
+	if ( ! wp_next_scheduled( 'wp_update_themes' ) && ! wp_installing() )
+		wp_schedule_event(time(), 'twicedaily', 'wp_update_themes');
+}
+
+/**
+ * Clear existing update caches for plugins, themes, and core.
+ *
+ * @since 4.1.0
+ */
+function wp_clean_update_cache() {
+	if ( function_exists( 'wp_clean_plugins_cache' ) ) {
+		wp_clean_plugins_cache();
+	} else {
+		delete_site_transient( 'update_plugins' );
+	}
+	wp_clean_themes_cache();
+	delete_site_transient( 'update_core' );
+}
+
+if ( ( ! is_main_site() && ! is_network_admin() ) || wp_doing_ajax() ) {
+	return;
+}
+
+add_action( 'admin_init', '_maybe_update_core' );
+add_action( 'wp_version_check', 'wp_version_check' );
+
+add_action( 'load-plugins.php', 'wp_update_plugins' );
+add_action( 'load-update.php', 'wp_update_plugins' );
+add_action( 'load-update-core.php', 'wp_update_plugins' );
+add_action( 'admin_init', '_maybe_update_plugins' );
+add_action( 'wp_update_plugins', 'wp_update_plugins' );
+
+add_action( 'load-themes.php', 'wp_update_themes' );
+add_action( 'load-update.php', 'wp_update_themes' );
+add_action( 'load-update-core.php', 'wp_update_themes' );
+add_action( 'admin_init', '_maybe_update_themes' );
+add_action( 'wp_update_themes', 'wp_update_themes' );
+
+add_action( 'update_option_WPLANG', 'wp_clean_update_cache' , 10, 0 );
+
+add_action( 'wp_maybe_auto_update', 'wp_maybe_auto_update' );
+
+add_action( 'init', 'wp_schedule_update_checks' );
