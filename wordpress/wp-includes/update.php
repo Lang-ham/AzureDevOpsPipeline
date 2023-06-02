@@ -236,4 +236,358 @@ function wp_update_plugins( $extra_stats = array() ) {
 	$translations = wp_get_installed_translations( 'plugins' );
 
 	$active  = get_option( 'active_plugins', array() );
-	$current = get_site_transient( 'update_pl
+	$current = get_site_transient( 'update_plugins' );
+	if ( ! is_object($current) )
+		$current = new stdClass;
+
+	$new_option = new stdClass;
+	$new_option->last_checked = time();
+
+	$doing_cron = wp_doing_cron();
+
+	// Check for update on a different schedule, depending on the page.
+	switch ( current_filter() ) {
+		case 'upgrader_process_complete' :
+			$timeout = 0;
+			break;
+		case 'load-update-core.php' :
+			$timeout = MINUTE_IN_SECONDS;
+			break;
+		case 'load-plugins.php' :
+		case 'load-update.php' :
+			$timeout = HOUR_IN_SECONDS;
+			break;
+		default :
+			if ( $doing_cron ) {
+				$timeout = 2 * HOUR_IN_SECONDS;
+			} else {
+				$timeout = 12 * HOUR_IN_SECONDS;
+			}
+	}
+
+	$time_not_changed = isset( $current->last_checked ) && $timeout > ( time() - $current->last_checked );
+
+	if ( $time_not_changed && ! $extra_stats ) {
+		$plugin_changed = false;
+		foreach ( $plugins as $file => $p ) {
+			$new_option->checked[ $file ] = $p['Version'];
+
+			if ( !isset( $current->checked[ $file ] ) || strval($current->checked[ $file ]) !== strval($p['Version']) )
+				$plugin_changed = true;
+		}
+
+		if ( isset ( $current->response ) && is_array( $current->response ) ) {
+			foreach ( $current->response as $plugin_file => $update_details ) {
+				if ( ! isset($plugins[ $plugin_file ]) ) {
+					$plugin_changed = true;
+					break;
+				}
+			}
+		}
+
+		// Bail if we've checked recently and if nothing has changed
+		if ( ! $plugin_changed ) {
+			return;
+		}
+	}
+
+	// Update last_checked for current to prevent multiple blocking requests if request hangs
+	$current->last_checked = time();
+	set_site_transient( 'update_plugins', $current );
+
+	$to_send = compact( 'plugins', 'active' );
+
+	$locales = array_values( get_available_languages() );
+
+	/**
+	 * Filters the locales requested for plugin translations.
+	 *
+	 * @since 3.7.0
+	 * @since 4.5.0 The default value of the `$locales` parameter changed to include all locales.
+	 *
+	 * @param array $locales Plugin locales. Default is all available locales of the site.
+	 */
+	$locales = apply_filters( 'plugins_update_check_locales', $locales );
+	$locales = array_unique( $locales );
+
+	if ( $doing_cron ) {
+		$timeout = 30;
+	} else {
+		// Three seconds, plus one extra second for every 10 plugins
+		$timeout = 3 + (int) ( count( $plugins ) / 10 );
+	}
+
+	$options = array(
+		'timeout' => $timeout,
+		'body' => array(
+			'plugins'      => wp_json_encode( $to_send ),
+			'translations' => wp_json_encode( $translations ),
+			'locale'       => wp_json_encode( $locales ),
+			'all'          => wp_json_encode( true ),
+		),
+		'user-agent' => 'WordPress/' . $wp_version . '; ' . home_url( '/' )
+	);
+
+	if ( $extra_stats ) {
+		$options['body']['update_stats'] = wp_json_encode( $extra_stats );
+	}
+
+	$url = $http_url = 'http://api.wordpress.org/plugins/update-check/1.1/';
+	if ( $ssl = wp_http_supports( array( 'ssl' ) ) )
+		$url = set_url_scheme( $url, 'https' );
+
+	$raw_response = wp_remote_post( $url, $options );
+	if ( $ssl && is_wp_error( $raw_response ) ) {
+		trigger_error(
+			sprintf(
+				/* translators: %s: support forums URL */
+				__( 'An unexpected error occurred. Something may be wrong with WordPress.org or this server&#8217;s configuration. If you continue to have problems, please try the <a href="%s">support forums</a>.' ),
+				__( 'https://wordpress.org/support/' )
+			) . ' ' . __( '(WordPress could not establish a secure connection to WordPress.org. Please contact your server administrator.)' ),
+			headers_sent() || WP_DEBUG ? E_USER_WARNING : E_USER_NOTICE
+		);
+		$raw_response = wp_remote_post( $http_url, $options );
+	}
+
+	if ( is_wp_error( $raw_response ) || 200 != wp_remote_retrieve_response_code( $raw_response ) ) {
+		return;
+	}
+
+	$response = json_decode( wp_remote_retrieve_body( $raw_response ), true );
+	foreach ( $response['plugins'] as &$plugin ) {
+		$plugin = (object) $plugin;
+		if ( isset( $plugin->compatibility ) ) {
+			$plugin->compatibility = (object) $plugin->compatibility;
+			foreach ( $plugin->compatibility as &$data ) {
+				$data = (object) $data;
+			}
+		}
+	}
+	unset( $plugin, $data );
+	foreach ( $response['no_update'] as &$plugin ) {
+		$plugin = (object) $plugin;
+	}
+	unset( $plugin );
+
+	if ( is_array( $response ) ) {
+		$new_option->response = $response['plugins'];
+		$new_option->translations = $response['translations'];
+		// TODO: Perhaps better to store no_update in a separate transient with an expiry?
+		$new_option->no_update = $response['no_update'];
+	} else {
+		$new_option->response = array();
+		$new_option->translations = array();
+		$new_option->no_update = array();
+	}
+
+	set_site_transient( 'update_plugins', $new_option );
+}
+
+/**
+ * Check theme versions against the latest versions hosted on WordPress.org.
+ *
+ * A list of all themes installed in sent to WP. Checks against the
+ * WordPress server at api.wordpress.org. Will only check if WordPress isn't
+ * installing.
+ *
+ * @since 2.7.0
+ *
+ * @param array $extra_stats Extra statistics to report to the WordPress.org API.
+ */
+function wp_update_themes( $extra_stats = array() ) {
+	if ( wp_installing() ) {
+		return;
+	}
+
+	// include an unmodified $wp_version
+	include( ABSPATH . WPINC . '/version.php' );
+
+	$installed_themes = wp_get_themes();
+	$translations = wp_get_installed_translations( 'themes' );
+
+	$last_update = get_site_transient( 'update_themes' );
+	if ( ! is_object($last_update) )
+		$last_update = new stdClass;
+
+	$themes = $checked = $request = array();
+
+	// Put slug of current theme into request.
+	$request['active'] = get_option( 'stylesheet' );
+
+	foreach ( $installed_themes as $theme ) {
+		$checked[ $theme->get_stylesheet() ] = $theme->get('Version');
+
+		$themes[ $theme->get_stylesheet() ] = array(
+			'Name'       => $theme->get('Name'),
+			'Title'      => $theme->get('Name'),
+			'Version'    => $theme->get('Version'),
+			'Author'     => $theme->get('Author'),
+			'Author URI' => $theme->get('AuthorURI'),
+			'Template'   => $theme->get_template(),
+			'Stylesheet' => $theme->get_stylesheet(),
+		);
+	}
+
+	$doing_cron = wp_doing_cron();
+
+	// Check for update on a different schedule, depending on the page.
+	switch ( current_filter() ) {
+		case 'upgrader_process_complete' :
+			$timeout = 0;
+			break;
+		case 'load-update-core.php' :
+			$timeout = MINUTE_IN_SECONDS;
+			break;
+		case 'load-themes.php' :
+		case 'load-update.php' :
+			$timeout = HOUR_IN_SECONDS;
+			break;
+		default :
+			if ( $doing_cron ) {
+				$timeout = 2 * HOUR_IN_SECONDS;
+			} else {
+				$timeout = 12 * HOUR_IN_SECONDS;
+			}
+	}
+
+	$time_not_changed = isset( $last_update->last_checked ) && $timeout > ( time() - $last_update->last_checked );
+
+	if ( $time_not_changed && ! $extra_stats ) {
+		$theme_changed = false;
+		foreach ( $checked as $slug => $v ) {
+			if ( !isset( $last_update->checked[ $slug ] ) || strval($last_update->checked[ $slug ]) !== strval($v) )
+				$theme_changed = true;
+		}
+
+		if ( isset ( $last_update->response ) && is_array( $last_update->response ) ) {
+			foreach ( $last_update->response as $slug => $update_details ) {
+				if ( ! isset($checked[ $slug ]) ) {
+					$theme_changed = true;
+					break;
+				}
+			}
+		}
+
+		// Bail if we've checked recently and if nothing has changed
+		if ( ! $theme_changed ) {
+			return;
+		}
+	}
+
+	// Update last_checked for current to prevent multiple blocking requests if request hangs
+	$last_update->last_checked = time();
+	set_site_transient( 'update_themes', $last_update );
+
+	$request['themes'] = $themes;
+
+	$locales = array_values( get_available_languages() );
+
+	/**
+	 * Filters the locales requested for theme translations.
+	 *
+	 * @since 3.7.0
+	 * @since 4.5.0 The default value of the `$locales` parameter changed to include all locales.
+	 *
+	 * @param array $locales Theme locales. Default is all available locales of the site.
+	 */
+	$locales = apply_filters( 'themes_update_check_locales', $locales );
+	$locales = array_unique( $locales );
+
+	if ( $doing_cron ) {
+		$timeout = 30;
+	} else {
+		// Three seconds, plus one extra second for every 10 themes
+		$timeout = 3 + (int) ( count( $themes ) / 10 );
+	}
+
+	$options = array(
+		'timeout' => $timeout,
+		'body' => array(
+			'themes'       => wp_json_encode( $request ),
+			'translations' => wp_json_encode( $translations ),
+			'locale'       => wp_json_encode( $locales ),
+		),
+		'user-agent'	=> 'WordPress/' . $wp_version . '; ' . home_url( '/' )
+	);
+
+	if ( $extra_stats ) {
+		$options['body']['update_stats'] = wp_json_encode( $extra_stats );
+	}
+
+	$url = $http_url = 'http://api.wordpress.org/themes/update-check/1.1/';
+	if ( $ssl = wp_http_supports( array( 'ssl' ) ) )
+		$url = set_url_scheme( $url, 'https' );
+
+	$raw_response = wp_remote_post( $url, $options );
+	if ( $ssl && is_wp_error( $raw_response ) ) {
+		trigger_error(
+			sprintf(
+				/* translators: %s: support forums URL */
+				__( 'An unexpected error occurred. Something may be wrong with WordPress.org or this server&#8217;s configuration. If you continue to have problems, please try the <a href="%s">support forums</a>.' ),
+				__( 'https://wordpress.org/support/' )
+			) . ' ' . __( '(WordPress could not establish a secure connection to WordPress.org. Please contact your server administrator.)' ),
+			headers_sent() || WP_DEBUG ? E_USER_WARNING : E_USER_NOTICE
+		);
+		$raw_response = wp_remote_post( $http_url, $options );
+	}
+
+	if ( is_wp_error( $raw_response ) || 200 != wp_remote_retrieve_response_code( $raw_response ) ) {
+		return;
+	}
+
+	$new_update = new stdClass;
+	$new_update->last_checked = time();
+	$new_update->checked = $checked;
+
+	$response = json_decode( wp_remote_retrieve_body( $raw_response ), true );
+
+	if ( is_array( $response ) ) {
+		$new_update->response     = $response['themes'];
+		$new_update->translations = $response['translations'];
+	}
+
+	set_site_transient( 'update_themes', $new_update );
+}
+
+/**
+ * Performs WordPress automatic background updates.
+ *
+ * @since 3.7.0
+ */
+function wp_maybe_auto_update() {
+	include_once( ABSPATH . '/wp-admin/includes/admin.php' );
+	include_once( ABSPATH . '/wp-admin/includes/class-wp-upgrader.php' );
+
+	$upgrader = new WP_Automatic_Updater;
+	$upgrader->run();
+}
+
+/**
+ * Retrieves a list of all language updates available.
+ *
+ * @since 3.7.0
+ *
+ * @return array
+ */
+function wp_get_translation_updates() {
+	$updates = array();
+	$transients = array( 'update_core' => 'core', 'update_plugins' => 'plugin', 'update_themes' => 'theme' );
+	foreach ( $transients as $transient => $type ) {
+		$transient = get_site_transient( $transient );
+		if ( empty( $transient->translations ) )
+			continue;
+
+		foreach ( $transient->translations as $translation ) {
+			$updates[] = (object) $translation;
+		}
+	}
+	return $updates;
+}
+
+/**
+ * Collect counts and UI strings for available updates
+ *
+ * @since 3.3.0
+ *
+ * @return array
+ */
